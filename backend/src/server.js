@@ -49,11 +49,16 @@ async function initDb() {
     if (global.__pgPool && global.__pgPool.connectionString === config.dbUrl) {
       pool = global.__pgPool;
     } else {
-      pool = new Pool({ connectionString: config.dbUrl });
+      // set a short connection timeout so serverless cold-starts don't
+      // hang for long when the DB host is unreachable (e.g. IPv6-only)
+      pool = new Pool({ connectionString: config.dbUrl, connectionTimeoutMillis: 3000 });
       global.__pgPool = pool;
       global.__pgPool.connectionString = config.dbUrl;
     }
-    const client = await pool.connect();
+    // guard against unusually long connect attempts
+    const connectPromise = pool.connect();
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('connect timeout')), 4000));
+    const client = await Promise.race([connectPromise, timeout]);
     client.release();
     app.locals.db = { query: (...args) => pool.query(...args) };
     console.info('Connected to database');
