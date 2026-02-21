@@ -5,23 +5,32 @@ const serverless = require('serverless-http');
 const pino = require('pino');
 const logger = pino();
 
+let startupError = null;
+
 try {
 	const app = require('../backend/src/server');
 	module.exports = serverless(app);
 } catch (err) {
+	startupError = err;
 	// Log the startup error prominently so Vercel runtime logs capture it
-	logger.error({ err }, 'server startup error in api/index.js');
-	// Export a simple fallback handler that returns 500 so invocations
-	// don't fail with opaque FUNCTION_INVOCATION_FAILED without logs.
+	try { logger.fatal({ err }, 'server startup error in api/index.js'); } catch (_) {}
+	// Also emit raw stack to stderr/console to make sure it appears in logs
+	try { console.error('server startup error in api/index.js', err && err.stack ? err.stack : err); } catch (_) {}
+
+	// Export a fallback handler that returns 500 with the error message
+	// and stacktrace to aid debugging of production invocation failures.
 	module.exports = async (req, res) => {
 		try {
 			res.statusCode = 500;
 			res.setHeader('content-type', 'application/json');
-			res.end(JSON.stringify({ error: 'server startup failed' }));
+			const payload = {
+				error: 'server startup failed',
+				message: startupError && startupError.message ? startupError.message : String(startupError),
+				stack: startupError && startupError.stack ? startupError.stack : undefined,
+			};
+			res.end(JSON.stringify(payload));
 		} catch (e) {
-			// best-effort log
 			try { logger.error({ e }, 'fallback handler error'); } catch (_) {}
-			// nothing else we can do
 		}
 	};
 }
