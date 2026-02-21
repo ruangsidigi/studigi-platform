@@ -1,0 +1,84 @@
+.cms-page {
+  max-width: 1200px;
+  margin: 24px auto;
+  padding: 0 16px 24px;
+}
+
+.cms-page h1 {
+  margin-bottom: 4px;
+}
+
+.cms-page .subtitle {
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+.cms-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.cms-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.cms-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.cms-grid.two {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.cms-grid.three {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.cms-input,
+.cms-select,
+.cms-textarea {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+}
+
+.cms-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.cms-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cms-table th,
+.cms-table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 10px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.cms-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  background: #f3f4f6;
+}
+
+.cms-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

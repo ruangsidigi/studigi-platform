@@ -1,0 +1,52 @@
+.timer {
+  background: white;
+  border: 2px solid #28a745;
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+  min-width: 120px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.timer.warning {
+  border-color: #ff9800;
+  background-color: #fff3cd;
+}
+
+.timer.critical {
+  border-color: #dc3545;
+  background-color: #f8d7da;
+  animation: pulse 1s infinite;
+}
+
+.timer-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.timer-display {
+  font-size: 32px;
+  font-weight: bold;
+  color: #007bff;
+  font-family: 'Courier New', monospace;
+}
+
+.timer.warning .timer-display {
+  color: #ff9800;
+}
+
+.timer.critical .timer-display {
+  color: #dc3545;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}

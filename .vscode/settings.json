@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^node -e \"\\(async\\(\\)=>\\{ const base='http://localhost:5000/api'; const login=await fetch\\(base\\+'/auth/login',\\{method:'POST',headers:\\{'Content-Type':'application/json'\\},body:JSON\\.stringify\\(\\{email:'admin@skdcpns\\.com',password:'admin123'\\}\\)\\}\\); const lb=await login\\.json\\(\\); if\\(!login\\.ok\\)\\{ console\\.log\\('LOGIN_FAIL', login\\.status, JSON\\.stringify\\(lb\\)\\); process\\.exit\\(1\\);\\} const token=lb\\.token; const headers=\\{Authorization:'Bearer '\\+token\\}; const adminRes=await fetch\\(base\\+'/materials/admin',\\{headers\\}\\); const adminBody=await adminRes\\.text\\(\\); console\\.log\\('ADMIN_STATUS',adminRes\\.status\\); console\\.log\\('ADMIN_BODY',adminBody\\.slice\\(0,300\\)\\); const myRes=await fetch\\(base\\+'/materials/my',\\{headers\\}\\); const myBody=await myRes\\.text\\(\\); console\\.log\\('MY_STATUS',myRes\\.status\\); console\\.log\\('MY_BODY',myBody\\.slice\\(0,300\\)\\); \\}\\)\\(\\)\\.catch\\(e=>\\{ console\\.error\\('SCRIPT_ERROR',e\\.message\\); process\\.exit\\(1\\); \\}\\);\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

@@ -1,0 +1,97 @@
+.report-page .report-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.report-page .report-grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.report-page .mini-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  min-height: 180px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.report-page .mini-chart-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 20px;
+}
+
+.report-page .mini-chart-bar {
+  width: 100%;
+  max-width: 28px;
+  background: #1d7a7a;
+  border-radius: 6px 6px 0 0;
+  min-height: 6px;
+}
+
+.report-page .mini-chart-item span {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #666;
+}
+
+.report-page .pagination-row {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.report-page .recommendation-box {
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.report-page .detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+/* Question Link Button */
+.question-link-btn {
+  background: none;
+  border: none;
+  color: #1d7a7a;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid #1d7a7a;
+}
+
+.question-link-btn:hover {
+  color: #0d4a4a;
+  border-bottom-color: #0d4a4a;
+  text-decoration: underline;
+}
+
+.question-link-btn:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+  .report-page .report-grid-two {
+    grid-template-columns: 1fr;
+  }
+}
