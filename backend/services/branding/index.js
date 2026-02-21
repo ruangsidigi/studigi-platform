@@ -2,14 +2,14 @@
 const express = require('express');
 const router = express.Router();
 
-router.get('/api/branding', async (req, res) => {
+router.get('/branding', async (req, res) => {
   const db = req.app.locals.db;
   const { rows } = await db.query('SELECT * FROM branding_settings ORDER BY created_at DESC LIMIT 1');
   if (!rows[0]) return res.json({ logo: null, header_color: '#0b5fff' });
   res.json({ logo: rows[0].logo_key, header_color: rows[0].header_color });
 });
 
-router.put('/api/branding', async (req, res) => {
+router.put('/branding', async (req, res) => {
   const { header_color } = req.body;
   const db = req.app.locals.db;
   await db.query(`

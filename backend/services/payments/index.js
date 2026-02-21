@@ -4,7 +4,7 @@ const router = express.Router();
 const config = require('../../shared/config');
 
 // Creates a checkout session with external payment provider (adapter placeholder)
-router.post('/api/payments/checkout', async (req, res) => {
+router.post('/payments/checkout', async (req, res) => {
   // In production, create session via provider SDK using config.paymentApiKey
   const { bundle_id, success_url, cancel_url } = req.body || {};
   if (!bundle_id) return res.status(400).json({ error: 'bundle_id required' });
@@ -13,7 +13,7 @@ router.post('/api/payments/checkout', async (req, res) => {
 });
 
 // Webhook endpoint to receive provider events
-router.post('/api/payments/webhook', express.raw({ type: '*/*' }), async (req, res) => {
+router.post('/payments/webhook', express.raw({ type: '*/*' }), async (req, res) => {
   // Validate signature and process event. This is a skeleton.
   console.log('payment webhook received');
   res.status(200).send('ok');

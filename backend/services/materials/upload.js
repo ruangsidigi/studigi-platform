@@ -30,8 +30,8 @@ async function uploadToStorage({ buffer, mimeType, folder = 'materials' }) {
   return `${config.cdnUrl.replace(/\/$/, '')}/${config.storageBucket}/${key}`;
 }
 
-// Admin-only: upload PDF material
-router.post('/api/materials', upload.single('file'), async (req, res) => {
+// Admin-only: upload PDF material (mounted under /api)
+router.post('/materials', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'File is required' });
     const allowed = ['application/pdf'];
@@ -51,8 +51,8 @@ router.post('/api/materials', upload.single('file'), async (req, res) => {
   }
 });
 
-// Branding logo upload (png/jpg)
-router.post('/api/branding/logo', upload.single('file'), async (req, res) => {
+// Branding logo upload (png/jpg) (mounted under /api)
+router.post('/branding/logo', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'File is required' });
     const allowed = ['image/png', 'image/jpeg', 'image/jpg'];

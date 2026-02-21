@@ -67,6 +67,8 @@ initDb();
 
 // health
 app.get('/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+// also expose API-scoped health for platforms that route under /api
+app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 // Attach middleware and routes
 const authMiddleware = require('../shared/middleware/auth');
@@ -77,10 +79,14 @@ const brandingRoutes = require('../services/branding');
 const authRoutes = require('../services/auth');
 const paymentsRoutes = require('../services/payments');
 
-app.use(uploadRoutes);
-app.use(brandingRoutes);
-app.use(authRoutes);
-app.use(paymentsRoutes);
+// Mount all service routers under the common `/api` prefix. Service routers
+// define relative paths (e.g. `/auth/login`, `/materials`) so final routes
+// become `/api/auth/login`, `/api/materials`, etc. This is more robust
+// when running behind Vercel function path rewrites.
+app.use('/api', uploadRoutes);
+app.use('/api', brandingRoutes);
+app.use('/api', authRoutes);
+app.use('/api', paymentsRoutes);
 
 // JSON parse error handler (body-parser / express.json)
 app.use((err, req, res, next) => {

@@ -6,8 +6,8 @@ const config = require('../../shared/config');
 
 const router = express.Router();
 
-// POST /api/auth/login
-router.post('/api/auth/login', async (req, res, next) => {
+// POST /auth/login (mounted under /api)
+router.post('/auth/login', async (req, res, next) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Missing credentials' });
   const db = req.app.locals.db;
