@@ -1,0 +1,33 @@
+name: Migrate & Seed
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Run migrations
+        env:
+          PG_CONNECTION_STRING: ${{ secrets.PG_CONNECTION_STRING }}
+        run: npm --prefix backend run migrate
+
+      - name: Seed admin
+        env:
+          PG_CONNECTION_STRING: ${{ secrets.PG_CONNECTION_STRING }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: node backend/scripts/seed_admin.js
