@@ -45,8 +45,14 @@ async function initDb() {
     return;
   }
   try {
-    pool = new Pool({ connectionString: config.dbUrl });
-    // quick test connection
+    // cache pool across serverless invocations
+    if (global.__pgPool && global.__pgPool.connectionString === config.dbUrl) {
+      pool = global.__pgPool;
+    } else {
+      pool = new Pool({ connectionString: config.dbUrl });
+      global.__pgPool = pool;
+      global.__pgPool.connectionString = config.dbUrl;
+    }
     const client = await pool.connect();
     client.release();
     app.locals.db = { query: (...args) => pool.query(...args) };
@@ -56,7 +62,7 @@ async function initDb() {
     app.locals.db = { query: async () => { throw new Error('DB unavailable'); } };
   }
 }
-// initialize DB connection (don't block server startup entirely)
+// initialize DB connection (do not block require)
 initDb();
 
 // health
@@ -91,5 +97,4 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-const port = config.port || 5000;
-app.listen(port, () => logger.info({ port }, 'Server running'));
+module.exports = app;

@@ -4,8 +4,8 @@
   "description": "Studigi backend - modular edtech platform",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon --watch src --exec node src/server.js",
+    "start": "node src/start.js",
+    "dev": "nodemon --watch src --exec node src/start.js",
     "migrate": "node scripts/run_migrations_local.js",
     "seed:admin": "node scripts/seed_admin.js"
   },
@@ -20,6 +20,7 @@
     "@aws-sdk/client-s3": "^3.0.0",
     "axios": "^1.4.0",
     "bcrypt": "^5.1.0",
+    "serverless-http": "^3.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
