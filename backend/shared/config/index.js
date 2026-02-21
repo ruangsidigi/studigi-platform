@@ -4,9 +4,12 @@ const Joi = require('joi');
 require('dotenv').config();
 
 // Accept DATABASE_URL or PG_CONNECTION_STRING for flexibility in local envs.
+// Connection strings may include characters that Joi's `uri()` rejects
+// (and some environments supply non-standard formats), so validate as
+// plain strings to avoid failing startup in serverless deployments.
 const schema = Joi.object({
-  DATABASE_URL: Joi.string().uri().allow('').optional(),
-  PG_CONNECTION_STRING: Joi.string().uri().allow('').optional(),
+  DATABASE_URL: Joi.string().allow('').optional(),
+  PG_CONNECTION_STRING: Joi.string().allow('').optional(),
   STORAGE_ENDPOINT: Joi.string().uri().allow('').optional(),
   STORAGE_BUCKET: Joi.string().allow('').optional(),
   STORAGE_KEY: Joi.string().allow('').optional(),
