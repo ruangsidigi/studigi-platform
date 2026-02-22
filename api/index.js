@@ -1,26 +1,37 @@
-// Root Vercel function: wrap backend app with serverless-http and
-// provide a fallback handler that logs require/startup errors so
-// production invocation failures surface useful diagnostics.
-let serverless;
-let pino;
-let logger;
+// Wrapper that ensures a minimal set of env defaults for startup and
+// then loads the backend app. Any startup or invocation errors are
+// logged synchronously and returned as JSON to aid production debugging.
+const serverless = require('serverless-http');
+const pino = require('pino');
+const logger = pino();
+
+// Provide minimal env fallbacks so the app doesn't exit immediately
+// when a secret isn't configured in the deployment (temporary measure).
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'dev-fallback-secret';
+
 let startupError = null;
 
 try {
-	serverless = require('serverless-http');
-	pino = require('pino');
-	logger = pino();
-
 	const app = require('../backend/src/server');
-	module.exports = serverless(app);
+	const baseHandler = serverless(app);
+
+	module.exports = async (req, res) => {
+		try {
+			try { console.log('api/index handler invoked', { url: req.url, originalUrl: req.headers['x-now-route'] || req.headers['x-vercel-original-url'] || req.url }); } catch (_) {}
+			return await baseHandler(req, res);
+		} catch (invokeErr) {
+			try { logger.fatal({ err: invokeErr }, 'invocation error in api/index.js'); } catch (_) {}
+			try { console.error('invocation error in api/index.js', invokeErr && invokeErr.stack ? invokeErr.stack : invokeErr); } catch (_) {}
+			try {
+				res.statusCode = 500;
+				res.setHeader('content-type', 'application/json');
+				res.end(JSON.stringify({ error: 'invocation error', message: invokeErr && invokeErr.message ? invokeErr.message : String(invokeErr), stack: invokeErr && invokeErr.stack ? invokeErr.stack : undefined }));
+			} catch (_) {}
+		}
+	};
 } catch (err) {
 	startupError = err;
-	// Try to log using pino if available, otherwise fallback to console
-	try {
-		if (!logger && pino) logger = pino();
-		if (logger && logger.fatal) logger.fatal({ err }, 'server startup error in api/index.js');
-	} catch (_) {}
-
+	try { logger.fatal({ err }, 'server startup error in api/index.js'); } catch (_) {}
 	try { console.error('server startup error in api/index.js', err && err.stack ? err.stack : err); } catch (_) {}
 
 	module.exports = async (req, res) => {
@@ -34,8 +45,7 @@ try {
 			};
 			res.end(JSON.stringify(payload));
 		} catch (e) {
-			try { if (logger && logger.error) logger.error({ e }, 'fallback handler error'); } catch (_) {}
-			try { console.error('fallback handler error', e && e.stack ? e.stack : e); } catch (_) {}
+			try { logger.error({ e }, 'fallback handler error'); } catch (_) {}
 		}
 	};
 }
