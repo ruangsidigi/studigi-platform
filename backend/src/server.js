@@ -91,12 +91,18 @@ app.locals.db = {
 
 // health
 app.get('/health', (req, res) => {
-  console.log('health handler /health invoked', { url: req.url, headers: Object.keys(req.headers) });
+  console.log('health handler /health invoked', { url: req.url, originalUrl: req.originalUrl, headers: Object.keys(req.headers) });
   return res.json({ ok: true, time: new Date().toISOString() });
 });
 // also expose API-scoped health for platforms that route under /api
 app.get('/api/health', (req, res) => {
-  console.log('health handler /api/health invoked', { url: req.url, headers: Object.keys(req.headers) });
+  console.log('health handler /api/health invoked', { url: req.url, originalUrl: req.originalUrl, headers: Object.keys(req.headers) });
+  return res.json({ ok: true, time: new Date().toISOString() });
+});
+
+// Accept root path health probes since platform rewrites may change req.url
+app.get('/', (req, res) => {
+  console.log('health handler / invoked (platform rewrite)', { url: req.url, originalUrl: req.originalUrl, headers: Object.keys(req.headers) });
   return res.json({ ok: true, time: new Date().toISOString() });
 });
 
