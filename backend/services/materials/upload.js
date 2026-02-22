@@ -8,15 +8,22 @@ const config = require('../../shared/config');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
-const s3 = new S3Client({
-  endpoint: config.storageEndpoint,
-  region: 'us-east-1',
-  credentials: {
-    accessKeyId: config.storageKey || '',
-    secretAccessKey: config.storageSecret || ''
-  },
-  forcePathStyle: true
-});
+console.log('materials/upload: initializing S3 client', { endpoint: config.storageEndpoint, bucket: config.storageBucket });
+let s3;
+try {
+  s3 = new S3Client({
+    endpoint: config.storageEndpoint,
+    region: 'us-east-1',
+    credentials: {
+      accessKeyId: config.storageKey || '',
+      secretAccessKey: config.storageSecret || ''
+    },
+    forcePathStyle: true
+  });
+} catch (e) {
+  console.error('materials/upload: failed to create S3 client', e && e.stack ? e.stack : e);
+  s3 = null;
+}
 
 async function uploadToStorage({ buffer, mimeType, folder = 'materials' }) {
   const key = `${folder}/${Date.now()}-${uuidv4()}`;
@@ -26,6 +33,8 @@ async function uploadToStorage({ buffer, mimeType, folder = 'materials' }) {
     Body: buffer,
     ContentType: mimeType
   });
+  console.log('materials/upload: sending PutObjectCommand', { key, mimeType, size: buffer && buffer.length });
+  if (!s3) throw new Error('S3 client not initialized');
   await s3.send(command);
   return `${config.cdnUrl.replace(/\/$/, '')}/${config.storageBucket}/${key}`;
 }
