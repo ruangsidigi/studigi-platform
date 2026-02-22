@@ -9,6 +9,9 @@ const { Pool } = require('pg');
 const logger = pino();
 const app = express();
 
+// Trust proxy headers so `req.ip` is populated behind Vercel's proxy
+app.set('trust proxy', true);
+
 // Diagnostic: indicate module load in logs to help trace cold-starts
 console.log('backend/src/server loaded', { nodeEnv: process.env.NODE_ENV, pid: process.pid });
 
@@ -36,7 +39,20 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(rateLimit({ windowMs: 60 * 1000, max: 120 }));
+// Use a safe keyGenerator to avoid errors when `req.ip` is undefined
+app.use(rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyGenerator: (req /*, res */) => {
+    try {
+      if (req.ip) return req.ip;
+      const xf = req.headers['x-forwarded-for'] || req.headers['x-vercel-forwarded-for'] || req.headers['x-real-ip'];
+      if (xf) return String(xf).split(',')[0].trim();
+      if (req.connection && req.connection.remoteAddress) return req.connection.remoteAddress;
+    } catch (_) {}
+    return 'unknown';
+  }
+}));
 
 // DB: attempt to connect, but provide graceful fallback so server can start when
 // DB: lazy initialization. Do not block `require()` on DB connect to avoid
