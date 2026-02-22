@@ -9,6 +9,9 @@ const { Pool } = require('pg');
 const logger = pino();
 const app = express();
 
+// Diagnostic: indicate module load in logs to help trace cold-starts
+console.log('backend/src/server loaded', { nodeEnv: process.env.NODE_ENV, pid: process.pid });
+
 // Basic middleware
 app.use(helmet());
 // capture raw body for better parse-error logging
@@ -36,44 +39,66 @@ app.use((req, res, next) => {
 app.use(rateLimit({ windowMs: 60 * 1000, max: 120 }));
 
 // DB: attempt to connect, but provide graceful fallback so server can start when
-// the database is temporarily unavailable (useful for local dev without DB).
+// DB: lazy initialization. Do not block `require()` on DB connect to avoid
+// cold-start hangs in serverless environments. The first call to
+// `app.locals.db.query(...)` will trigger `ensureDb()` which attempts to
+// connect with a short timeout and falls back to a mock implementation.
 let pool;
-async function initDb() {
-  if (!config.dbUrl) {
-    console.warn('No DATABASE_URL configured; using mock db');
-    app.locals.db = { query: async () => { throw new Error('DB not configured'); } };
-    return;
+async function ensureDb() {
+  if (app.locals._dbInitPromise) {
+    await app.locals._dbInitPromise;
+    return app.locals.db;
   }
-  try {
-    // cache pool across serverless invocations
-    if (global.__pgPool && global.__pgPool.connectionString === config.dbUrl) {
-      pool = global.__pgPool;
-    } else {
-      // set a short connection timeout so serverless cold-starts don't
-      // hang for long when the DB host is unreachable (e.g. IPv6-only)
-      pool = new Pool({ connectionString: config.dbUrl, connectionTimeoutMillis: 3000 });
-      global.__pgPool = pool;
-      global.__pgPool.connectionString = config.dbUrl;
+
+  app.locals._dbInitPromise = (async () => {
+    if (!config.dbUrl) {
+      console.warn('No DATABASE_URL configured; using mock db');
+      app.locals.db = { query: async () => { throw new Error('DB not configured'); } };
+      return;
     }
-    // guard against unusually long connect attempts
-    const connectPromise = pool.connect();
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('connect timeout')), 4000));
-    const client = await Promise.race([connectPromise, timeout]);
-    client.release();
-    app.locals.db = { query: (...args) => pool.query(...args) };
-    console.info('Connected to database');
-  } catch (err) {
-    console.warn('Database connection failed; starting with mock DB. Error:', err.message);
-    app.locals.db = { query: async () => { throw new Error('DB unavailable'); } };
-  }
+
+    try {
+      if (global.__pgPool && global.__pgPool.connectionString === config.dbUrl) {
+        pool = global.__pgPool;
+      } else {
+        pool = new Pool({ connectionString: config.dbUrl, connectionTimeoutMillis: 3000 });
+        global.__pgPool = pool;
+        global.__pgPool.connectionString = config.dbUrl;
+      }
+      const connectPromise = pool.connect();
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('connect timeout')), 4000));
+      const client = await Promise.race([connectPromise, timeout]);
+      client.release();
+      app.locals.db = { query: (...args) => pool.query(...args) };
+      console.info('Connected to database');
+    } catch (err) {
+      console.warn('Database connection failed; using mock DB. Error:', err && err.message ? err.message : err);
+      app.locals.db = { query: async () => { throw new Error('DB unavailable'); } };
+    }
+  })();
+
+  await app.locals._dbInitPromise;
+  return app.locals.db;
 }
-// initialize DB connection (do not block require)
-initDb();
+
+// initial lazy db proxy: triggers `ensureDb()` on first use
+app.locals.db = {
+  query: async (...args) => {
+    const db = await ensureDb();
+    return db.query(...args);
+  }
+};
 
 // health
-app.get('/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+app.get('/health', (req, res) => {
+  console.log('health handler /health invoked', { url: req.url, headers: Object.keys(req.headers) });
+  return res.json({ ok: true, time: new Date().toISOString() });
+});
 // also expose API-scoped health for platforms that route under /api
-app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+app.get('/api/health', (req, res) => {
+  console.log('health handler /api/health invoked', { url: req.url, headers: Object.keys(req.headers) });
+  return res.json({ ok: true, time: new Date().toISOString() });
+});
 
 // Attach middleware and routes
 const authMiddleware = require('../shared/middleware/auth');
