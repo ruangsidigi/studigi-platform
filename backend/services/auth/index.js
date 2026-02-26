@@ -11,14 +11,40 @@ router.post('/auth/login', async (req, res, next) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Missing credentials' });
   const db = req.app.locals.db;
+  const jwtSecret = config.jwtSecret || config.jwtSecretFallback;
   try {
-    const { rows } = await db.query('SELECT id, email, password_hash FROM users WHERE email=$1 AND deleted_at IS NULL', [email]);
+    const { rows } = await db.query('SELECT id, email, display_name, password_hash FROM users WHERE email=$1 AND deleted_at IS NULL', [email]);
     const user = rows[0];
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     const ok = await bcrypt.compare(password, user.password_hash || '');
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = jwt.sign({ sub: user.id, email: user.email }, config.jwtSecret, { expiresIn: '7d' });
-    return res.json({ token });
+
+    let role = 'user';
+    try {
+      const roleResult = await db.query(
+        `SELECT r.name
+         FROM roles r
+         JOIN user_roles ur ON ur.role_id = r.id
+         WHERE ur.user_id = $1
+         ORDER BY r.name = 'admin' DESC, r.name ASC
+         LIMIT 1`,
+        [user.id]
+      );
+      if (roleResult.rows[0]?.name) role = roleResult.rows[0].name;
+    } catch (_) {
+      role = 'user';
+    }
+
+    const token = jwt.sign({ sub: user.id, email: user.email }, jwtSecret, { expiresIn: '7d' });
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.display_name || user.email,
+        role,
+      },
+    });
   } catch (err) {
     // handle DB unavailable or other errors gracefully
     if (err && err.message && err.message.toLowerCase().includes('db unavailable')) {

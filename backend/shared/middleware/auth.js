@@ -8,7 +8,8 @@ module.exports = async function authMiddleware(req, res, next) {
   if (!header.startsWith('Bearer ')) return next();
   const token = header.slice(7);
   try {
-    const payload = jwt.verify(token, config.jwtSecret);
+    const jwtSecret = config.jwtSecret || config.jwtSecretFallback;
+    const payload = jwt.verify(token, jwtSecret);
     // load user with roles from DB
     const db = req.app.locals.db;
     console.log('auth middleware: token verified, loading user', { sub: payload && payload.sub });

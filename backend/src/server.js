@@ -1,6 +1,7 @@
 // backend/src/server.js
 const express = require('express');
 const helmet = require('helmet');
+const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const pino = require('pino');
 const config = require('../shared/config');
@@ -15,10 +16,50 @@ app.set('trust proxy', true);
 // Diagnostic: indicate module load in logs to help trace cold-starts
 console.log('backend/src/server loaded', { nodeEnv: process.env.NODE_ENV, pid: process.pid });
 
+// Masked startup config (do not print secrets) to aid deploy verification
+try {
+  console.log('startup config', {
+    nodeEnv: process.env.NODE_ENV,
+    dbUrlSet: !!config.dbUrl,
+    supabaseUrlSet: !!config.supabaseUrl,
+    storageBucketSet: !!config.storageBucket,
+    jwtSecretSet: !!config.jwtSecret
+  });
+} catch (e) {
+  console.warn('failed to log startup config', e && e.message ? e.message : e);
+}
+
 // Basic middleware
 app.use(helmet());
-// capture raw body for better parse-error logging
+const allowedOrigins = (() => {
+  const fromEnvList = (config.corsOrigins || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const origins = new Set([
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    ...(config.frontendUrl ? [config.frontendUrl] : []),
+    ...fromEnvList,
+  ]);
+  return [...origins];
+})();
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(null, false);
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+// capture raw body for better parse-error logging and increase JSON limit
 app.use(express.json({
+  limit: '10mb',
   verify: (req, _res, buf) => {
     try {
       req.rawBody = buf && buf.toString();
@@ -27,7 +68,7 @@ app.use(express.json({
     }
   }
 }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // simple request logger (only logs method/url and body size to avoid noise)
 app.use((req, res, next) => {
@@ -117,7 +158,7 @@ app.locals.db = {
 // health
 app.get('/health', (req, res) => {
   console.log('health handler /health invoked', { url: req.url, originalUrl: req.originalUrl, headers: Object.keys(req.headers) });
-  return res.json({ ok: true, time: new Date().toISOString() });
+  return res.json({ status: 'ok' });
 });
 // also expose API-scoped health for platforms that route under /api
 app.get('/api/health', (req, res) => {
@@ -129,6 +170,19 @@ app.get('/api/health', (req, res) => {
 app.get('/', (req, res) => {
   console.log('health handler / invoked (platform rewrite)', { url: req.url, originalUrl: req.originalUrl, headers: Object.keys(req.headers) });
   return res.json({ ok: true, time: new Date().toISOString() });
+});
+
+// DB-check endpoint: run a lightweight query to validate DB connectivity
+app.get('/api/db-check', async (req, res) => {
+  try {
+    const start = Date.now();
+    const result = await app.locals.db.query('SELECT now() AS now');
+    const elapsed = Date.now() - start;
+    return res.json({ ok: true, time: result && result.rows && result.rows[0] && result.rows[0].now, elapsedMs: elapsed });
+  } catch (err) {
+    console.error('db-check failed', err && err.message ? err.message : err);
+    return res.status(500).json({ ok: false, error: err && err.message ? err.message : String(err) });
+  }
 });
 
 // Attach middleware and routes
