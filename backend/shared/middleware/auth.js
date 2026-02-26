@@ -13,12 +13,21 @@ module.exports = async function authMiddleware(req, res, next) {
     // load user with roles from DB
     const db = req.app.locals.db;
     console.log('auth middleware: token verified, loading user', { sub: payload && payload.sub });
-    const { rows } = await db.query('SELECT id, email, display_name FROM users WHERE id=$1 AND deleted_at IS NULL', [payload.sub]);
+    const { rows } = await db.query('SELECT * FROM users WHERE id=$1 LIMIT 1', [payload.sub]);
     if (!rows[0]) return res.status(401).json({ error: 'Invalid token' });
-    const user = rows[0];
+    const rowUser = rows[0];
+    const user = {
+      id: rowUser.id,
+      email: rowUser.email,
+      display_name: rowUser.display_name || rowUser.name || rowUser.email,
+    };
     console.log('auth middleware: loading roles for user', { userId: user.id });
-    const r = await db.query('SELECT roles.* FROM roles JOIN user_roles ur ON ur.role_id=roles.id WHERE ur.user_id=$1', [user.id]);
-    user.roles = r.rows || [];
+    try {
+      const r = await db.query('SELECT roles.* FROM roles JOIN user_roles ur ON ur.role_id=roles.id WHERE ur.user_id=$1', [user.id]);
+      user.roles = r.rows || [];
+    } catch (_) {
+      user.roles = [];
+    }
     req.user = user;
     next();
   } catch (err) {

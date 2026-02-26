@@ -13,10 +13,11 @@ router.post('/auth/login', async (req, res, next) => {
   const db = req.app.locals.db;
   const jwtSecret = config.jwtSecret || config.jwtSecretFallback;
   try {
-    const { rows } = await db.query('SELECT id, email, display_name, password_hash FROM users WHERE email=$1 AND deleted_at IS NULL', [email]);
+    const { rows } = await db.query('SELECT * FROM users WHERE email=$1 LIMIT 1', [email]);
     const user = rows[0];
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-    const ok = await bcrypt.compare(password, user.password_hash || '');
+    const storedHash = user.password_hash || user.password || '';
+    const ok = await bcrypt.compare(password, storedHash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
     let role = 'user';
@@ -41,7 +42,7 @@ router.post('/auth/login', async (req, res, next) => {
       user: {
         id: user.id,
         email: user.email,
-        name: user.display_name || user.email,
+        name: user.display_name || user.name || user.email,
         role,
       },
     });
