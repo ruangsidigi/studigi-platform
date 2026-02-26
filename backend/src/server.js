@@ -110,7 +110,8 @@ async function ensureDb() {
   app.locals._dbInitPromise = (async () => {
     if (!config.dbUrl) {
       console.warn('No DATABASE_URL configured; using mock db');
-      app.locals.db = { query: async () => { throw new Error('DB not configured'); } };
+      app.locals._dbErrorMessage = 'DATABASE_URL not configured';
+      app.locals.db = { query: async () => { throw new Error(`DB unavailable: ${app.locals._dbErrorMessage}`); } };
       return;
     }
 
@@ -136,10 +137,12 @@ async function ensureDb() {
       app.locals.db = { query: (...args) => pool.query(...args) };
       const elapsed = Date.now() - attemptStart;
       console.info('Connected to database', { elapsed });
+      app.locals._dbErrorMessage = null;
     } catch (err) {
       console.warn('Database connection failed; using mock DB. Error:', err && err.message ? err.message : err);
       try { console.error('ensureDb error stack', err && err.stack ? err.stack : err); } catch (_) {}
-      app.locals.db = { query: async () => { throw new Error('DB unavailable'); } };
+      app.locals._dbErrorMessage = err && err.message ? err.message : String(err);
+      app.locals.db = { query: async () => { throw new Error(`DB unavailable: ${app.locals._dbErrorMessage}`); } };
     }
   })();
 
@@ -181,7 +184,11 @@ app.get('/api/db-check', async (req, res) => {
     return res.json({ ok: true, time: result && result.rows && result.rows[0] && result.rows[0].now, elapsedMs: elapsed });
   } catch (err) {
     console.error('db-check failed', err && err.message ? err.message : err);
-    return res.status(500).json({ ok: false, error: err && err.message ? err.message : String(err) });
+    return res.status(500).json({
+      ok: false,
+      error: err && err.message ? err.message : String(err),
+      detail: app.locals._dbErrorMessage || null,
+    });
   }
 });
 
