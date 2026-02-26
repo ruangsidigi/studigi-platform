@@ -20,7 +20,7 @@ router.post('/auth/login', async (req, res, next) => {
     const ok = await bcrypt.compare(password, storedHash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
-    let role = 'user';
+    let role = user.role || 'user';
     try {
       const roleResult = await db.query(
         `SELECT r.name
@@ -33,7 +33,7 @@ router.post('/auth/login', async (req, res, next) => {
       );
       if (roleResult.rows[0]?.name) role = roleResult.rows[0].name;
     } catch (_) {
-      role = 'user';
+      role = user.role || 'user';
     }
 
     const token = jwt.sign({ sub: user.id, email: user.email }, jwtSecret, { expiresIn: '7d' });
