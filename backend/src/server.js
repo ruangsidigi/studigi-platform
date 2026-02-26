@@ -204,6 +204,7 @@ const uploadRoutes = require('../services/materials/upload');
 const brandingRoutes = require('../services/branding');
 const authRoutes = require('../services/auth');
 const paymentsRoutes = require('../services/payments');
+const categoriesRoutes = require('../services/categories');
 
 // Mount all service routers under the common `/api` prefix. Service routers
 // define relative paths (e.g. `/auth/login`, `/materials`) so final routes
@@ -213,6 +214,7 @@ app.use('/api', uploadRoutes);
 app.use('/api', brandingRoutes);
 app.use('/api', authRoutes);
 app.use('/api', paymentsRoutes);
+app.use('/api', categoriesRoutes);
 
 // JSON parse error handler (body-parser / express.json)
 app.use((err, req, res, next) => {
