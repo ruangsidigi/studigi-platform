@@ -36,6 +36,11 @@ router.post('/auth/login', async (req, res, next) => {
       role = user.role || 'user';
     }
 
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@skdcpns.com').toLowerCase();
+    if (String(user.email || '').toLowerCase() === adminEmail) {
+      role = 'admin';
+    }
+
     const token = jwt.sign({ sub: user.id, email: user.email }, jwtSecret, { expiresIn: '7d' });
     return res.json({
       token,
