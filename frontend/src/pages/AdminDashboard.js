@@ -1174,9 +1174,10 @@ const BrandingSettingsForm = ({ setMessage }) => {
     try {
       setLoading(true);
       const response = await brandingService.uploadLogo(logoFile);
-      const nextLogoUrl = response.data?.settings?.logoUrl || '';
+      const nextLogoUrl = response.data?.settings?.logoUrl || response.data?.url || '';
       setLogoUrl(nextLogoUrl);
       setLogoFile(null);
+      window.dispatchEvent(new CustomEvent('branding-updated'));
       setMessage('Logo branding berhasil diupload');
     } catch (error) {
       setMessage('Error upload logo: ' + (error.response?.data?.error || error.message));

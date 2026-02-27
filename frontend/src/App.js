@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext';
 import { brandingService } from './services/api';
@@ -54,41 +54,48 @@ function App() {
     lineColor: '#dddddd',
   });
 
+  const loadBranding = useCallback(async () => {
+    try {
+      const response = await brandingService.getSettings();
+      const settings = response.data || {};
+      const headerColor = settings.headerColor || '#1d7a7a';
+      const buttonColor = settings.buttonColor || '#007bff';
+      const lineColor = settings.lineColor || '#dddddd';
+      const rawLogoUrl = settings.logoUrl || null;
+      const isDataUrl = typeof rawLogoUrl === 'string' && rawLogoUrl.startsWith('data:');
+      const logoUrl = rawLogoUrl
+        ? (isDataUrl
+          ? rawLogoUrl
+          : `${rawLogoUrl}${rawLogoUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(settings.updatedAt || Date.now())}`)
+        : null;
+
+      setBranding({
+        logoUrl,
+        headerColor,
+        buttonColor,
+        lineColor,
+      });
+
+      document.documentElement.style.setProperty('--header-color', headerColor);
+      document.documentElement.style.setProperty('--button-color', buttonColor);
+      document.documentElement.style.setProperty('--line-color', lineColor);
+    } catch (error) {
+      document.documentElement.style.setProperty('--header-color', '#1d7a7a');
+      document.documentElement.style.setProperty('--button-color', '#007bff');
+      document.documentElement.style.setProperty('--line-color', '#dddddd');
+    }
+  }, []);
+
   useEffect(() => {
-    const loadBranding = async () => {
-      try {
-        const response = await brandingService.getSettings();
-        const settings = response.data || {};
-        const headerColor = settings.headerColor || '#1d7a7a';
-        const buttonColor = settings.buttonColor || '#007bff';
-        const lineColor = settings.lineColor || '#dddddd';
-        const rawLogoUrl = settings.logoUrl || null;
-        const isDataUrl = typeof rawLogoUrl === 'string' && rawLogoUrl.startsWith('data:');
-        const logoUrl = rawLogoUrl
-          ? (isDataUrl
-            ? rawLogoUrl
-            : `${rawLogoUrl}${rawLogoUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(settings.updatedAt || Date.now())}`)
-          : null;
+    loadBranding();
 
-        setBranding({
-          logoUrl,
-          headerColor,
-          buttonColor,
-          lineColor,
-        });
-
-        document.documentElement.style.setProperty('--header-color', headerColor);
-        document.documentElement.style.setProperty('--button-color', buttonColor);
-        document.documentElement.style.setProperty('--line-color', lineColor);
-      } catch (error) {
-        document.documentElement.style.setProperty('--header-color', '#1d7a7a');
-        document.documentElement.style.setProperty('--button-color', '#007bff');
-        document.documentElement.style.setProperty('--line-color', '#dddddd');
-      }
+    const handleBrandingUpdated = () => {
+      loadBranding();
     };
 
-    loadBranding();
-  }, []);
+    window.addEventListener('branding-updated', handleBrandingUpdated);
+    return () => window.removeEventListener('branding-updated', handleBrandingUpdated);
+  }, [loadBranding]);
 
   return (
     <Router>
