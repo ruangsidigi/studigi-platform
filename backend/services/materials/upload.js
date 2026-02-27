@@ -395,7 +395,17 @@ router.post('/branding/logo', upload.single('file'), async (req, res) => {
     const allowed = ['image/png', 'image/jpeg', 'image/jpg'];
     if (!allowed.includes(req.file.mimetype)) return res.status(400).json({ error: 'Invalid image type' });
     if (req.file.size > 2 * 1024 * 1024) return res.status(400).json({ error: 'Image too large' });
-    const url = await uploadToStorage({ buffer: req.file.buffer, mimeType: req.file.mimetype, folder: 'branding' });
+
+    let logoValue;
+    let usedStorageFallback = false;
+    try {
+      logoValue = await uploadToStorage({ buffer: req.file.buffer, mimeType: req.file.mimetype, folder: 'branding' });
+    } catch (storageError) {
+      console.warn('branding/logo: storage upload failed, fallback to data URL', storageError && storageError.message ? storageError.message : storageError);
+      logoValue = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+      usedStorageFallback = true;
+    }
+
     const db = req.app.locals.db;
     const headerColor = req.body.header_color || '#1d7a7a';
 
@@ -411,7 +421,7 @@ router.post('/branding/logo', upload.single('file'), async (req, res) => {
          INSERT INTO branding_settings (${columnName}, header_color, created_at, updated_at)
          SELECT $1, $2, NOW(), NOW()
          WHERE NOT EXISTS (SELECT 1 FROM updated)`,
-        [url, headerColor]
+        [logoValue, headerColor]
       );
     };
 
@@ -424,9 +434,9 @@ router.post('/branding/logo', upload.single('file'), async (req, res) => {
     await db.query(
       `INSERT INTO audit_logs (actor_id, action, resource_type, after)
        VALUES ($1, $2, $3, $4)`,
-      [req.user?.id || null, 'update_branding', 'branding', { url }]
+      [req.user?.id || null, 'update_branding', 'branding', { url: logoValue }]
     ).catch(() => {});
-    res.json({ url });
+    res.json({ url: logoValue, fallback: usedStorageFallback });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Upload failed', detail: err && err.message ? err.message : String(err) });
