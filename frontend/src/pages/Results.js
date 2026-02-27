@@ -37,9 +37,8 @@ const Results = () => {
       <div className="results-header">
         <h1>Hasil Tryout Anda</h1>
         <button 
-          className="btn btn-primary" 
+          className="btn btn-primary results-review-btn" 
           onClick={() => navigate(`/review/${sessionId}`)}
-          style={{ marginLeft: 'auto' }}
         >
           📖 Lihat Review Sistem Edtech
         </button>

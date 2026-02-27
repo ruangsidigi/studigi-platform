@@ -45,6 +45,12 @@
   font-weight: 700;
 }
 
+.review-title-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
 .review-subtitle {
   margin: 0;
   font-size: 14px;
@@ -351,6 +357,8 @@
 @media (max-width: 768px) {
   .review-content {
     grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 12px;
   }
 
   .review-sidebar {
@@ -367,17 +375,43 @@
     padding: 16px;
   }
 
+  .review-title-row {
+    width: 100%;
+    gap: 10px;
+  }
+
+  .btn-icon-back {
+    padding: 7px 10px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
   .review-header h1 {
     font-size: 22px;
   }
 
   .review-header-stats {
-    gap: 16px;
+    gap: 8px;
     font-size: 14px;
+    justify-content: center;
+  }
+
+  .score-chip {
+    min-width: 64px;
+    padding: 6px 8px;
+  }
+
+  .score-chip-value {
+    font-size: 17px;
   }
 
   .stat-value {
     font-size: 18px;
+  }
+
+  .stat-badge {
+    font-size: 12px;
+    padding: 4px 10px;
   }
 
   .viewer-section {
@@ -390,14 +424,19 @@
 }
 
 @media (max-width: 480px) {
-  .review-content {
+  .review-header {
     padding: 12px;
     gap: 12px;
   }
 
-  .review-header {
-    padding: 12px;
-    gap: 12px;
+  .review-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .btn-icon-back {
+    align-self: flex-start;
   }
 
   .review-header h1 {
@@ -405,12 +444,20 @@
   }
 
   .review-header-stats {
-    flex-direction: column;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+  }
+
+  .score-chip,
+  .stat-item {
+    width: 100%;
   }
 
   .question-navigation {
     flex-direction: column;
+    gap: 8px;
   }
 
   .nav-button {

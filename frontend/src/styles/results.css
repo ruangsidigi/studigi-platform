@@ -11,6 +11,11 @@
   gap: 20px;
 }
 
+.results-review-btn {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .results-header h1 {
   font-size: 32px;
   color: #333;
@@ -275,11 +280,81 @@
 }
 
 @media (max-width: 768px) {
+  .results-page {
+    max-width: 100%;
+  }
+
+  .results-header {
+    margin: 18px 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .results-header h1 {
+    font-size: 24px;
+  }
+
+  .results-review-btn {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .score-summary {
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+
+  .status-badge {
+    font-size: 15px;
+    padding: 8px 14px;
+    margin-bottom: 16px;
+  }
+
   .scores-grid {
     grid-template-columns: repeat(2, 1fr);
+    margin: 16px 0;
+    gap: 10px;
+  }
+
+  .score-card {
+    padding: 14px;
+  }
+
+  .score-value {
+    font-size: 24px;
+  }
+
+  .explanations h2 {
+    font-size: 20px;
+  }
+
+  .question-header {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .question-explanation {
+    padding: 12px;
   }
 
   .answer-info {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .scores-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .results-header h1 {
+    font-size: 22px;
+  }
+
+  .question-number-badge {
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
   }
 }

@@ -188,7 +188,7 @@ const ReviewPage = () => {
       {/* Header */}
       <div className="review-header">
         <div className="review-header-left">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div className="review-title-row">
             <button 
               className="btn-icon-back"
               onClick={() => navigate(-1)}
