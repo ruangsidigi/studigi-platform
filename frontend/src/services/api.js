@@ -204,7 +204,7 @@ export const adaptiveService = {
 };
 
 export const brandingService = {
-  getSettings: () => api.get('/branding'),
+  getSettings: () => api.get(`/branding?t=${Date.now()}`),
   updateSettings: (payload) => api.put('/branding', payload),
   uploadLogo: (file) => {
     const formData = new FormData();
