@@ -2,7 +2,13 @@ const express = require('express');
 const multer = require('multer');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    fieldSize: 10 * 1024 * 1024,
+  },
+});
 
 const getUserRoleNames = (user) => {
   if (!user || !Array.isArray(user.roles)) return [];
@@ -62,7 +68,7 @@ router.post('/questions/:id/image', requireAdmin, upload.single('image'), async 
 
     let finalImageUrl = req.body?.imageUrl || null;
 
-    if (req.file && !finalImageUrl) {
+    if (req.file) {
       const mimeType = req.file.mimetype || 'image/jpeg';
       const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
       if (!allowed.includes(mimeType)) {

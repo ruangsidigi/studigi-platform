@@ -21,6 +21,10 @@ const Quiz = () => {
   // Convert Google Drive sharing link to direct image URL
   const convertGoogleDriveUrl = (url) => {
     if (!url) return null;
+
+    if (String(url).startsWith('data:image/')) {
+      return url;
+    }
     
     // If already a direct image URL (ends with common image extensions)
     if (/\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url)) {
@@ -44,9 +48,7 @@ const Quiz = () => {
     }
     
     if (fileId) {
-      // Return direct view URL for Google Drive images
-      // This works better than /uc?export=view for some files
-      return `https://drive.google.com/uc?export=view&id=${fileId}`;
+      return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
     }
     
     // If it's already a direct Google Drive URL
@@ -232,7 +234,7 @@ const Quiz = () => {
                 alt="Question" 
                 onLoad={() => handleImageLoad(question.id)}
                 onError={() => handleImageError(question.id)}
-                style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }}
+                style={{ maxWidth: '100%', width: 'auto', height: 'auto' }}
                 crossOrigin="anonymous"
               />
             </div>

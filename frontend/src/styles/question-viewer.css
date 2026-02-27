@@ -123,8 +123,7 @@
 
 .question-image-container {
   border-radius: 8px;
-  overflow: hidden;
-  max-height: 300px;
+  overflow: visible;
   background: #f5f5f5;
   display: flex;
   align-items: center;
@@ -133,7 +132,8 @@
 
 .question-image {
   max-width: 100%;
-  max-height: 300px;
+  width: auto;
+  height: auto;
   object-fit: contain;
 }
 

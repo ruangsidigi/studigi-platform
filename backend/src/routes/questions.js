@@ -6,7 +6,13 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const fs = require('fs');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    fieldSize: 10 * 1024 * 1024,
+  },
+});
 
 // Get questions by package
 router.get('/package/:packageId', async (req, res) => {
@@ -178,7 +184,7 @@ router.post(
       // Either use provided URL or upload file as base64
       let finalImageUrl = imageUrl;
 
-      if (req.file && !imageUrl) {
+      if (req.file) {
         // Convert file to base64 if file uploaded
         const base64 = req.file.buffer.toString('base64');
         const mimeType = req.file.mimetype || 'image/jpeg';

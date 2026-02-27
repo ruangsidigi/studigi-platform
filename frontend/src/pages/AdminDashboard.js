@@ -776,6 +776,8 @@ const EditQuestionsTab = () => {
   const [questions, setQuestions] = useState([]);
   const [selectedQuestion, setSelectedQuestion] = useState(null);
   const [editFormData, setEditFormData] = useState({});
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState('');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
@@ -799,6 +801,8 @@ const EditQuestionsTab = () => {
     setSelectedPackage(packageId);
     setSelectedQuestion(null);
     setEditFormData({});
+    setSelectedImageFile(null);
+    setSelectedImagePreview('');
     setMessage('');
 
     if (packageId) {
@@ -815,6 +819,8 @@ const EditQuestionsTab = () => {
   const handleSelectQuestion = (question) => {
     setSelectedQuestion(question);
     setEditFormData(question);
+    setSelectedImageFile(null);
+    setSelectedImagePreview('');
   };
 
   const handleFormChange = (field, value) => {
@@ -830,6 +836,8 @@ const EditQuestionsTab = () => {
       setQuestions(res.data || []);
       setSelectedQuestion(null);
       setEditFormData({});
+      setSelectedImageFile(null);
+      setSelectedImagePreview('');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage('Error saving question: ' + (err.response?.data?.error || err.message));
@@ -848,6 +856,8 @@ const EditQuestionsTab = () => {
       if (selectedQuestion?.id === questionId) {
         setSelectedQuestion(null);
         setEditFormData({});
+        setSelectedImageFile(null);
+        setSelectedImagePreview('');
       }
 
       setTimeout(() => setMessage(''), 3000);
@@ -1020,10 +1030,10 @@ const EditQuestionsTab = () => {
                 <strong>Gambar Soal</strong>
               </div>
 
-              {editFormData.image_url && (
+              {(selectedImagePreview || editFormData.image_url) && (
                 <div style={{ marginBottom: '10px' }}>
                   <img
-                    src={editFormData.image_url}
+                    src={selectedImagePreview || editFormData.image_url}
                     alt="Current"
                     style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
                     onError={(e) => {
@@ -1041,13 +1051,11 @@ const EditQuestionsTab = () => {
                   onChange={(e) => {
                     const file = e.target.files[0];
                     if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        handleFormChange('image_url', event.target.result);
-                        setMessage('Preview gambar berhasil dimuat');
-                        setTimeout(() => setMessage(''), 2000);
-                      };
-                      reader.readAsDataURL(file);
+                      const previewUrl = URL.createObjectURL(file);
+                      setSelectedImageFile(file);
+                      setSelectedImagePreview(previewUrl);
+                      setMessage('Preview gambar berhasil dimuat');
+                      setTimeout(() => setMessage(''), 2000);
                     }
                   }}
                 />
@@ -1058,14 +1066,20 @@ const EditQuestionsTab = () => {
 
               <button
                 onClick={async () => {
-                  if (!editFormData.image_url) {
+                  if (!selectedImageFile) {
                     setMessage('Pilih gambar terlebih dahulu');
                     return;
                   }
                   try {
                     const formData = new FormData();
-                    formData.append('imageUrl', editFormData.image_url);
-                    await questionService.uploadQuestionImage(selectedQuestion.id, formData);
+                    formData.append('image', selectedImageFile);
+                    const uploadRes = await questionService.uploadQuestionImage(selectedQuestion.id, formData);
+                    const uploadedUrl = uploadRes?.data?.image_url;
+                    if (uploadedUrl) {
+                      setEditFormData((prev) => ({ ...prev, image_url: uploadedUrl }));
+                    }
+                    setSelectedImageFile(null);
+                    setSelectedImagePreview('');
                     setMessage('Gambar berhasil disimpan!');
                     setTimeout(() => setMessage(''), 3000);
                   } catch (err) {

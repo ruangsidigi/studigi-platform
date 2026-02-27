@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS questions (
   point_c INT DEFAULT 0,
   point_d INT DEFAULT 0,
   point_e INT DEFAULT 0,
-  image_url VARCHAR(500),
+  image_url TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
