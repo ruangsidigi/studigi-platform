@@ -243,3 +243,57 @@ small {
   color: #999;
   font-style: italic;
 }
+
+@media (max-width: 900px) {
+  .admin-container {
+    padding: 12px;
+  }
+
+  .admin-header {
+    margin-bottom: 14px;
+  }
+
+  .admin-header h1 {
+    font-size: 24px;
+  }
+
+  .admin-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .tab-btn {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .admin-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: 10px;
+    font-size: 13px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .bundle-picker-grid {
+    grid-template-columns: 1fr;
+    max-height: 220px;
+  }
+}

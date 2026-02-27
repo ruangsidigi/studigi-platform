@@ -99,3 +99,35 @@
     font-size: 14px;
   }
 }
+
+@media (max-width: 560px) {
+  .navbar-container {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    align-items: center;
+  }
+
+  .navbar-logo-img {
+    height: 30px;
+    max-width: 150px;
+  }
+
+  .navbar-menu {
+    width: 100%;
+    justify-content: flex-end;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    gap: 6px;
+  }
+
+  .navbar-link,
+  .navbar-logout {
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .navbar-user {
+    max-width: 75px;
+    font-size: 12px;
+  }
+}

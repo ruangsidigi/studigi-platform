@@ -58,11 +58,11 @@ const Dashboard = () => {
       <div className="dashboard-header">
         <h1>Pilih Kategori Tes</h1>
         <p className="text-muted">Kategori akan otomatis muncul sesuai data yang dibuat admin.</p>
-        <div style={{ marginTop: 12 }}>
+        <div className="dashboard-actions">
           <button className="btn btn-primary" onClick={() => navigate('/adaptive-dashboard')}>
             Buka Adaptive Learning Dashboard
           </button>
-          <button className="btn btn-info" style={{ marginLeft: 8 }} onClick={() => navigate('/my-materials')}>
+          <button className="btn btn-info" onClick={() => navigate('/my-materials')}>
             Buka Materi Saya
           </button>
         </div>

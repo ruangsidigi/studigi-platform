@@ -2,6 +2,13 @@
   margin-bottom: 30px;
 }
 
+.dashboard-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .smart-campaign-stack {
   display: grid;
   gap: 14px;
@@ -398,6 +405,18 @@
 }
 
 @media (max-width: 768px) {
+  .dashboard-header {
+    margin-bottom: 18px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 24px;
+  }
+
+  .dashboard-actions .btn {
+    flex: 1 1 100%;
+  }
+
   .smart-campaign-card {
     grid-template-columns: 1fr;
   }
@@ -412,5 +431,29 @@
 
   .packages-grid {
     grid-template-columns: 1fr;
+  }
+
+  .categories-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .category-card {
+    padding: 14px;
+  }
+
+  .category-meta {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-header h1 {
+    font-size: 22px;
+  }
+
+  .smart-campaign-image {
+    height: 140px;
   }
 }
