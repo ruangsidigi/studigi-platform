@@ -21,6 +21,8 @@ export const authService = {
     api.post('/auth/register', { email, password, name }),
   login: (email, password) =>
     api.post('/auth/login', { email, password }),
+  verifyEmail: (token) =>
+    api.post('/auth/verify-email', { token }),
   forgotPassword: (email) =>
     api.post('/auth/forgot-password', { email }),
   resetPassword: (token, newPassword) =>

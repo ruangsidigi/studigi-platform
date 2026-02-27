@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
 import '../styles/auth.css';
 
@@ -9,12 +9,14 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -23,8 +25,8 @@ const Register = () => {
 
     setLoading(true);
     try {
-      await authService.register(email, password, name);
-      navigate('/login');
+      const response = await authService.register(email, password, name);
+      setSuccess(response.data?.message || 'Registrasi berhasil. Silakan cek email untuk verifikasi akun.');
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');
     } finally {
@@ -37,6 +39,7 @@ const Register = () => {
       <div className="auth-card">
         <h2>Register</h2>
         {error && <div className="alert alert-danger">{error}</div>}
+        {success && <div className="alert alert-success">{success}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Name</label>
@@ -79,7 +82,12 @@ const Register = () => {
           </button>
         </form>
         <p className="auth-link">
-          Already have account? <a href="/login">Login here</a>
+          Already have account? <Link to="/login">Login here</Link>
+        </p>
+        <p className="auth-link">
+          <button type="button" className="btn btn-primary" onClick={() => navigate('/login')}>
+            Buka Halaman Login
+          </button>
         </p>
       </div>
     </div>
