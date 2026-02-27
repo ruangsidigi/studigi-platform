@@ -116,18 +116,66 @@ const detectHeaderIndexMap = (grid) => {
   return { headerRowIndex: -1, indexMap: defaultColumnIndexMap };
 };
 
+const isLikelyNumberCell = (value) => {
+  if (value === null || value === undefined) return false;
+  const text = String(value).trim();
+  if (!text) return false;
+  return Number.isFinite(Number(text.replace(',', '.')));
+};
+
+const detectDataStartOffset = (grid, startRow = 0) => {
+  const score = new Map();
+
+  for (let r = startRow; r < Math.min(grid.length, startRow + 200); r += 1) {
+    const row = grid[r] || [];
+    if (!row.length) continue;
+
+    for (let i = 0; i < Math.min(10, row.length); i += 1) {
+      const maybeNumber = row[i];
+      const maybeQuestionAtPlus1 = row[i + 1];
+      const maybeQuestionAtPlus2 = row[i + 2];
+
+      const looksValid1 = isLikelyNumberCell(maybeNumber) && maybeQuestionAtPlus1 && String(maybeQuestionAtPlus1).trim().length >= 5;
+      const looksValid2 = isLikelyNumberCell(maybeNumber) && maybeQuestionAtPlus2 && String(maybeQuestionAtPlus2).trim().length >= 5;
+
+      if (looksValid1 || looksValid2) {
+        score.set(i, (score.get(i) || 0) + 1);
+      }
+    }
+  }
+
+  if (!score.size) return 0;
+
+  let bestOffset = 0;
+  let bestScore = -1;
+  for (const [offset, value] of score.entries()) {
+    if (value > bestScore) {
+      bestScore = value;
+      bestOffset = offset;
+    }
+  }
+
+  return bestOffset;
+};
+
 const buildRowsFromWorksheetFallback = (worksheet) => {
   const grid = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null, raw: false });
   if (!grid.length) return [];
 
   const { headerRowIndex, indexMap } = detectHeaderIndexMap(grid);
   const startDataIndex = headerRowIndex >= 0 ? headerRowIndex + 1 : 0;
+  const offset = headerRowIndex >= 0 ? 0 : detectDataStartOffset(grid, startDataIndex);
+
+  const effectiveIndexMap = {};
+  Object.entries(indexMap).forEach(([key, idx]) => {
+    effectiveIndexMap[key] = idx + offset;
+  });
 
   const rows = [];
   for (let i = startDataIndex; i < grid.length; i += 1) {
     const row = grid[i] || [];
     const normalized = {};
-    Object.entries(indexMap).forEach(([key, idx]) => {
+    Object.entries(effectiveIndexMap).forEach(([key, idx]) => {
       normalized[key] = row[idx] ?? null;
     });
     rows.push(normalized);
@@ -318,7 +366,12 @@ router.post('/questions/upload', requireAdmin, upload.single('file'), async (req
 
     if (insertedCount === 0) {
       await db.query('ROLLBACK');
-      return res.status(400).json({ error: 'No valid rows to import. Pastikan kolom nomor dan teks soal terisi.' });
+      const preview = rows.slice(0, 2).map((item) => Object.keys(item || {}));
+      return res.status(400).json({
+        error: 'No valid rows to import. Pastikan kolom nomor dan teks soal terisi.',
+        hint: 'Gunakan header: number, question_text, option_a..option_e, correct_answer, explanation, category',
+        previewHeaders: preview,
+      });
     }
 
     await db.query('COMMIT');
