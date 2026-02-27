@@ -1,5 +1,6 @@
 const express = require('express');
 const multer = require('multer');
+const XLSX = require('xlsx');
 
 const router = express.Router();
 const upload = multer({
@@ -56,6 +57,103 @@ router.get('/questions/:id', async (req, res) => {
     if (!question) return res.status(404).json({ error: 'Question not found' });
     return res.json(question);
   } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/questions/upload', requireAdmin, upload.single('file'), async (req, res) => {
+  const db = req.app.locals.db;
+  const packageId = Number(req.body?.packageId);
+
+  if (!Number.isInteger(packageId)) {
+    return res.status(400).json({ error: 'Invalid package id' });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'File is required' });
+  }
+
+  try {
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const firstSheetName = workbook.SheetNames?.[0];
+    if (!firstSheetName) {
+      return res.status(400).json({ error: 'Excel file is empty' });
+    }
+
+    const worksheet = workbook.Sheets[firstSheetName];
+    const rows = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+
+    if (!rows.length) {
+      return res.status(400).json({ error: 'No rows found in Excel' });
+    }
+
+    await db.query('BEGIN');
+
+    let insertedCount = 0;
+    for (const row of rows) {
+      const number = Number(row.number);
+      const questionText = row.question_text ? String(row.question_text).trim() : '';
+
+      if (!Number.isInteger(number) || !questionText) {
+        continue;
+      }
+
+      await db.query(
+        `INSERT INTO questions (
+          package_id, number, question_text,
+          option_a, option_b, option_c, option_d, option_e,
+          correct_answer, explanation, category,
+          point_a, point_b, point_c, point_d, point_e,
+          image_url, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3,
+          $4, $5, $6, $7, $8,
+          $9, $10, $11,
+          $12, $13, $14, $15, $16,
+          $17, NOW(), NOW()
+        )`,
+        [
+          packageId,
+          number,
+          questionText,
+          row.option_a ? String(row.option_a) : null,
+          row.option_b ? String(row.option_b) : null,
+          row.option_c ? String(row.option_c) : null,
+          row.option_d ? String(row.option_d) : null,
+          row.option_e ? String(row.option_e) : null,
+          row.correct_answer ? String(row.correct_answer).toUpperCase() : null,
+          row.explanation ? String(row.explanation) : null,
+          row.category ? String(row.category).toUpperCase() : null,
+          Number.isFinite(Number(row.point_a)) ? Number(row.point_a) : null,
+          Number.isFinite(Number(row.point_b)) ? Number(row.point_b) : null,
+          Number.isFinite(Number(row.point_c)) ? Number(row.point_c) : null,
+          Number.isFinite(Number(row.point_d)) ? Number(row.point_d) : null,
+          Number.isFinite(Number(row.point_e)) ? Number(row.point_e) : null,
+          row.image_url ? String(row.image_url) : null,
+        ]
+      );
+
+      insertedCount += 1;
+    }
+
+    if (insertedCount === 0) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({ error: 'No valid rows to import. Check number and question_text columns.' });
+    }
+
+    await db.query('COMMIT');
+
+    await db.query(
+      'UPDATE packages SET question_count = (SELECT COUNT(*) FROM questions WHERE package_id = $1), updated_at = NOW() WHERE id = $1',
+      [packageId]
+    ).catch(() => {});
+
+    return res.json({
+      message: `${insertedCount} questions imported successfully`,
+      count: insertedCount,
+    });
+  } catch (error) {
+    try { await db.query('ROLLBACK'); } catch (_) {}
     return res.status(500).json({ error: error.message });
   }
 });
