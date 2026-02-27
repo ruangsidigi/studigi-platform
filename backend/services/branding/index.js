@@ -25,29 +25,38 @@ const normalizeLogoUrl = (rawUrl) => {
   return rawUrl;
 };
 
-const upsertHeaderColor = async (db, headerColor) => {
+const upsertBrandingColors = async (db, colors) => {
+  const headerColor = colors.header_color;
+  const buttonColor = colors.button_color;
+  const lineColor = colors.line_color;
+
   try {
     await db.query(
       `WITH updated AS (
          UPDATE branding_settings
-         SET header_color = $1, updated_at = NOW()
+         SET header_color = COALESCE($1, header_color),
+             button_color = COALESCE($2, button_color),
+             line_color = COALESCE($3, line_color),
+             updated_at = NOW()
          RETURNING id
        )
-       INSERT INTO branding_settings (header_color, created_at, updated_at)
-       SELECT $1, NOW(), NOW()
+       INSERT INTO branding_settings (header_color, button_color, line_color, created_at, updated_at)
+       SELECT COALESCE($1, '#103c21'), COALESCE($2, '#007bff'), COALESCE($3, '#dddddd'), NOW(), NOW()
        WHERE NOT EXISTS (SELECT 1 FROM updated)`,
-      [headerColor]
+      [headerColor, buttonColor, lineColor]
     );
     return;
   } catch (_) {}
 
   await db.query(
-    `INSERT INTO branding_settings (header_color, created_at, updated_at)
-     VALUES ($1, NOW(), NOW())
+    `INSERT INTO branding_settings (header_color, button_color, line_color, created_at, updated_at)
+     VALUES (COALESCE($1, '#103c21'), COALESCE($2, '#007bff'), COALESCE($3, '#dddddd'), NOW(), NOW())
      ON CONFLICT ((1)) DO UPDATE
-       SET header_color = EXCLUDED.header_color,
+       SET header_color = COALESCE(EXCLUDED.header_color, branding_settings.header_color),
+           button_color = COALESCE(EXCLUDED.button_color, branding_settings.button_color),
+           line_color = COALESCE(EXCLUDED.line_color, branding_settings.line_color),
            updated_at = NOW()`,
-    [headerColor]
+    [headerColor, buttonColor, lineColor]
   );
 };
 
@@ -77,10 +86,24 @@ router.get('/branding', async (req, res) => {
 });
 
 router.put('/branding', async (req, res) => {
-  const { header_color } = req.body;
+  const headerColor = req.body?.header_color || req.body?.headerColor || null;
+  const buttonColor = req.body?.button_color || req.body?.buttonColor || null;
+  const lineColor = req.body?.line_color || req.body?.lineColor || null;
+
   const db = req.app.locals.db;
-  await upsertHeaderColor(db, header_color);
-  res.json({ ok: true });
+  await upsertBrandingColors(db, {
+    header_color: headerColor,
+    button_color: buttonColor,
+    line_color: lineColor,
+  });
+  res.json({
+    ok: true,
+    settings: {
+      headerColor: headerColor || '#103c21',
+      buttonColor: buttonColor || '#007bff',
+      lineColor: lineColor || '#dddddd',
+    },
+  });
 });
 
 module.exports = router;
