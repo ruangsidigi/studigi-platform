@@ -224,7 +224,10 @@ const Quiz = () => {
 
       <div className="quiz-content">
         <div className="question-section">
-          <div className="question-number">Soal Nomor {question.number}</div>
+          <div className="question-number">
+            <span>Soal Nomor {question.number}</span>
+            <span className="question-progress">{currentQuestion + 1}/{questions.length}</span>
+          </div>
           <div className="question-text">{question.question_text}</div>
 
           {question.image_url && !imageErrors[question.id] && (
