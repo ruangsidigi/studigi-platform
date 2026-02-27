@@ -2,6 +2,32 @@
 const express = require('express');
 const router = express.Router();
 
+const upsertHeaderColor = async (db, headerColor) => {
+  try {
+    await db.query(
+      `WITH updated AS (
+         UPDATE branding_settings
+         SET header_color = $1, updated_at = NOW()
+         RETURNING id
+       )
+       INSERT INTO branding_settings (header_color, created_at, updated_at)
+       SELECT $1, NOW(), NOW()
+       WHERE NOT EXISTS (SELECT 1 FROM updated)`,
+      [headerColor]
+    );
+    return;
+  } catch (_) {}
+
+  await db.query(
+    `INSERT INTO branding_settings (header_color, created_at, updated_at)
+     VALUES ($1, NOW(), NOW())
+     ON CONFLICT ((1)) DO UPDATE
+       SET header_color = EXCLUDED.header_color,
+           updated_at = NOW()`,
+    [headerColor]
+  );
+};
+
 router.get('/branding', async (req, res) => {
   const db = req.app.locals.db;
   const { rows } = await db.query('SELECT * FROM branding_settings ORDER BY created_at DESC LIMIT 1');
@@ -15,9 +41,10 @@ router.get('/branding', async (req, res) => {
       lineColor: '#dddddd',
     });
   }
+  const logoValue = rows[0].logo_key || rows[0].logo_url || null;
   res.json({
-    logo: rows[0].logo_key,
-    logoUrl: rows[0].logo_key,
+    logo: logoValue,
+    logoUrl: logoValue,
     header_color: rows[0].header_color,
     headerColor: rows[0].header_color,
     buttonColor: rows[0].button_color || '#007bff',
@@ -29,11 +56,7 @@ router.get('/branding', async (req, res) => {
 router.put('/branding', async (req, res) => {
   const { header_color } = req.body;
   const db = req.app.locals.db;
-  await db.query(`
-    INSERT INTO branding_settings (id, header_color)
-    VALUES ((select id from branding_settings limit 1), $1)
-    ON CONFLICT (id) DO UPDATE SET header_color = EXCLUDED.header_color, updated_at = now()
-  `, [header_color]);
+  await upsertHeaderColor(db, header_color);
   res.json({ ok: true });
 });
 

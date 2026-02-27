@@ -397,17 +397,39 @@ router.post('/branding/logo', upload.single('file'), async (req, res) => {
     if (req.file.size > 2 * 1024 * 1024) return res.status(400).json({ error: 'Image too large' });
     const url = await uploadToStorage({ buffer: req.file.buffer, mimeType: req.file.mimetype, folder: 'branding' });
     const db = req.app.locals.db;
-    await db.query(`
-      INSERT INTO branding_settings (id, logo_key, header_color)
-      VALUES ((select id from branding_settings limit 1), $1, $2)
-      ON CONFLICT (id) DO UPDATE SET logo_key = EXCLUDED.logo_key, updated_at = now()
-    `, [url, req.body.header_color || null]);
-    await db.query(`INSERT INTO audit_logs (actor_id, action, resource_type, after) VALUES ($1,$2,$3)`,
-      [req.user?.id || null, 'update_branding', 'branding', ]).catch(()=>{});
+    const headerColor = req.body.header_color || '#1d7a7a';
+
+    const upsertLogoWithColumn = async (columnName) => {
+      await db.query(
+        `WITH updated AS (
+           UPDATE branding_settings
+           SET ${columnName} = $1,
+               header_color = COALESCE($2, header_color),
+               updated_at = NOW()
+           RETURNING id
+         )
+         INSERT INTO branding_settings (${columnName}, header_color, created_at, updated_at)
+         SELECT $1, $2, NOW(), NOW()
+         WHERE NOT EXISTS (SELECT 1 FROM updated)`,
+        [url, headerColor]
+      );
+    };
+
+    try {
+      await upsertLogoWithColumn('logo_key');
+    } catch (firstError) {
+      await upsertLogoWithColumn('logo_url');
+    }
+
+    await db.query(
+      `INSERT INTO audit_logs (actor_id, action, resource_type, after)
+       VALUES ($1, $2, $3, $4)`,
+      [req.user?.id || null, 'update_branding', 'branding', { url }]
+    ).catch(() => {});
     res.json({ url });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Upload failed' });
+    res.status(500).json({ error: 'Upload failed', detail: err && err.message ? err.message : String(err) });
   }
 });
 
