@@ -155,6 +155,20 @@ try {
   s3 = null;
 }
 
+function buildPublicStorageUrl(bucket, key) {
+  const base = (config.cdnUrl || config.storageEndpoint || process.env.SUPABASE_URL || '').replace(/\/$/, '');
+  if (!base) return `${bucket}/${key}`;
+
+  if (/supabase\.co/i.test(base)) {
+    if (/\/storage\/v1\/object\/public/i.test(base)) {
+      return `${base}/${bucket}/${key}`;
+    }
+    return `${base}/storage/v1/object/public/${bucket}/${key}`;
+  }
+
+  return `${base}/${bucket}/${key}`;
+}
+
 async function uploadToStorage({ buffer, mimeType, folder = 'materials' }) {
   const key = `${folder}/${Date.now()}-${uuidv4()}`;
   const command = new PutObjectCommand({
@@ -166,7 +180,7 @@ async function uploadToStorage({ buffer, mimeType, folder = 'materials' }) {
   console.log('materials/upload: sending PutObjectCommand', { key, mimeType, size: buffer && buffer.length });
   if (!s3) throw new Error('S3 client not initialized');
   await s3.send(command);
-  return `${config.cdnUrl.replace(/\/$/, '')}/${config.storageBucket}/${key}`;
+  return buildPublicStorageUrl(config.storageBucket, key);
 }
 
 async function handleMaterialUpload(req, res) {

@@ -2,6 +2,29 @@
 const express = require('express');
 const router = express.Router();
 
+const normalizeLogoUrl = (rawUrl) => {
+  if (!rawUrl || String(rawUrl).startsWith('data:')) return rawUrl || null;
+
+  try {
+    const parsed = new URL(String(rawUrl));
+    if (!/supabase\.co$/i.test(parsed.hostname)) return rawUrl;
+
+    if (/^\/storage\/v1\/object\/public\//i.test(parsed.pathname)) {
+      return rawUrl;
+    }
+
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (parts.length >= 2) {
+      const [bucket, ...rest] = parts;
+      return `${parsed.origin}/storage/v1/object/public/${bucket}/${rest.join('/')}`;
+    }
+  } catch (_) {
+    return rawUrl;
+  }
+
+  return rawUrl;
+};
+
 const upsertHeaderColor = async (db, headerColor) => {
   try {
     await db.query(
@@ -41,7 +64,7 @@ router.get('/branding', async (req, res) => {
       lineColor: '#dddddd',
     });
   }
-  const logoValue = rows[0].logo_key || rows[0].logo_url || null;
+  const logoValue = normalizeLogoUrl(rows[0].logo_key || rows[0].logo_url || null);
   res.json({
     logo: logoValue,
     logoUrl: logoValue,
