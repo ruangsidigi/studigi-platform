@@ -8,6 +8,104 @@ const config = require('../../shared/config');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
+const getUserRoleNames = (user) => {
+  if (!user || !Array.isArray(user.roles)) return [];
+  return user.roles
+    .map((role) => String(role?.name || role?.role || '').toLowerCase())
+    .filter(Boolean);
+};
+
+const requireAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Access token required' });
+  const roleNames = getUserRoleNames(req.user);
+  const isAdmin =
+    roleNames.includes('admin') ||
+    String(req.user.role || '').toLowerCase() === 'admin' ||
+    String(req.user.email || '').toLowerCase() === String(process.env.ADMIN_EMAIL || 'admin@skdcpns.com').toLowerCase();
+  if (!isAdmin) return res.status(403).json({ error: 'Forbidden - admin only' });
+  return next();
+};
+
+const parsePackageIds = (body) => {
+  const values = [];
+  if (body?.packageId) values.push(body.packageId);
+  if (Array.isArray(body?.packageIds)) values.push(...body.packageIds);
+  if (typeof body?.packageIds === 'string' && body.packageIds.trim()) {
+    try {
+      const parsed = JSON.parse(body.packageIds);
+      if (Array.isArray(parsed)) values.push(...parsed);
+      else values.push(body.packageIds);
+    } catch (_) {
+      values.push(...body.packageIds.split(','));
+    }
+  }
+  return [...new Set(values
+    .map((item) => Number(item))
+    .filter((value) => Number.isInteger(value) && value > 0))];
+};
+
+const loadPackageMap = async (db) => {
+  try {
+    const links = await db.query(
+      `SELECT
+         pm.material_id,
+         pm.package_id,
+         p.name AS package_name,
+         p.type AS package_type
+       FROM package_materials pm
+       LEFT JOIN packages p ON p.id = pm.package_id`
+    );
+
+    const map = new Map();
+    for (const row of links.rows || []) {
+      if (!map.has(row.material_id)) map.set(row.material_id, []);
+      map.get(row.material_id).push({
+        package_id: row.package_id,
+        package: {
+          id: row.package_id,
+          name: row.package_name || null,
+          type: row.package_type || null,
+        },
+      });
+    }
+    return map;
+  } catch (_) {
+    const fallback = await db.query('SELECT id, package_id FROM materials WHERE package_id IS NOT NULL');
+    if (!fallback.rows?.length) return new Map();
+
+    const packageIds = [...new Set(fallback.rows.map((row) => Number(row.package_id)).filter((id) => Number.isInteger(id)))];
+    const packages = packageIds.length
+      ? await db.query('SELECT id, name, type FROM packages WHERE id = ANY($1::int[])', [packageIds])
+      : { rows: [] };
+
+    const packageById = new Map((packages.rows || []).map((pkg) => [Number(pkg.id), pkg]));
+    const map = new Map();
+    for (const row of fallback.rows || []) {
+      const packageId = Number(row.package_id);
+      if (!Number.isInteger(packageId)) continue;
+      map.set(row.id, [
+        {
+          package_id: packageId,
+          package: packageById.get(packageId) || { id: packageId, name: null, type: null },
+        },
+      ]);
+    }
+    return map;
+  }
+};
+
+const withMaterialPackages = (materials, packageMap) => {
+  return (materials || []).map((item) => {
+    const attached = packageMap.get(item.id) || [];
+    return {
+      ...item,
+      file_url: item.file_url || item.storage_key || null,
+      attached_packages: attached,
+      package_ids: attached.map((row) => row.package_id),
+    };
+  });
+};
+
 console.log('materials/upload: initializing S3 client', { endpoint: config.storageEndpoint, bucket: config.storageBucket });
 let s3;
 try {
@@ -60,8 +158,132 @@ async function handleMaterialUpload(req, res) {
 }
 
 // Admin-only: upload PDF material (mounted under /api)
-router.post('/materials', upload.single('file'), handleMaterialUpload);
-router.post('/materials/upload', upload.single('file'), handleMaterialUpload);
+router.post('/materials', requireAdmin, upload.single('file'), handleMaterialUpload);
+router.post('/materials/upload', requireAdmin, upload.single('file'), handleMaterialUpload);
+
+router.get('/materials/admin', requireAdmin, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const result = await db.query('SELECT * FROM materials ORDER BY created_at DESC NULLS LAST, id DESC');
+    const packageMap = await loadPackageMap(db);
+    return res.json(withMaterialPackages(result.rows || [], packageMap));
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.put('/materials/:id', requireAdmin, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const materialId = Number(req.params.id);
+    if (!Number.isInteger(materialId)) return res.status(400).json({ error: 'Invalid material id' });
+
+    const packageIds = parsePackageIds(req.body || {});
+    const updates = {
+      title: Object.prototype.hasOwnProperty.call(req.body || {}, 'title') ? (req.body.title || null) : undefined,
+      description: Object.prototype.hasOwnProperty.call(req.body || {}, 'description') ? (req.body.description || null) : undefined,
+      category_id: Object.prototype.hasOwnProperty.call(req.body || {}, 'categoryId') ? (req.body.categoryId ? Number(req.body.categoryId) : null) : undefined,
+      package_id: packageIds.length ? packageIds[0] : undefined,
+    };
+
+    const fields = [];
+    const values = [];
+    if (updates.title !== undefined) { fields.push(`title = $${values.length + 1}`); values.push(updates.title); }
+    if (updates.description !== undefined) { fields.push(`description = $${values.length + 1}`); values.push(updates.description); }
+    if (updates.category_id !== undefined) { fields.push(`category_id = $${values.length + 1}`); values.push(updates.category_id); }
+    if (updates.package_id !== undefined) { fields.push(`package_id = $${values.length + 1}`); values.push(updates.package_id); }
+    fields.push('updated_at = NOW()');
+
+    values.push(materialId);
+    const result = await db.query(
+      `UPDATE materials SET ${fields.join(', ')} WHERE id = $${values.length} RETURNING *`,
+      values
+    );
+
+    if (!result.rows[0]) return res.status(404).json({ error: 'Material not found' });
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'packageIds') || Object.prototype.hasOwnProperty.call(req.body || {}, 'packageId')) {
+      try {
+        await db.query('DELETE FROM package_materials WHERE material_id = $1', [materialId]);
+        if (packageIds.length) {
+          await db.query(
+            'INSERT INTO package_materials (material_id, package_id, created_at) SELECT $1, UNNEST($2::int[]), NOW()',
+            [materialId, packageIds]
+          );
+        }
+      } catch (_) {}
+    }
+
+    const packageMap = await loadPackageMap(db);
+    const normalized = withMaterialPackages(result.rows, packageMap)[0];
+    return res.json({ message: 'Material updated', material: normalized });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/materials/:id', requireAdmin, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const materialId = Number(req.params.id);
+    if (!Number.isInteger(materialId)) return res.status(400).json({ error: 'Invalid material id' });
+
+    try {
+      await db.query('DELETE FROM package_materials WHERE material_id = $1', [materialId]);
+    } catch (_) {}
+
+    const result = await db.query('DELETE FROM materials WHERE id = $1 RETURNING id', [materialId]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Material not found' });
+    return res.json({ message: 'Material deleted' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/materials/:id/packages', requireAdmin, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const materialId = Number(req.params.id);
+    const packageId = Number(req.body?.packageId);
+    if (!Number.isInteger(materialId) || !Number.isInteger(packageId)) {
+      return res.status(400).json({ error: 'Invalid material or package id' });
+    }
+
+    try {
+      await db.query(
+        'INSERT INTO package_materials (material_id, package_id, created_at) VALUES ($1, $2, NOW()) ON CONFLICT DO NOTHING',
+        [materialId, packageId]
+      );
+    } catch (_) {
+      await db.query('UPDATE materials SET package_id = $1, updated_at = NOW() WHERE id = $2', [packageId, materialId]);
+    }
+
+    return res.json({ message: 'Package attached to material' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/materials/:id/packages/:packageId', requireAdmin, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const materialId = Number(req.params.id);
+    const packageId = Number(req.params.packageId);
+    if (!Number.isInteger(materialId) || !Number.isInteger(packageId)) {
+      return res.status(400).json({ error: 'Invalid material or package id' });
+    }
+
+    try {
+      await db.query('DELETE FROM package_materials WHERE material_id = $1 AND package_id = $2', [materialId, packageId]);
+    } catch (_) {
+      await db.query('UPDATE materials SET package_id = NULL, updated_at = NOW() WHERE id = $1 AND package_id = $2', [materialId, packageId]);
+    }
+
+    return res.json({ message: 'Package detached from material' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 // Branding logo upload (png/jpg) (mounted under /api)
 router.post('/branding/logo', upload.single('file'), async (req, res) => {
