@@ -212,6 +212,7 @@ const campaignRoutes = require('../services/campaigns');
 const adaptiveRoutes = require('../services/adaptive');
 const tryoutsRoutes = require('../services/tryouts');
 const questionsRoutes = require('../services/questions');
+const reviewsRoutes = require('../services/reviews');
 const categoriesRoutes = require('../services/categories');
 
 // Mount all service routers under the common `/api` prefix. Service routers
@@ -230,6 +231,7 @@ app.use('/api', campaignRoutes);
 app.use('/api', adaptiveRoutes);
 app.use('/api', tryoutsRoutes);
 app.use('/api', questionsRoutes);
+app.use('/api', reviewsRoutes);
 app.use('/api', categoriesRoutes);
 
 const mountLegacyRoute = (basePath, modulePath) => {
