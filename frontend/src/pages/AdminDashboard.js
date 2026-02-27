@@ -1347,6 +1347,25 @@ const CampaignManager = ({ setMessage }) => {
     }
   };
 
+  const handleDeleteCampaign = async (campaignId, campaignTitle) => {
+    if (!window.confirm(`Hapus campaign \"${campaignTitle}\"?`)) {
+      return;
+    }
+
+    try {
+      await campaignService.delete(campaignId);
+      setMessage('Campaign berhasil dihapus');
+      setSelectedBanner((prev) => {
+        const next = { ...prev };
+        delete next[campaignId];
+        return next;
+      });
+      await loadCampaigns();
+    } catch (error) {
+      setMessage('Gagal hapus campaign: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
   return (
     <div>
       <form onSubmit={handleCreateCampaign} style={{ marginBottom: 18 }}>
@@ -1424,6 +1443,7 @@ const CampaignManager = ({ setMessage }) => {
               <th>Priority</th>
               <th>Schedule</th>
               <th>Banner</th>
+              <th>Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -1447,6 +1467,14 @@ const CampaignManager = ({ setMessage }) => {
                   />
                   <button className="btn btn-primary btn-sm" style={{ marginTop: 6 }} onClick={() => handleUploadBanner(campaign.id)}>
                     Upload Banner
+                  </button>
+                </td>
+                <td>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => handleDeleteCampaign(campaign.id, campaign.title)}
+                  >
+                    Hapus
                   </button>
                 </td>
               </tr>

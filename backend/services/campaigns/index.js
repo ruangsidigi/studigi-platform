@@ -151,6 +151,36 @@ router.put('/campaigns/:id', requireAdmin, async (req, res) => {
   }
 });
 
+router.delete('/campaigns/:id', requireAdmin, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const campaignId = Number(req.params.id);
+    if (!Number.isInteger(campaignId)) return res.status(400).json({ error: 'Invalid campaign id' });
+
+    await db.query('BEGIN');
+    try {
+      await db.query('DELETE FROM campaign_assets WHERE campaign_id = $1', [campaignId]);
+    } catch (assetError) {
+      if (!isMissingCampaignTable(assetError.message)) throw assetError;
+    }
+
+    const deleted = await db.query('DELETE FROM campaigns WHERE id = $1 RETURNING id', [campaignId]);
+    await db.query('COMMIT');
+
+    if (!deleted.rows[0]) return res.status(404).json({ error: 'Campaign not found' });
+    return res.json({ message: 'Campaign deleted' });
+  } catch (error) {
+    try {
+      await req.app.locals.db.query('ROLLBACK');
+    } catch (rollbackError) {
+      // ignore rollback error
+    }
+
+    if (isMissingCampaignTable(error.message)) return res.status(404).json({ error: 'Campaign not found' });
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/campaigns/:id/assets', requireAdmin, upload.single('file'), async (req, res) => {
   try {
     const db = req.app.locals.db;

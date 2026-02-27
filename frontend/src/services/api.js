@@ -219,6 +219,7 @@ export const campaignService = {
   create: (payload) => api.post('/campaigns', payload),
   listAdmin: () => api.get('/campaigns/admin'),
   update: (id, payload) => api.put(`/campaigns/${id}`, payload),
+  delete: (id) => api.delete(`/campaigns/${id}`),
   uploadBanner: (id, file) => {
     const formData = new FormData();
     formData.append('file', file);
