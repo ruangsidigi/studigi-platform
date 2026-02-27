@@ -49,7 +49,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 function App() {
   const [branding, setBranding] = useState({
     logoUrl: null,
-    headerColor: '#1d7a7a',
+    headerColor: '#103c21',
     buttonColor: '#007bff',
     lineColor: '#dddddd',
   });
@@ -58,7 +58,7 @@ function App() {
     try {
       const response = await brandingService.getSettings();
       const settings = response.data || {};
-      const headerColor = settings.headerColor || '#1d7a7a';
+      const headerColor = settings.headerColor || '#103c21';
       const buttonColor = settings.buttonColor || '#007bff';
       const lineColor = settings.lineColor || '#dddddd';
       const rawLogoUrl = settings.logoUrl || null;
@@ -80,7 +80,7 @@ function App() {
       document.documentElement.style.setProperty('--button-color', buttonColor);
       document.documentElement.style.setProperty('--line-color', lineColor);
     } catch (error) {
-      document.documentElement.style.setProperty('--header-color', '#1d7a7a');
+      document.documentElement.style.setProperty('--header-color', '#103c21');
       document.documentElement.style.setProperty('--button-color', '#007bff');
       document.documentElement.style.setProperty('--line-color', '#dddddd');
     }

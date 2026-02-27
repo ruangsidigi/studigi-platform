@@ -434,7 +434,7 @@ router.post('/branding/logo', upload.single('file'), async (req, res) => {
     }
 
     const db = req.app.locals.db;
-    const headerColor = req.body.header_color || '#1d7a7a';
+    const headerColor = req.body.header_color || '#103c21';
 
     const upsertLogoWithColumn = async (columnName) => {
       await db.query(

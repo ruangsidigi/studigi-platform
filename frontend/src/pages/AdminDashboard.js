@@ -1101,7 +1101,7 @@ const EditQuestionsTab = () => {
 export default AdminDashboard;
 
 const BrandingSettingsForm = ({ setMessage }) => {
-  const [headerColor, setHeaderColor] = useState('#1d7a7a');
+  const [headerColor, setHeaderColor] = useState('#103c21');
   const [buttonColor, setButtonColor] = useState('#007bff');
   const [lineColor, setLineColor] = useState('#dddddd');
   const [logoFile, setLogoFile] = useState(null);
@@ -1114,7 +1114,7 @@ const BrandingSettingsForm = ({ setMessage }) => {
     try {
       const response = await brandingService.getSettings();
       const data = response.data || {};
-      setHeaderColor(data.headerColor || '#1d7a7a');
+      setHeaderColor(data.headerColor || '#103c21');
       setButtonColor(data.buttonColor || '#007bff');
       setLineColor(data.lineColor || '#dddddd');
       setLogoUrl(data.logoUrl || '');
@@ -1131,7 +1131,7 @@ const BrandingSettingsForm = ({ setMessage }) => {
     e.preventDefault();
 
     if (!colorRegex.test(headerColor)) {
-      setMessage('Header color harus format hex 6 digit, contoh: #1d7a7a');
+      setMessage('Header color harus format hex 6 digit, contoh: #103c21');
       return;
     }
     if (!colorRegex.test(buttonColor)) {
@@ -1196,7 +1196,7 @@ const BrandingSettingsForm = ({ setMessage }) => {
               type="text"
               value={headerColor}
               onChange={(e) => setHeaderColor(e.target.value)}
-              placeholder="#1d7a7a"
+              placeholder="#103c21"
               maxLength={7}
               required
             />

@@ -58,8 +58,8 @@ router.get('/branding', async (req, res) => {
     return res.json({
       logo: null,
       logoUrl: null,
-      header_color: '#0b5fff',
-      headerColor: '#0b5fff',
+      header_color: '#103c21',
+      headerColor: '#103c21',
       buttonColor: '#007bff',
       lineColor: '#dddddd',
     });
