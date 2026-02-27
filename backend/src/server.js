@@ -206,6 +206,9 @@ const authRoutes = require('../services/auth');
 const adminRoutes = require('../services/admin');
 const packagesRoutes = require('../services/packages');
 const paymentsRoutes = require('../services/payments');
+const purchasesRoutes = require('../services/purchases');
+const reportsRoutes = require('../services/reports');
+const campaignRoutes = require('../services/campaigns');
 const categoriesRoutes = require('../services/categories');
 
 // Mount all service routers under the common `/api` prefix. Service routers
@@ -218,6 +221,9 @@ app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', packagesRoutes);
 app.use('/api', paymentsRoutes);
+app.use('/api', purchasesRoutes);
+app.use('/api', reportsRoutes);
+app.use('/api', campaignRoutes);
 app.use('/api', categoriesRoutes);
 
 const mountLegacyRoute = (basePath, modulePath) => {
