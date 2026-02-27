@@ -29,20 +29,51 @@ router.post('/auth/register', async (req, res, next) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     let inserted;
 
-    try {
-      inserted = await db.query(
-        `INSERT INTO users (email, password_hash, display_name, created_at, updated_at)
-         VALUES ($1, $2, $3, NOW(), NOW())
-         RETURNING id, email, display_name, created_at`,
-        [email, hashedPassword, name]
-      );
-    } catch (errorFirst) {
-      inserted = await db.query(
-        `INSERT INTO users (email, password, name, role, created_at, updated_at)
-         VALUES ($1, $2, $3, 'user', NOW(), NOW())
-         RETURNING id, email, name, role, created_at`,
-        [email, hashedPassword, name]
-      );
+    const insertAttempts = [
+      {
+        text: `INSERT INTO users (email, password_hash, display_name, created_at, updated_at)
+               VALUES ($1, $2, $3, NOW(), NOW())
+               RETURNING id, email, display_name, created_at`,
+        values: [email, hashedPassword, name],
+      },
+      {
+        text: `INSERT INTO users (email, password_hash, display_name, created_at)
+               VALUES ($1, $2, $3, NOW())
+               RETURNING id, email, display_name, created_at`,
+        values: [email, hashedPassword, name],
+      },
+      {
+        text: `INSERT INTO users (email, password, name, role, created_at, updated_at)
+               VALUES ($1, $2, $3, 'user', NOW(), NOW())
+               RETURNING id, email, name, role, created_at`,
+        values: [email, hashedPassword, name],
+      },
+      {
+        text: `INSERT INTO users (email, password, name, role, created_at)
+               VALUES ($1, $2, $3, 'user', NOW())
+               RETURNING id, email, name, role, created_at`,
+        values: [email, hashedPassword, name],
+      },
+      {
+        text: `INSERT INTO users (email, password, name, created_at)
+               VALUES ($1, $2, $3, NOW())
+               RETURNING id, email, name, created_at`,
+        values: [email, hashedPassword, name],
+      },
+    ];
+
+    let lastInsertError;
+    for (const attempt of insertAttempts) {
+      try {
+        inserted = await db.query(attempt.text, attempt.values);
+        if (inserted?.rows?.[0]) break;
+      } catch (insertErr) {
+        lastInsertError = insertErr;
+      }
+    }
+
+    if (!inserted?.rows?.[0]) {
+      throw lastInsertError || new Error('Failed to create user');
     }
 
     const user = inserted.rows?.[0];
@@ -81,7 +112,7 @@ router.post('/auth/register', async (req, res, next) => {
     if (err && err.message && err.message.toLowerCase().includes('db unavailable')) {
       return res.status(503).json({ error: 'Database unavailable' });
     }
-    return next(err);
+    return res.status(500).json({ error: err?.message || 'Internal server error' });
   }
 });
 
