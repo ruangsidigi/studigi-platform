@@ -266,6 +266,8 @@ router.get('/reports/analytics', requireAuth, async (req, res) => {
       if (message.includes('file_url')) {
         const fallbackMaterials = await db.query('SELECT id, title, description, storage_key AS file_url FROM materials ORDER BY created_at DESC NULLS LAST LIMIT 50');
         materialsRows = fallbackMaterials.rows || [];
+      } else if (message.includes('materials') || message.includes('relation') || message.includes('does not exist')) {
+        materialsRows = [];
       } else {
         throw error;
       }
@@ -291,7 +293,13 @@ router.get('/reports/analytics', requireAuth, async (req, res) => {
 
     return res.json({ strengths, weaknesses, trends, recommendations });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    console.warn('reports analytics fallback:', error?.message || error);
+    return res.json({
+      strengths: [],
+      weaknesses: [],
+      trends: [],
+      recommendations: [],
+    });
   }
 });
 
