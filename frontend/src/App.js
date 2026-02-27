@@ -63,8 +63,11 @@ function App() {
         const buttonColor = settings.buttonColor || '#007bff';
         const lineColor = settings.lineColor || '#dddddd';
         const rawLogoUrl = settings.logoUrl || null;
+        const isDataUrl = typeof rawLogoUrl === 'string' && rawLogoUrl.startsWith('data:');
         const logoUrl = rawLogoUrl
-          ? `${rawLogoUrl}${rawLogoUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(settings.updatedAt || Date.now())}`
+          ? (isDataUrl
+            ? rawLogoUrl
+            : `${rawLogoUrl}${rawLogoUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(settings.updatedAt || Date.now())}`)
           : null;
 
         setBranding({
