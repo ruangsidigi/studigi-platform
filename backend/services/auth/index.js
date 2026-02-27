@@ -41,7 +41,7 @@ router.post('/auth/login', async (req, res, next) => {
       role = 'admin';
     }
 
-    const token = jwt.sign({ sub: user.id, email: user.email }, jwtSecret, { expiresIn: '7d' });
+    const token = jwt.sign({ sub: user.id, id: user.id, email: user.email, role }, jwtSecret, { expiresIn: '7d' });
     return res.json({
       token,
       user: {

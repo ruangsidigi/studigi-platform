@@ -216,6 +216,34 @@ app.use('/api', authRoutes);
 app.use('/api', paymentsRoutes);
 app.use('/api', categoriesRoutes);
 
+const mountLegacyRoute = (basePath, modulePath) => {
+  try {
+    const router = require(modulePath);
+    app.use(basePath, router);
+    console.log('mounted legacy route', { basePath, modulePath });
+  } catch (error) {
+    console.warn('skip legacy route mount', {
+      basePath,
+      modulePath,
+      error: error && error.message ? error.message : String(error),
+    });
+  }
+};
+
+mountLegacyRoute('/api/admin', './routes/admin');
+mountLegacyRoute('/api/packages', './routes/packages');
+mountLegacyRoute('/api/bundles', './routes/bundles');
+mountLegacyRoute('/api/questions', './routes/questions');
+mountLegacyRoute('/api/tryouts', './routes/tryouts');
+mountLegacyRoute('/api/purchases', './routes/purchases');
+mountLegacyRoute('/api/users', './routes/users');
+mountLegacyRoute('/api/reports', './routes/reports');
+mountLegacyRoute('/api/reviews', './routes/reviews');
+mountLegacyRoute('/api/dashboard', './routes/dashboard');
+mountLegacyRoute('/api/content', './routes/content');
+mountLegacyRoute('/api/cms', './routes/cms');
+mountLegacyRoute('/api/campaigns', './routes/campaigns');
+
 // JSON parse error handler (body-parser / express.json)
 app.use((err, req, res, next) => {
   if (err && (err.type === 'entity.parse.failed' || err instanceof SyntaxError)) {
