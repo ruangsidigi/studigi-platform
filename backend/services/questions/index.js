@@ -29,6 +29,35 @@ const requireAdmin = (req, res, next) => {
   return next();
 };
 
+const normalizeKey = (value) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/\uFEFF/g, '')
+  .replace(/[^a-z0-9]+/g, '_')
+  .replace(/^_+|_+$/g, '');
+
+const normalizeRow = (row) => {
+  const normalized = {};
+  for (const [key, value] of Object.entries(row || {})) {
+    normalized[normalizeKey(key)] = value;
+  }
+  return normalized;
+};
+
+const pickValue = (row, aliases = []) => {
+  for (const alias of aliases) {
+    const value = row[normalizeKey(alias)];
+    if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+  }
+  return null;
+};
+
+const toNumberOrNull = (value) => {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const parsed = Number(String(value).replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 router.get('/questions/package/:packageId', async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -90,13 +119,26 @@ router.post('/questions/upload', requireAdmin, upload.single('file'), async (req
     await db.query('BEGIN');
 
     let insertedCount = 0;
-    for (const row of rows) {
-      const number = Number(row.number);
-      const questionText = row.question_text ? String(row.question_text).trim() : '';
+    for (const sourceRow of rows) {
+      const row = normalizeRow(sourceRow);
+
+      const number = toNumberOrNull(pickValue(row, ['number', 'no', 'nomor']));
+      const questionTextRaw = pickValue(row, ['question_text', 'question', 'soal', 'pertanyaan']);
+      const questionText = questionTextRaw ? String(questionTextRaw).trim() : '';
 
       if (!Number.isInteger(number) || !questionText) {
         continue;
       }
+
+      const optionA = pickValue(row, ['option_a', 'a', 'pilihan_a']);
+      const optionB = pickValue(row, ['option_b', 'b', 'pilihan_b']);
+      const optionC = pickValue(row, ['option_c', 'c', 'pilihan_c']);
+      const optionD = pickValue(row, ['option_d', 'd', 'pilihan_d']);
+      const optionE = pickValue(row, ['option_e', 'e', 'pilihan_e']);
+      const correctAnswer = pickValue(row, ['correct_answer', 'answer', 'jawaban_benar', 'kunci_jawaban']);
+      const explanation = pickValue(row, ['explanation', 'pembahasan', 'penjelasan']);
+      const category = pickValue(row, ['category', 'kategori']);
+      const imageUrl = pickValue(row, ['image_url', 'gambar', 'url_gambar', 'image']);
 
       await db.query(
         `INSERT INTO questions (
@@ -116,20 +158,20 @@ router.post('/questions/upload', requireAdmin, upload.single('file'), async (req
           packageId,
           number,
           questionText,
-          row.option_a ? String(row.option_a) : null,
-          row.option_b ? String(row.option_b) : null,
-          row.option_c ? String(row.option_c) : null,
-          row.option_d ? String(row.option_d) : null,
-          row.option_e ? String(row.option_e) : null,
-          row.correct_answer ? String(row.correct_answer).toUpperCase() : null,
-          row.explanation ? String(row.explanation) : null,
-          row.category ? String(row.category).toUpperCase() : null,
-          Number.isFinite(Number(row.point_a)) ? Number(row.point_a) : null,
-          Number.isFinite(Number(row.point_b)) ? Number(row.point_b) : null,
-          Number.isFinite(Number(row.point_c)) ? Number(row.point_c) : null,
-          Number.isFinite(Number(row.point_d)) ? Number(row.point_d) : null,
-          Number.isFinite(Number(row.point_e)) ? Number(row.point_e) : null,
-          row.image_url ? String(row.image_url) : null,
+          optionA ? String(optionA) : null,
+          optionB ? String(optionB) : null,
+          optionC ? String(optionC) : null,
+          optionD ? String(optionD) : null,
+          optionE ? String(optionE) : null,
+          correctAnswer ? String(correctAnswer).trim().toUpperCase() : null,
+          explanation ? String(explanation) : null,
+          category ? String(category).trim().toUpperCase() : null,
+          toNumberOrNull(pickValue(row, ['point_a', 'poin_a', 'nilai_a'])),
+          toNumberOrNull(pickValue(row, ['point_b', 'poin_b', 'nilai_b'])),
+          toNumberOrNull(pickValue(row, ['point_c', 'poin_c', 'nilai_c'])),
+          toNumberOrNull(pickValue(row, ['point_d', 'poin_d', 'nilai_d'])),
+          toNumberOrNull(pickValue(row, ['point_e', 'poin_e', 'nilai_e'])),
+          imageUrl ? String(imageUrl) : null,
         ]
       );
 
