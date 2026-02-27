@@ -1,6 +1,7 @@
 // backend/services/materials/upload.js
 const express = require('express');
 const multer = require('multer');
+const axios = require('axios');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../../shared/config');
@@ -414,6 +415,18 @@ router.post('/branding/logo', upload.single('file'), async (req, res) => {
     let usedStorageFallback = false;
     try {
       logoValue = await uploadToStorage({ buffer: req.file.buffer, mimeType: req.file.mimetype, folder: 'branding' });
+
+      if (typeof logoValue === 'string' && /^https?:\/\//i.test(logoValue)) {
+        const check = await axios.get(logoValue, {
+          timeout: 7000,
+          responseType: 'arraybuffer',
+          validateStatus: () => true,
+        });
+
+        if (check.status >= 400) {
+          throw new Error(`Public logo URL unreachable (status ${check.status})`);
+        }
+      }
     } catch (storageError) {
       console.warn('branding/logo: storage upload failed, fallback to data URL', storageError && storageError.message ? storageError.message : storageError);
       logoValue = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
