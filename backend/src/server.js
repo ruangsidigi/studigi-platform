@@ -204,6 +204,7 @@ const uploadRoutes = require('../services/materials/upload');
 const brandingRoutes = require('../services/branding');
 const authRoutes = require('../services/auth');
 const adminRoutes = require('../services/admin');
+const packagesRoutes = require('../services/packages');
 const paymentsRoutes = require('../services/payments');
 const categoriesRoutes = require('../services/categories');
 
@@ -215,6 +216,7 @@ app.use('/api', uploadRoutes);
 app.use('/api', brandingRoutes);
 app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
+app.use('/api', packagesRoutes);
 app.use('/api', paymentsRoutes);
 app.use('/api', categoriesRoutes);
 
