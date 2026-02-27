@@ -6,6 +6,85 @@ const config = require('../../shared/config');
 
 const router = express.Router();
 
+// POST /auth/register (mounted under /api)
+router.post('/auth/register', async (req, res, next) => {
+  const { email, password, name } = req.body || {};
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: 'Email, password, and name are required' });
+  }
+
+  if (String(password).length < 6) {
+    return res.status(400).json({ error: 'Password minimal 6 karakter' });
+  }
+
+  const db = req.app.locals.db;
+  const jwtSecret = config.jwtSecret || config.jwtSecretFallback;
+
+  try {
+    const existing = await db.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1', [email]);
+    if (existing.rows?.[0]) {
+      return res.status(400).json({ error: 'User already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    let inserted;
+
+    try {
+      inserted = await db.query(
+        `INSERT INTO users (email, password_hash, display_name, created_at, updated_at)
+         VALUES ($1, $2, $3, NOW(), NOW())
+         RETURNING id, email, display_name, created_at`,
+        [email, hashedPassword, name]
+      );
+    } catch (errorFirst) {
+      inserted = await db.query(
+        `INSERT INTO users (email, password, name, role, created_at, updated_at)
+         VALUES ($1, $2, $3, 'user', NOW(), NOW())
+         RETURNING id, email, name, role, created_at`,
+        [email, hashedPassword, name]
+      );
+    }
+
+    const user = inserted.rows?.[0];
+    if (!user) {
+      return res.status(500).json({ error: 'Failed to create user' });
+    }
+
+    try {
+      const userRole = await db.query(`SELECT id FROM roles WHERE name = 'user' LIMIT 1`);
+      if (userRole.rows?.[0]?.id) {
+        await db.query(
+          `INSERT INTO user_roles (user_id, role_id)
+           VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [user.id, userRole.rows[0].id]
+        );
+      }
+    } catch (_) {
+      // optional role mapping for schema that has roles table
+    }
+
+    const role = 'user';
+    const token = jwt.sign({ sub: user.id, id: user.id, email: user.email, role }, jwtSecret, { expiresIn: '7d' });
+
+    return res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.display_name || user.name || name,
+        role,
+      },
+    });
+  } catch (err) {
+    if (err && err.message && err.message.toLowerCase().includes('db unavailable')) {
+      return res.status(503).json({ error: 'Database unavailable' });
+    }
+    return next(err);
+  }
+});
+
 // POST /auth/login (mounted under /api)
 router.post('/auth/login', async (req, res, next) => {
   const { email, password } = req.body || {};
