@@ -26,6 +26,20 @@ const requireAdmin = (req, res, next) => {
   return next();
 };
 
+const requireAuth = (req, res, next) => {
+  if (!req.user || !req.user.id) return res.status(401).json({ error: 'Access token required' });
+  return next();
+};
+
+const isAdminUser = (user) => {
+  const roleNames = getUserRoleNames(user);
+  return (
+    roleNames.includes('admin') ||
+    String(user?.role || '').toLowerCase() === 'admin' ||
+    String(user?.email || '').toLowerCase() === String(process.env.ADMIN_EMAIL || 'admin@skdcpns.com').toLowerCase()
+  );
+};
+
 const parsePackageIds = (body) => {
   const values = [];
   if (body?.packageId) values.push(body.packageId);
@@ -103,6 +117,24 @@ const withMaterialPackages = (materials, packageMap) => {
       attached_packages: attached,
       package_ids: attached.map((row) => row.package_id),
     };
+  });
+};
+
+const getOwnedPackageIds = async (db, userId) => {
+  const result = await db.query('SELECT package_id FROM purchases WHERE user_id = $1', [userId]);
+  return [...new Set((result.rows || [])
+    .map((row) => Number(row.package_id))
+    .filter((id) => Number.isInteger(id) && id > 0))];
+};
+
+const filterMaterialsByAccessiblePackages = (materials, packageMap, allowedPackageIds) => {
+  const allowed = new Set((allowedPackageIds || []).map((id) => Number(id)));
+  const normalized = withMaterialPackages(materials, packageMap);
+
+  return normalized.filter((material) => {
+    const packageIds = material.package_ids || [];
+    if (packageIds.length === 0) return false;
+    return packageIds.some((packageId) => allowed.has(Number(packageId)));
   });
 };
 
@@ -280,6 +312,77 @@ router.delete('/materials/:id/packages/:packageId', requireAdmin, async (req, re
     }
 
     return res.json({ message: 'Package detached from material' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/materials/my', requireAuth, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const packageMap = await loadPackageMap(db);
+    const allMaterialsResult = await db.query('SELECT * FROM materials ORDER BY created_at DESC NULLS LAST, id DESC');
+
+    if (isAdminUser(req.user)) {
+      return res.json(withMaterialPackages(allMaterialsResult.rows || [], packageMap));
+    }
+
+    const ownedPackageIds = await getOwnedPackageIds(db, req.user.id);
+    if (!ownedPackageIds.length) return res.json([]);
+
+    return res.json(filterMaterialsByAccessiblePackages(allMaterialsResult.rows || [], packageMap, ownedPackageIds));
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/materials/package/:packageId', requireAuth, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const packageId = Number(req.params.packageId);
+    if (!Number.isInteger(packageId)) return res.status(400).json({ error: 'Invalid package id' });
+
+    const packageMap = await loadPackageMap(db);
+    const allMaterialsResult = await db.query('SELECT * FROM materials ORDER BY created_at DESC NULLS LAST, id DESC');
+    const allNormalized = withMaterialPackages(allMaterialsResult.rows || [], packageMap);
+
+    if (!isAdminUser(req.user)) {
+      const ownedPackageIds = await getOwnedPackageIds(db, req.user.id);
+      if (!ownedPackageIds.includes(packageId)) return res.status(403).json({ error: 'No access to this package materials' });
+    }
+
+    const filtered = allNormalized.filter((material) => (material.package_ids || []).some((id) => Number(id) === packageId));
+    return res.json(filtered);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/materials/:id/access', requireAuth, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const materialId = Number(req.params.id);
+    if (!Number.isInteger(materialId)) return res.status(400).json({ error: 'Invalid material id' });
+
+    const materialResult = await db.query('SELECT * FROM materials WHERE id = $1 LIMIT 1', [materialId]);
+    const material = materialResult.rows[0];
+    if (!material) return res.status(404).json({ error: 'Material not found' });
+
+    if (!isAdminUser(req.user)) {
+      const packageMap = await loadPackageMap(db);
+      const attached = packageMap.get(materialId) || [];
+      const materialPackageIds = attached.map((item) => Number(item.package_id)).filter((id) => Number.isInteger(id));
+
+      if (!materialPackageIds.length) return res.status(403).json({ error: 'No access to this material' });
+
+      const ownedPackageIds = await getOwnedPackageIds(db, req.user.id);
+      const hasAccess = materialPackageIds.some((id) => ownedPackageIds.includes(id));
+      if (!hasAccess) return res.status(403).json({ error: 'No access to this material' });
+    }
+
+    const accessUrl = material.file_url || material.storage_key || null;
+    if (!accessUrl) return res.status(404).json({ error: 'Material URL not found' });
+    return res.json({ access_url: accessUrl });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
