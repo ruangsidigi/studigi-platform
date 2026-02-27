@@ -111,9 +111,45 @@ const buildEmailTransporter = (overrides = {}) => {
 
 const sendAuthEmail = async ({ to, subject, html, text }) => {
   const transporter = buildEmailTransporter();
-  if (!transporter) return { delivered: false, error: 'SMTP transport not configured' };
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const from = process.env.MAIL_FROM || process.env.SMTP_FROM || process.env.RESEND_FROM || 'no-reply@studigi.local';
 
-  const from = process.env.MAIL_FROM || process.env.SMTP_FROM || 'no-reply@studigi.local';
+  const sendViaResend = async () => {
+    if (!resendApiKey) return { delivered: false, error: 'Resend API key not configured' };
+
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from,
+          to: Array.isArray(to) ? to : [to],
+          subject,
+          html,
+          text,
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return {
+          delivered: false,
+          error: payload?.message || payload?.error || `Resend HTTP ${response.status}`,
+        };
+      }
+
+      return { delivered: true };
+    } catch (err) {
+      return { delivered: false, error: err?.message || 'Resend request failed' };
+    }
+  };
+
+  if (!transporter) {
+    return sendViaResend();
+  }
   try {
     await transporter.sendMail({ from, to, subject, html, text });
     return { delivered: true };
@@ -149,6 +185,12 @@ const sendAuthEmail = async ({ to, subject, html, text }) => {
           );
         }
       }
+    }
+
+    const resendResult = await sendViaResend();
+    if (resendResult.delivered) {
+      console.log(`[AUTH][MAIL_FALLBACK] ${to} delivered via Resend API after SMTP failure`);
+      return resendResult;
     }
 
     return { delivered: false, error: primaryError };
