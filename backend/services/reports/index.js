@@ -181,16 +181,42 @@ router.get('/reports/analytics', requireAuth, async (req, res) => {
     }
 
     const sessionIds = sessions.map((session) => Number(session.id));
-    const answersResult = await db.query(
-      `SELECT a.session_id, a.question_id, a.user_answer, a.is_correct, a.submitted_at,
-              q.category, q.correct_answer, q.point_a, q.point_b, q.point_c, q.point_d, q.point_e
-       FROM tryout_answers a
-       LEFT JOIN questions q ON q.id = a.question_id
-       WHERE a.session_id = ANY($1::int[])`,
-      [sessionIds]
-    );
+    let answersRows = [];
+    let hasTkpPointColumns = true;
+    try {
+      const answersResult = await db.query(
+        `SELECT a.session_id, a.question_id, a.user_answer, a.is_correct, a.submitted_at,
+                q.category, q.correct_answer, q.point_a, q.point_b, q.point_c, q.point_d, q.point_e
+         FROM tryout_answers a
+         LEFT JOIN questions q ON q.id = a.question_id
+         WHERE a.session_id = ANY($1::int[])`,
+        [sessionIds]
+      );
+      answersRows = answersResult.rows || [];
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      const missingPointColumns =
+        message.includes('point_a') ||
+        message.includes('point_b') ||
+        message.includes('point_c') ||
+        message.includes('point_d') ||
+        message.includes('point_e');
 
-    const latestAnswers = mapLatestAnswers(answersResult.rows || []);
+      if (!missingPointColumns) throw error;
+
+      hasTkpPointColumns = false;
+      const fallbackAnswers = await db.query(
+        `SELECT a.session_id, a.question_id, a.user_answer, a.is_correct, a.submitted_at,
+                q.category, q.correct_answer
+         FROM tryout_answers a
+         LEFT JOIN questions q ON q.id = a.question_id
+         WHERE a.session_id = ANY($1::int[])`,
+        [sessionIds]
+      );
+      answersRows = fallbackAnswers.rows || [];
+    }
+
+    const latestAnswers = mapLatestAnswers(answersRows);
     const topicMap = new Map();
     for (const item of latestAnswers) {
       const topic = String(item.category || 'LAINNYA').toUpperCase();
@@ -198,11 +224,18 @@ router.get('/reports/analytics', requireAuth, async (req, res) => {
       current.total += 1;
 
       if (topic === 'TKP') {
-        const option = String(item.user_answer || '').toLowerCase();
-        const selected = asNumber(item[`point_${option}`]);
-        const maxPoint = Math.max(asNumber(item.point_a), asNumber(item.point_b), asNumber(item.point_c), asNumber(item.point_d), asNumber(item.point_e));
-        current.tkpPoints += selected;
-        current.tkpMax += maxPoint > 0 ? maxPoint : 5;
+        if (hasTkpPointColumns) {
+          const option = String(item.user_answer || '').toLowerCase();
+          const selected = asNumber(item[`point_${option}`]);
+          const maxPoint = Math.max(asNumber(item.point_a), asNumber(item.point_b), asNumber(item.point_c), asNumber(item.point_d), asNumber(item.point_e));
+          current.tkpPoints += selected;
+          current.tkpMax += maxPoint > 0 ? maxPoint : 5;
+        } else {
+          const isCorrectByFlag = item.is_correct === true;
+          const isCorrectByAnswer = item.user_answer && item.correct_answer && item.user_answer === item.correct_answer;
+          if (isCorrectByFlag || isCorrectByAnswer) current.correct += 1;
+          else current.wrong += 1;
+        }
       } else {
         const isCorrect = item.user_answer && item.correct_answer && item.user_answer === item.correct_answer;
         if (isCorrect) current.correct += 1;
@@ -215,7 +248,7 @@ router.get('/reports/analytics', requireAuth, async (req, res) => {
     const trends = sessions.map((session, index) => ({ index: index + 1, attemptId: session.id, score: asNumber(session.total_score) }));
     const topicRows = Array.from(topicMap.values()).map((row) => {
       const objectiveTotal = row.correct + row.wrong;
-      const accuracy = row.topic === 'TKP'
+      const accuracy = row.topic === 'TKP' && hasTkpPointColumns
         ? Math.round((row.tkpPoints / Math.max(1, row.tkpMax)) * 100)
         : Math.round((row.correct / Math.max(1, objectiveTotal)) * 100);
       return { topic: row.topic, total: row.total, correct: row.correct, wrong: row.wrong, accuracy };
@@ -224,9 +257,22 @@ router.get('/reports/analytics', requireAuth, async (req, res) => {
     const strengths = topicRows.filter((row) => row.accuracy >= 70).sort((a, b) => b.accuracy - a.accuracy);
     const weaknesses = topicRows.filter((row) => row.accuracy < 55).sort((a, b) => a.accuracy - b.accuracy);
 
-    const materialsResult = await db.query('SELECT id, title, description, COALESCE(file_url, storage_key) AS file_url FROM materials ORDER BY created_at DESC NULLS LAST LIMIT 50');
+    let materialsRows = [];
+    try {
+      const materialsResult = await db.query('SELECT id, title, description, COALESCE(file_url, storage_key) AS file_url FROM materials ORDER BY created_at DESC NULLS LAST LIMIT 50');
+      materialsRows = materialsResult.rows || [];
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      if (message.includes('file_url')) {
+        const fallbackMaterials = await db.query('SELECT id, title, description, storage_key AS file_url FROM materials ORDER BY created_at DESC NULLS LAST LIMIT 50');
+        materialsRows = fallbackMaterials.rows || [];
+      } else {
+        throw error;
+      }
+    }
+
     const recommendations = weaknesses.map((weak) => {
-      const related = (materialsResult.rows || [])
+      const related = (materialsRows || [])
         .filter((mat) => String(mat.title || '').toUpperCase().includes(weak.topic) || String(mat.description || '').toUpperCase().includes(weak.topic))
         .slice(0, 3)
         .map((mat) => ({ id: mat.id, title: mat.title, description: mat.description, fileUrl: mat.file_url }));
