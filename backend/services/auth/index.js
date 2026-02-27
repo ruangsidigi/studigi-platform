@@ -69,23 +69,36 @@ const hasColumn = async (db, tableName, columnName) => {
   return Boolean(result.rows?.[0]);
 };
 
-const buildEmailTransporter = () => {
+const buildEmailTransporter = (overrides = {}) => {
   const smtpUrl = process.env.SMTP_URL;
   const timeoutOptions = {
     connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
     greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
     socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
+    dnsTimeout: Number(process.env.SMTP_DNS_TIMEOUT_MS || 10000),
   };
 
-  if (smtpUrl) return nodemailer.createTransport(smtpUrl, timeoutOptions);
+  if (smtpUrl && !overrides.forceHostMode) return nodemailer.createTransport(smtpUrl, timeoutOptions);
 
-  if (!process.env.SMTP_HOST) return null;
+  const smtpHost = overrides.host || process.env.SMTP_HOST;
+  if (!smtpHost) return null;
+
+  const smtpPort = Number(overrides.port || process.env.SMTP_PORT || 587);
+  const smtpSecure =
+    typeof overrides.secure === 'boolean'
+      ? overrides.secure
+      : String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
 
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure,
     ...timeoutOptions,
+    requireTLS: !smtpSecure,
+    tls: {
+      minVersion: 'TLSv1.2',
+      servername: smtpHost,
+    },
     auth:
       process.env.SMTP_USER || process.env.SMTP_PASS
         ? {
@@ -105,7 +118,40 @@ const sendAuthEmail = async ({ to, subject, html, text }) => {
     await transporter.sendMail({ from, to, subject, html, text });
     return { delivered: true };
   } catch (error) {
-    return { delivered: false, error: error?.message || 'Failed to send email' };
+    const primaryError = error?.message || 'Failed to send email';
+
+    const smtpHost = String(process.env.SMTP_HOST || '').toLowerCase();
+    const isGmailHost = smtpHost === 'smtp.gmail.com';
+    const usingSmtpUrl = Boolean(process.env.SMTP_URL);
+
+    if (isGmailHost && !usingSmtpUrl) {
+      const currentPort = Number(process.env.SMTP_PORT || 587);
+      const currentSecure = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
+      const retryPlans = [
+        { port: 587, secure: false },
+        { port: 465, secure: true },
+      ].filter((plan) => !(plan.port === currentPort && plan.secure === currentSecure));
+
+      for (const plan of retryPlans) {
+        try {
+          const retryTransporter = buildEmailTransporter({
+            forceHostMode: true,
+            host: process.env.SMTP_HOST,
+            port: plan.port,
+            secure: plan.secure,
+          });
+          await retryTransporter.sendMail({ from, to, subject, html, text });
+          console.log(`[AUTH][MAIL_RETRY_OK] ${to} via ${process.env.SMTP_HOST}:${plan.port} secure=${plan.secure}`);
+          return { delivered: true };
+        } catch (retryError) {
+          console.error(
+            `[AUTH][MAIL_RETRY_FAIL] ${to} via ${process.env.SMTP_HOST}:${plan.port} secure=${plan.secure}: ${retryError?.message || 'unknown error'}`
+          );
+        }
+      }
+    }
+
+    return { delivered: false, error: primaryError };
   }
 };
 
