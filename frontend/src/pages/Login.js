@@ -8,13 +8,16 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setInfo('');
     setLoading(true);
 
     try {
@@ -35,11 +38,31 @@ const Login = () => {
     }
   };
 
+  const handleResendVerification = async () => {
+    if (!email) {
+      setError('Isi email terlebih dahulu');
+      return;
+    }
+
+    setError('');
+    setInfo('');
+    setResendLoading(true);
+    try {
+      const response = await authService.resendVerification(email);
+      setInfo(response.data?.message || 'Email verifikasi dikirim ulang.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Gagal mengirim ulang verifikasi');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   return (
     <div className="auth-container">
       <div className="auth-card">
         <h2>Login</h2>
         {error && <div className="alert alert-danger">{error}</div>}
+        {info && <div className="alert alert-info">{info}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Email</label>
@@ -68,6 +91,11 @@ const Login = () => {
         </p>
         <p className="auth-link">
           <a href="/forgot-password">Forgot password?</a>
+        </p>
+        <p className="auth-link">
+          <button type="button" className="btn btn-primary" onClick={handleResendVerification} disabled={resendLoading}>
+            {resendLoading ? 'Mengirim ulang...' : 'Kirim Ulang Verifikasi Email'}
+          </button>
         </p>
       </div>
     </div>

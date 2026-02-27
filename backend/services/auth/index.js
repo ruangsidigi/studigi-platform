@@ -71,7 +71,13 @@ const hasColumn = async (db, tableName, columnName) => {
 
 const buildEmailTransporter = () => {
   const smtpUrl = process.env.SMTP_URL;
-  if (smtpUrl) return nodemailer.createTransport(smtpUrl);
+  const timeoutOptions = {
+    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
+    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
+    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
+  };
+
+  if (smtpUrl) return nodemailer.createTransport(smtpUrl, timeoutOptions);
 
   if (!process.env.SMTP_HOST) return null;
 
@@ -79,6 +85,7 @@ const buildEmailTransporter = () => {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
     secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
+    ...timeoutOptions,
     auth:
       process.env.SMTP_USER || process.env.SMTP_PASS
         ? {
@@ -91,11 +98,62 @@ const buildEmailTransporter = () => {
 
 const sendAuthEmail = async ({ to, subject, html, text }) => {
   const transporter = buildEmailTransporter();
-  if (!transporter) return { delivered: false };
+  if (!transporter) return { delivered: false, error: 'SMTP transport not configured' };
 
   const from = process.env.MAIL_FROM || process.env.SMTP_FROM || 'no-reply@studigi.local';
-  await transporter.sendMail({ from, to, subject, html, text });
-  return { delivered: true };
+  try {
+    await transporter.sendMail({ from, to, subject, html, text });
+    return { delivered: true };
+  } catch (error) {
+    return { delivered: false, error: error?.message || 'Failed to send email' };
+  }
+};
+
+const sendVerificationEmailForUser = async ({ db, user, displayName }) => {
+  const verificationToken = createRawToken();
+  const verificationLink = `${getFrontendBaseUrl()}/verify-email?token=${encodeURIComponent(verificationToken)}`;
+
+  await saveAuthToken({
+    db,
+    userId: user.id,
+    email: user.email,
+    purpose: 'verify_email',
+    tokenHash: hashToken(verificationToken),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  });
+
+  const mailResult = await sendAuthEmail({
+    to: user.email,
+    subject: 'Konfirmasi email akun Studigi',
+    text: `Halo ${displayName},\n\nKlik link berikut untuk verifikasi email akun kamu:\n${verificationLink}\n\nLink berlaku 24 jam.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #222;">
+        <h2>Konfirmasi Email Akun Studigi</h2>
+        <p>Halo <strong>${String(displayName || 'Peserta')}</strong>,</p>
+        <p>Silakan klik tombol berikut untuk mengaktifkan akun kamu:</p>
+        <p>
+          <a href="${verificationLink}" style="display:inline-block;padding:10px 16px;background:#103c21;color:#fff;text-decoration:none;border-radius:6px;">
+            Verifikasi Email
+          </a>
+        </p>
+        <p>Jika tombol tidak berfungsi, salin link ini:</p>
+        <p><a href="${verificationLink}">${verificationLink}</a></p>
+        <p>Link berlaku selama 24 jam.</p>
+      </div>
+    `,
+  });
+
+  if (!mailResult.delivered) {
+    console.error(`[AUTH][VERIFY][MAIL_ERROR] ${user.email}: ${mailResult.error || 'unknown error'}`);
+    if (!isProduction) {
+      console.log(`[AUTH][VERIFY] ${user.email} -> ${verificationLink}`);
+    }
+  }
+
+  return {
+    ...mailResult,
+    verificationLink,
+  };
 };
 
 const getUserByEmail = async (db, email) => {
@@ -283,52 +341,57 @@ router.post('/auth/register', async (req, res, next) => {
       // optional role mapping for schema that has roles table
     }
 
-    const verificationToken = createRawToken();
-    const verificationLink = `${getFrontendBaseUrl()}/verify-email?token=${encodeURIComponent(verificationToken)}`;
-    await saveAuthToken({
+    const mailResult = await sendVerificationEmailForUser({
       db,
-      userId: user.id,
-      email: user.email,
-      purpose: 'verify_email',
-      tokenHash: hashToken(verificationToken),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      user,
+      displayName: user.display_name || user.name || name,
     });
-
-    const mailResult = await sendAuthEmail({
-      to: user.email,
-      subject: 'Konfirmasi email akun Studigi',
-      text: `Halo ${name},\n\nKlik link berikut untuk verifikasi email akun kamu:\n${verificationLink}\n\nLink berlaku 24 jam.`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #222;">
-          <h2>Konfirmasi Email Akun Studigi</h2>
-          <p>Halo <strong>${String(name || 'Peserta')}</strong>,</p>
-          <p>Silakan klik tombol berikut untuk mengaktifkan akun kamu:</p>
-          <p>
-            <a href="${verificationLink}" style="display:inline-block;padding:10px 16px;background:#103c21;color:#fff;text-decoration:none;border-radius:6px;">
-              Verifikasi Email
-            </a>
-          </p>
-          <p>Jika tombol tidak berfungsi, salin link ini:</p>
-          <p><a href="${verificationLink}">${verificationLink}</a></p>
-          <p>Link berlaku selama 24 jam.</p>
-        </div>
-      `,
-    });
-
-    if (!mailResult.delivered && !isProduction) {
-      console.log(`[AUTH][VERIFY] ${user.email} -> ${verificationLink}`);
-    }
 
     return res.status(201).json({
       message: mailResult.delivered
         ? 'Registrasi berhasil. Silakan cek email untuk verifikasi akun sebelum login.'
-        : 'Registrasi berhasil. SMTP belum dikonfigurasi, link verifikasi dicetak di log server.',
-      ...(mailResult.delivered || isProduction ? {} : { debugVerificationLink: verificationLink }),
+        : 'Registrasi berhasil, tetapi email verifikasi gagal dikirim. Coba Kirim Ulang Verifikasi dari halaman login.',
+      ...(mailResult.delivered || isProduction ? {} : { debugVerificationLink: mailResult.verificationLink }),
     });
   } catch (err) {
     if (err && err.message && err.message.toLowerCase().includes('db unavailable')) {
       return res.status(503).json({ error: 'Database unavailable' });
     }
+    return res.status(500).json({ error: err?.message || 'Internal server error' });
+  }
+});
+
+router.post('/auth/resend-verification', async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ error: 'Email wajib diisi' });
+
+  const db = req.app.locals.db;
+  try {
+    await ensureAuthSchema(db);
+
+    const user = await getUserByEmail(db, email);
+    if (!user) {
+      return res.json({ message: 'Jika akun terdaftar, email verifikasi akan dikirim ulang.' });
+    }
+
+    const hasEmailVerifiedColumn = await hasColumn(db, 'users', 'email_verified');
+    if (hasEmailVerifiedColumn && Boolean(user.email_verified)) {
+      return res.json({ message: 'Email sudah terverifikasi. Silakan login.' });
+    }
+
+    const mailResult = await sendVerificationEmailForUser({
+      db,
+      user,
+      displayName: user.display_name || user.name || user.email,
+    });
+
+    return res.json({
+      message: mailResult.delivered
+        ? 'Email verifikasi berhasil dikirim ulang.'
+        : 'Permintaan diterima, tetapi email verifikasi gagal dikirim. Coba beberapa saat lagi.',
+      ...(mailResult.delivered || isProduction ? {} : { debugVerificationLink: mailResult.verificationLink }),
+    });
+  } catch (err) {
     return res.status(500).json({ error: err?.message || 'Internal server error' });
   }
 });
@@ -396,14 +459,17 @@ router.post('/auth/forgot-password', async (req, res) => {
       `,
     });
 
-    if (!mailResult.delivered && !isProduction) {
-      console.log(`[AUTH][RESET] ${user.email} -> ${resetLink}`);
+    if (!mailResult.delivered) {
+      console.error(`[AUTH][RESET][MAIL_ERROR] ${user.email}: ${mailResult.error || 'unknown error'}`);
+      if (!isProduction) {
+        console.log(`[AUTH][RESET] ${user.email} -> ${resetLink}`);
+      }
     }
 
     return res.json({
       message: mailResult.delivered
         ? 'Jika email terdaftar, link reset password akan dikirim.'
-        : 'Permintaan diterima. SMTP belum dikonfigurasi, link reset dicetak di log server.',
+        : 'Permintaan diterima, tetapi pengiriman email reset sedang bermasalah. Coba lagi beberapa saat.',
       ...(mailResult.delivered || isProduction ? {} : { debugResetLink: resetLink }),
     });
   } catch (err) {
