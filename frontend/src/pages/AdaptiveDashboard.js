@@ -105,26 +105,28 @@ const AdaptiveDashboard = () => {
           {data.studyPlan.length === 0 ? (
             <p className="text-muted">Belum ada study plan.</p>
           ) : (
-            <table className="study-plan-table">
-              <thead>
-                <tr>
-                  <th>Priority</th>
-                  <th>Topic</th>
-                  <th>Action</th>
-                  <th>Target Accuracy</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.studyPlan.map((item) => (
-                  <tr key={`${item.topic}-${item.priority}`}>
-                    <td>{item.priority}</td>
-                    <td>{item.topic}</td>
-                    <td>{item.action}</td>
-                    <td>{item.targetAccuracy}%</td>
+            <div className="study-plan-table-wrap">
+              <table className="study-plan-table">
+                <thead>
+                  <tr>
+                    <th>Priority</th>
+                    <th>Topic</th>
+                    <th>Action</th>
+                    <th>Target Accuracy</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.studyPlan.map((item) => (
+                    <tr key={`${item.topic}-${item.priority}`}>
+                      <td>{item.priority}</td>
+                      <td>{item.topic}</td>
+                      <td>{item.action}</td>
+                      <td>{item.targetAccuracy}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </div>
