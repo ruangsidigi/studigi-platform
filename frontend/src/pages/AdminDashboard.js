@@ -122,6 +122,26 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteAllPackages = async () => {
+    if (!packages.length) {
+      setMessage('Tidak ada paket untuk dihapus');
+      return;
+    }
+
+    if (!window.confirm('Hapus SEMUA paket? Tindakan ini tidak bisa dibatalkan.')) {
+      return;
+    }
+
+    try {
+      const res = await packageService.deleteAll();
+      const deletedCount = Number(res?.data?.deletedCount || 0);
+      setMessage(`Berhasil menghapus ${deletedCount} paket`);
+      await loadDashboardData();
+    } catch (err) {
+      setMessage('Error deleting all packages: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   if (loading) return <div className="container">Loading...</div>;
 
   return (
@@ -422,7 +442,16 @@ const AdminDashboard = () => {
             </div>
 
             <div className="card mt-20">
-              <div className="card-title">Daftar Paket</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div className="card-title" style={{ marginBottom: 0 }}>Daftar Paket</div>
+                <button
+                  type="button"
+                  className="btn btn-danger btn-sm"
+                  onClick={handleDeleteAllPackages}
+                >
+                  Hapus Semua Paket
+                </button>
+              </div>
               <table className="admin-table">
                 <thead>
                   <tr>

@@ -36,6 +36,7 @@ export const packageService = {
   create: (data) => api.post('/packages', data),
   update: (id, data) => api.put(`/packages/${id}`, data),
   delete: (id) => api.delete(`/packages/${id}`),
+  deleteAll: () => api.delete('/packages'),
 };
 
 // Bundle Service

@@ -21,6 +21,19 @@ const requireAdmin = (req, res, next) => {
   return next();
 };
 
+const isMissingRelation = (message) => {
+  const msg = String(message || '').toLowerCase();
+  return msg.includes('does not exist') || msg.includes('relation') || msg.includes('column');
+};
+
+const safeExec = async (db, sql, values = []) => {
+  try {
+    await db.query(sql, values);
+  } catch (error) {
+    if (!isMissingRelation(error.message)) throw error;
+  }
+};
+
 router.get('/packages', async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -133,6 +146,38 @@ router.delete('/packages/:id', requireAdmin, async (req, res) => {
     if (!result.rows[0]) return res.status(404).json({ error: 'Package not found' });
     return res.json({ message: 'Package deleted successfully' });
   } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/packages', requireAdmin, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    await db.query('BEGIN');
+
+    await safeExec(
+      db,
+      `DELETE FROM tryout_answers
+       WHERE session_id IN (
+         SELECT id FROM tryout_sessions WHERE package_id IN (SELECT id FROM packages)
+       )`
+    );
+    await safeExec(db, 'DELETE FROM purchases WHERE package_id IN (SELECT id FROM packages)');
+    await safeExec(db, 'DELETE FROM tryout_sessions WHERE package_id IN (SELECT id FROM packages)');
+    await safeExec(db, 'DELETE FROM package_materials WHERE package_id IN (SELECT id FROM packages)');
+    await safeExec(db, 'DELETE FROM bundle_packages WHERE package_id IN (SELECT id FROM packages)');
+    await safeExec(db, 'UPDATE materials SET package_id = NULL WHERE package_id IN (SELECT id FROM packages)');
+
+    const deleted = await db.query('DELETE FROM packages');
+
+    await db.query('COMMIT');
+    return res.json({ message: 'All packages deleted successfully', deletedCount: deleted.rowCount || 0 });
+  } catch (error) {
+    try {
+      await req.app.locals.db.query('ROLLBACK');
+    } catch (rollbackError) {
+      // ignore rollback errors
+    }
     return res.status(500).json({ error: error.message });
   }
 });
