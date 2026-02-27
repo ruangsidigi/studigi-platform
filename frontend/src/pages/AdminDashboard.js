@@ -3,6 +3,7 @@ import { adminService, packageService, questionService, materialService, brandin
 import '../styles/admin.css';
 
 const API_ROOT = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+const BASE_CATEGORY_NAMES = ['CPNS', 'BUMN', 'TOEFL'];
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -48,6 +49,33 @@ const AdminDashboard = () => {
   const handleCreatePackage = async (e) => {
     e.preventDefault();
     try {
+      const ensureCategoryIdByName = async (rawName) => {
+        const normalizedName = String(rawName || '').trim();
+        if (!normalizedName) return null;
+
+        const existing = categories.find(
+          (category) => String(category?.name || '').trim().toLowerCase() === normalizedName.toLowerCase()
+        );
+        if (existing?.id) return existing.id;
+
+        const res = await fetch(API_ROOT + '/api/categories', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({ name: normalizedName, description: '' }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || res.statusText || 'Gagal membuat kategori');
+
+        setCategories((prev) => {
+          if ((prev || []).some((item) => String(item?.id) === String(json?.id))) return prev;
+          return [...prev, json];
+        });
+        return json.id;
+      };
+
       // resolve category: allow selecting preset names or creating a new one
       let payload = { ...newPackage };
       let resolvedCategoryId = null;
@@ -56,17 +84,9 @@ const AdminDashboard = () => {
           setMessage('Nama kategori baru harus diisi');
           return;
         }
-        // create new category
-        const res = await fetch(API_ROOT + '/api/categories', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-          body: JSON.stringify({ name: otherCategoryName, description: '' }),
-        });
-        const json = await res.json();
-        if (!res.ok) { setMessage('Gagal membuat kategori: ' + (json.error || res.statusText)); return; }
-        resolvedCategoryId = json.id;
-      } else if (['CPNS','BUMN','TOEFL','UTBK'].includes(payload.category_id)) {
-        const found = categories.find(c => c.name === payload.category_id);
-        if (found) resolvedCategoryId = found.id;
+        resolvedCategoryId = await ensureCategoryIdByName(otherCategoryName);
+      } else if (BASE_CATEGORY_NAMES.includes(payload.category_id)) {
+        resolvedCategoryId = await ensureCategoryIdByName(payload.category_id);
       } else if (payload.category_id) {
         resolvedCategoryId = payload.category_id;
       }
@@ -321,17 +341,12 @@ const AdminDashboard = () => {
                       <option value="CPNS">CPNS</option>
                       <option value="BUMN">BUMN</option>
                       <option value="TOEFL">TOEFL</option>
-                      <option value="UTBK">UTBK</option>
-                      <option value="other">Tambah Lainnya</option>
-                      {/* also include existing categories for direct selection by id */}
-                      {categories.map((c) => (
-                        <option key={`cat-${c.id}`} value={c.id}>{c.name}</option>
-                      ))}
+                      <option value="other">Lainnya</option>
                     </select>
                     {newPackage.category_id === 'other' && (
                       <input
                         type="text"
-                        placeholder="Nama kategori baru"
+                        placeholder="Nama kategori"
                         value={otherCategoryName}
                         onChange={(e) => setOtherCategoryName(e.target.value)}
                         style={{ marginTop: 8 }}
@@ -501,7 +516,7 @@ const AdminDashboard = () => {
         {activeTab === 'materials' && (
           <div className="card">
             <div className="card-title">Upload Materi (PDF)</div>
-            <MaterialUploader categories={categories} packages={packages} materials={materials} setMaterials={setMaterials} setMessage={setMessage} />
+            <MaterialUploader categories={categories} setCategories={setCategories} packages={packages} materials={materials} setMaterials={setMaterials} setMessage={setMessage} />
           </div>
         )}
 
@@ -1590,14 +1605,43 @@ const CategoryManager = ({ categories, setCategories, setMessage }) => {
 };
 
 // Material uploader component
-const MaterialUploader = ({ categories, packages, materials, setMaterials, setMessage }) => {
+const MaterialUploader = ({ categories, setCategories, packages, materials, setMaterials, setMessage }) => {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [otherCategoryName, setOtherCategoryName] = useState('');
   const [packageId, setPackageId] = useState('');
   const [faviconFile, setFaviconFile] = useState(null);
   const [attachPackageByMaterial, setAttachPackageByMaterial] = useState({});
+
+  const ensureCategoryIdByName = async (rawName) => {
+    const normalizedName = String(rawName || '').trim();
+    if (!normalizedName) return null;
+
+    const existing = categories.find(
+      (category) => String(category?.name || '').trim().toLowerCase() === normalizedName.toLowerCase()
+    );
+    if (existing?.id) return existing.id;
+
+    const res = await fetch(API_ROOT + '/api/categories', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify({ name: normalizedName, description: '' }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || res.statusText || 'Gagal membuat kategori');
+
+    setCategories((prev) => {
+      if ((prev || []).some((item) => String(item?.id) === String(json?.id))) return prev;
+      return [...prev, json];
+    });
+
+    return json.id;
+  };
 
   const reloadMaterials = async () => {
     const response = await materialService.listAdmin();
@@ -1612,22 +1656,39 @@ const MaterialUploader = ({ categories, packages, materials, setMaterials, setMe
       setMessage('File harus berformat PDF');
       return;
     }
+
+    let resolvedCategoryId = null;
+    try {
+      if (selectedCategory === 'other') {
+        if (!otherCategoryName.trim()) {
+          setMessage('Nama kategori harus diisi saat memilih Lainnya');
+          return;
+        }
+        resolvedCategoryId = await ensureCategoryIdByName(otherCategoryName);
+      } else if (BASE_CATEGORY_NAMES.includes(selectedCategory)) {
+        resolvedCategoryId = await ensureCategoryIdByName(selectedCategory);
+      }
+    } catch (categoryError) {
+      setMessage('Error kategori: ' + (categoryError.message || 'Gagal menyiapkan kategori'));
+      return;
+    }
+
     try {
       const form = new FormData();
       form.append('file', file);
-      if (categoryId) form.append('categoryId', categoryId);
+      if (resolvedCategoryId) form.append('categoryId', resolvedCategoryId);
       if (packageId) form.append('packageId', packageId);
       if (title) form.append('title', title);
       if (description) form.append('description', description);
 
       await materialService.upload(file, {
-        categoryId,
+        categoryId: resolvedCategoryId,
         packageId,
         title,
         description,
       });
       {
-        setMessage('Material uploaded'); setFile(null); setTitle(''); setDescription(''); setCategoryId(''); setPackageId('');
+        setMessage('Material uploaded'); setFile(null); setTitle(''); setDescription(''); setSelectedCategory(''); setOtherCategoryName(''); setPackageId('');
         await reloadMaterials();
       }
     } catch (err) { setMessage(err.message || 'Error uploading material'); }
@@ -1725,10 +1786,22 @@ const MaterialUploader = ({ categories, packages, materials, setMaterials, setMe
           </div>
           <div className="form-group">
             <label>Category</label>
-            <select value={categoryId} onChange={(e)=>setCategoryId(e.target.value)}>
+            <select value={selectedCategory} onChange={(e)=>setSelectedCategory(e.target.value)}>
               <option value="">-- none --</option>
-              {categories.map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="CPNS">CPNS</option>
+              <option value="BUMN">BUMN</option>
+              <option value="TOEFL">TOEFL</option>
+              <option value="other">Lainnya</option>
             </select>
+            {selectedCategory === 'other' && (
+              <input
+                type="text"
+                placeholder="Nama kategori"
+                value={otherCategoryName}
+                onChange={(e) => setOtherCategoryName(e.target.value)}
+                style={{ marginTop: 8 }}
+              />
+            )}
           </div>
         </div>
         <div className="form-row">
