@@ -134,7 +134,9 @@ const buildEmailTransporter = (overrides = {}) => {
 };
 
 const sendAuthEmail = async ({ to, subject, html, text }) => {
-  const transporter = buildEmailTransporter();
+  const mailTransport = readEnv('MAIL_TRANSPORT').toLowerCase();
+  const forceResend = readEnvBool('MAIL_FORCE_RESEND', false) || mailTransport === 'resend';
+  const transporter = forceResend ? null : buildEmailTransporter();
   const resendApiKey = readEnv('RESEND_API_KEY');
   const from = readEnv('MAIL_FROM') || readEnv('SMTP_FROM') || readEnv('RESEND_FROM') || 'no-reply@studigi.local';
 
@@ -170,6 +172,25 @@ const sendAuthEmail = async ({ to, subject, html, text }) => {
       return { delivered: false, error: err?.message || 'Resend request failed' };
     }
   };
+
+  if (forceResend) {
+    const resendFirst = await sendViaResend();
+    if (resendFirst.delivered) return resendFirst;
+
+    const smtpFallback = buildEmailTransporter();
+    if (!smtpFallback) return resendFirst;
+
+    try {
+      await smtpFallback.sendMail({ from, to, subject, html, text });
+      console.log(`[AUTH][MAIL_FALLBACK_SMTP] ${to} delivered via SMTP after Resend failure`);
+      return { delivered: true };
+    } catch (smtpErr) {
+      return {
+        delivered: false,
+        error: `Resend failed: ${resendFirst.error || 'unknown error'} | SMTP fallback failed: ${smtpErr?.message || 'unknown error'}`,
+      };
+    }
+  }
 
   if (!transporter) {
     return sendViaResend();

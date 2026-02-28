@@ -70,6 +70,12 @@ Alternatif pasangan Gmail yang valid:
 Jika tetap gagal dari environment serverless tertentu, siapkan fallback API email:
 - `RESEND_API_KEY` (opsional, tapi direkomendasikan sebagai backup)
 - `RESEND_FROM` (contoh: `Studigi <noreply@domainanda.com>`)
+- `MAIL_TRANSPORT=resend` (agar kirim mencoba Resend dulu, bukan SMTP)
+- `MAIL_FORCE_RESEND=true` (opsional, memaksa mode Resend)
+
+Untuk test cepat Resend tanpa domain custom, bisa pakai:
+- `RESEND_FROM=onboarding@resend.dev`
+Catatan: alamat ini biasanya hanya bisa kirim ke email akun Resend Anda sendiri.
 
 #### Opsional (hanya jika pakai upload file/material)
 
@@ -247,6 +253,8 @@ SMTP_PASS=app_password_16_karakter
 MAIL_FROM=Studigi <akunanda@gmail.com>
 RESEND_API_KEY=
 RESEND_FROM=
+MAIL_TRANSPORT=resend
+MAIL_FORCE_RESEND=true
 STORAGE_ENDPOINT=
 STORAGE_BUCKET=
 STORAGE_KEY=
