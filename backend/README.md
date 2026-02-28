@@ -129,6 +129,21 @@ npm run dev
 npm start
 ```
 
+### Test SMTP Gmail/env quickly:
+```bash
+npm run smtp:test
+```
+
+### Smoke test auth email flow (register/login block/resend/forgot):
+```bash
+npm run auth:flow:test
+```
+
+Untuk test ke backend deploy (Railway/Vercel), set base URL dulu:
+```bash
+AUTH_TEST_BASE_URL=https://your-backend-domain/api npm run auth:flow:test
+```
+
 Server akan berjalan di `http://localhost:5000`
 
 ## API Endpoints
@@ -136,6 +151,8 @@ Server akan berjalan di `http://localhost:5000`
 ### Authentication
 - `POST /api/auth/register` - Register user
 - `POST /api/auth/login` - Login user
+- `POST /api/auth/resend-verification` - Resend verification email
+- `POST /api/auth/verify-email` - Verify email by token
 - `POST /api/auth/forgot-password` - Request password reset
 - `POST /api/auth/reset-password` - Reset password
 

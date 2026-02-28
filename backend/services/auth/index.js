@@ -12,6 +12,27 @@ let authSchemaInitPromise = null;
 
 const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
 
+const readEnv = (name, fallback = '') => {
+  const raw = process.env[name];
+  if (raw === undefined || raw === null) return fallback;
+  return String(raw).trim();
+};
+
+const readEnvBool = (name, fallback = false) => {
+  const raw = readEnv(name, String(fallback));
+  if (!raw) return fallback;
+  const lowered = raw.toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(lowered)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(lowered)) return false;
+  return fallback;
+};
+
+const readEnvNum = (name, fallback) => {
+  const raw = readEnv(name, String(fallback));
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : fallback;
+};
+
 const getFrontendBaseUrl = () => {
   const url =
     process.env.FRONTEND_URL ||
@@ -70,24 +91,27 @@ const hasColumn = async (db, tableName, columnName) => {
 };
 
 const buildEmailTransporter = (overrides = {}) => {
-  const smtpUrl = process.env.SMTP_URL;
+  const smtpUrl = readEnv('SMTP_URL');
   const timeoutOptions = {
-    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
-    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
-    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
-    dnsTimeout: Number(process.env.SMTP_DNS_TIMEOUT_MS || 10000),
+    connectionTimeout: readEnvNum('SMTP_CONNECTION_TIMEOUT_MS', 10000),
+    greetingTimeout: readEnvNum('SMTP_GREETING_TIMEOUT_MS', 10000),
+    socketTimeout: readEnvNum('SMTP_SOCKET_TIMEOUT_MS', 15000),
+    dnsTimeout: readEnvNum('SMTP_DNS_TIMEOUT_MS', 10000),
   };
 
   if (smtpUrl && !overrides.forceHostMode) return nodemailer.createTransport(smtpUrl, timeoutOptions);
 
-  const smtpHost = overrides.host || process.env.SMTP_HOST;
+  const smtpHost = (overrides.host || readEnv('SMTP_HOST')).trim();
   if (!smtpHost) return null;
 
-  const smtpPort = Number(overrides.port || process.env.SMTP_PORT || 587);
+  const smtpPort = Number(overrides.port || readEnvNum('SMTP_PORT', 587));
   const smtpSecure =
     typeof overrides.secure === 'boolean'
       ? overrides.secure
-      : String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
+      : readEnvBool('SMTP_SECURE', false);
+
+  const smtpUser = readEnv('SMTP_USER');
+  const smtpPass = readEnv('SMTP_PASS');
 
   return nodemailer.createTransport({
     host: smtpHost,
@@ -100,10 +124,10 @@ const buildEmailTransporter = (overrides = {}) => {
       servername: smtpHost,
     },
     auth:
-      process.env.SMTP_USER || process.env.SMTP_PASS
+      smtpUser || smtpPass
         ? {
-            user: process.env.SMTP_USER || '',
-            pass: process.env.SMTP_PASS || '',
+            user: smtpUser,
+            pass: smtpPass,
           }
         : undefined,
   });
@@ -111,8 +135,8 @@ const buildEmailTransporter = (overrides = {}) => {
 
 const sendAuthEmail = async ({ to, subject, html, text }) => {
   const transporter = buildEmailTransporter();
-  const resendApiKey = process.env.RESEND_API_KEY;
-  const from = process.env.MAIL_FROM || process.env.SMTP_FROM || process.env.RESEND_FROM || 'no-reply@studigi.local';
+  const resendApiKey = readEnv('RESEND_API_KEY');
+  const from = readEnv('MAIL_FROM') || readEnv('SMTP_FROM') || readEnv('RESEND_FROM') || 'no-reply@studigi.local';
 
   const sendViaResend = async () => {
     if (!resendApiKey) return { delivered: false, error: 'Resend API key not configured' };
@@ -155,14 +179,16 @@ const sendAuthEmail = async ({ to, subject, html, text }) => {
     return { delivered: true };
   } catch (error) {
     const primaryError = error?.message || 'Failed to send email';
+    const primaryCode = error?.code;
+    const primaryResponse = error?.response;
 
-    const smtpHost = String(process.env.SMTP_HOST || '').toLowerCase();
+    const smtpHost = readEnv('SMTP_HOST').toLowerCase();
     const isGmailHost = smtpHost === 'smtp.gmail.com';
-    const usingSmtpUrl = Boolean(process.env.SMTP_URL);
+    const usingSmtpUrl = Boolean(readEnv('SMTP_URL'));
 
     if (isGmailHost && !usingSmtpUrl) {
-      const currentPort = Number(process.env.SMTP_PORT || 587);
-      const currentSecure = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
+      const currentPort = readEnvNum('SMTP_PORT', 587);
+      const currentSecure = readEnvBool('SMTP_SECURE', false);
       const retryPlans = [
         { port: 587, secure: false },
         { port: 465, secure: true },
@@ -172,16 +198,16 @@ const sendAuthEmail = async ({ to, subject, html, text }) => {
         try {
           const retryTransporter = buildEmailTransporter({
             forceHostMode: true,
-            host: process.env.SMTP_HOST,
+            host: readEnv('SMTP_HOST'),
             port: plan.port,
             secure: plan.secure,
           });
           await retryTransporter.sendMail({ from, to, subject, html, text });
-          console.log(`[AUTH][MAIL_RETRY_OK] ${to} via ${process.env.SMTP_HOST}:${plan.port} secure=${plan.secure}`);
+          console.log(`[AUTH][MAIL_RETRY_OK] ${to} via ${readEnv('SMTP_HOST')}:${plan.port} secure=${plan.secure}`);
           return { delivered: true };
         } catch (retryError) {
           console.error(
-            `[AUTH][MAIL_RETRY_FAIL] ${to} via ${process.env.SMTP_HOST}:${plan.port} secure=${plan.secure}: ${retryError?.message || 'unknown error'}`
+            `[AUTH][MAIL_RETRY_FAIL] ${to} via ${readEnv('SMTP_HOST')}:${plan.port} secure=${plan.secure}: ${retryError?.code || 'UNKNOWN_CODE'} ${retryError?.message || 'unknown error'}`
           );
         }
       }
@@ -193,7 +219,19 @@ const sendAuthEmail = async ({ to, subject, html, text }) => {
       return resendResult;
     }
 
-    return { delivered: false, error: primaryError };
+    const hints = [];
+    if (isGmailHost) {
+      hints.push('Pastikan SMTP_PASS adalah Gmail App Password 16 karakter tanpa spasi.');
+      hints.push('Gunakan salah satu pasangan: SMTP_PORT=587 + SMTP_SECURE=false, atau SMTP_PORT=465 + SMTP_SECURE=true.');
+    }
+    if (String(process.env.VERCEL || '').toLowerCase() === '1') {
+      hints.push('Jika backend berjalan di Vercel serverless dan SMTP gagal, pertimbangkan RESEND_API_KEY sebagai jalur kirim utama.');
+    }
+
+    const joinedHint = hints.length ? ` Hint: ${hints.join(' ')}` : '';
+    const detailedError = [primaryCode, primaryError, primaryResponse].filter(Boolean).join(' | ');
+
+    return { delivered: false, error: `${detailedError || primaryError}${joinedHint}` };
   }
 };
 
