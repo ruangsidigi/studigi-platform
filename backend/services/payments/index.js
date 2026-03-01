@@ -142,13 +142,7 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
 
   try {
     const snap = getSnapClient();
-    if (!snap) {
-      return res.status(500).json({
-        error: !midtransClient
-          ? 'Dependency midtrans-client belum terpasang di server.'
-          : 'Midtrans belum dikonfigurasi. Set MIDTRANS_SERVER_KEY terlebih dahulu.',
-      });
-    }
+    const useMidtrans = Boolean(snap);
 
     await ensurePaymentSchema(db);
     const {
@@ -159,6 +153,7 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
       termsAcceptedAt = null,
       termsVersion = 'unknown',
     } = req.body || {};
+    const effectivePaymentMethod = useMidtrans ? paymentMethod : 'manual_transfer';
     const normalizedPackageIds = normalizePackageIds(packageIds);
 
     if (termsAccepted !== true) {
@@ -207,13 +202,13 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
        RETURNING *`,
       [
         req.user.id,
-        paymentMethod,
+        effectivePaymentMethod,
         'pending',
         String(currency || 'IDR').toUpperCase(),
         subtotalAmount,
         discountAmount,
         totalAmount,
-        'midtrans',
+        useMidtrans ? 'midtrans' : 'manual',
         paymentReference,
         JSON.stringify({
           package_ids: normalizedPackageIds,
@@ -237,7 +232,7 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
          VALUES
           ($1, $2, $3, $4, $5, $6, $7, NOW())
          RETURNING *`,
-        [req.user.id, packageId, paymentMethod, 'pending', perPackageAmount, transaction.id, paymentReference]
+        [req.user.id, packageId, effectivePaymentMethod, 'pending', perPackageAmount, transaction.id, paymentReference]
       );
       if (purchaseResult.rows[0]) insertedPurchases.push(purchaseResult.rows[0]);
     }
@@ -251,43 +246,46 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
       },
     ];
 
-    const transactionPayload = {
-      transaction_details: {
-        order_id: paymentReference,
-        gross_amount: grossAmount,
-      },
-      customer_details: {
-        first_name: customerName,
-        email: req.user.email,
-      },
-      item_details: itemDetails,
-      callbacks: callbackUrls,
-      metadata: {
-        payment_transaction_id: transaction.id,
-        user_id: req.user.id,
-      },
-    };
+    let snapResponse = null;
+    if (useMidtrans) {
+      const transactionPayload = {
+        transaction_details: {
+          order_id: paymentReference,
+          gross_amount: grossAmount,
+        },
+        customer_details: {
+          first_name: customerName,
+          email: req.user.email,
+        },
+        item_details: itemDetails,
+        callbacks: callbackUrls,
+        metadata: {
+          payment_transaction_id: transaction.id,
+          user_id: req.user.id,
+        },
+      };
 
-    const snapResponse = await snap.createTransaction(transactionPayload);
+      snapResponse = await snap.createTransaction(transactionPayload);
 
-    await db.query(
-      `UPDATE payment_transactions
-       SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb,
-           updated_at = NOW()
-       WHERE id = $2`,
-      [
-        JSON.stringify({
-          snap_token: snapResponse?.token || null,
-          payment_url: snapResponse?.redirect_url || null,
-        }),
-        transaction.id,
-      ]
-    );
+      await db.query(
+        `UPDATE payment_transactions
+         SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [
+          JSON.stringify({
+            snap_token: snapResponse?.token || null,
+            payment_url: snapResponse?.redirect_url || null,
+          }),
+          transaction.id,
+        ]
+      );
+    }
 
     await db.query('COMMIT');
 
     return res.status(201).json({
-      message: 'Checkout created',
+      message: useMidtrans ? 'Checkout created' : 'Checkout created (manual transfer)',
       payment: {
         id: transaction.id,
         reference: transaction.provider_reference,
