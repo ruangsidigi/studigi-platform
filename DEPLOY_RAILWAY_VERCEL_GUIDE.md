@@ -73,6 +73,12 @@ Jika tetap gagal dari environment serverless tertentu, siapkan fallback API emai
 - `MAIL_TRANSPORT=resend` (agar kirim mencoba Resend dulu, bukan SMTP)
 - `MAIL_FORCE_RESEND=true` (opsional, memaksa mode Resend)
 
+Alternatif tetap lewat Gmail tanpa SMTP langsung (pakai Google Apps Script relay):
+- `MAIL_TRANSPORT=apps-script`
+- `MAIL_FORCE_APPS_SCRIPT=true`
+- `APPS_SCRIPT_WEBHOOK_URL=<URL Web App Apps Script>`
+- `APPS_SCRIPT_WEBHOOK_SECRET=<secret acak yang sama dengan script>`
+
 Untuk test cepat Resend tanpa domain custom, bisa pakai:
 - `RESEND_FROM=onboarding@resend.dev`
 Catatan: alamat ini biasanya hanya bisa kirim ke email akun Resend Anda sendiri.
@@ -85,9 +91,13 @@ Catatan: alamat ini biasanya hanya bisa kirim ke email akun Resend Anda sendiri.
 - `STORAGE_SECRET`
 - `CDN_URL`
 
-#### Opsional (hanya jika pakai payment provider nyata)
+#### Opsional (hanya jika pakai payment provider Midtrans)
 
-- `PAYMENT_API_KEY`
+- `MIDTRANS_SERVER_KEY`
+- `MIDTRANS_CLIENT_KEY`
+- `MIDTRANS_IS_PRODUCTION` = `false` (sandbox) / `true` (live)
+- Di dashboard Midtrans, set Notification URL ke:
+   - `https://backend-xxx.up.railway.app/api/payments/webhook`
 
 5. Setelah semua variable diisi, klik **Deploy** ulang (redeploy) jika Railway tidak auto-redeploy.
 
@@ -255,13 +265,74 @@ RESEND_API_KEY=
 RESEND_FROM=
 MAIL_TRANSPORT=resend
 MAIL_FORCE_RESEND=true
+APPS_SCRIPT_WEBHOOK_URL=
+APPS_SCRIPT_WEBHOOK_SECRET=
+MAIL_FORCE_APPS_SCRIPT=false
 STORAGE_ENDPOINT=
 STORAGE_BUCKET=
 STORAGE_KEY=
 STORAGE_SECRET=
 CDN_URL=
-PAYMENT_API_KEY=
+MIDTRANS_SERVER_KEY=SB-Mid-server-xxxx
+MIDTRANS_CLIENT_KEY=SB-Mid-client-xxxx
+MIDTRANS_IS_PRODUCTION=false
 ```
+
+### Opsi Gmail via Google Apps Script (tanpa SMTP Gmail langsung)
+
+1. Buka `https://script.google.com` dan buat project baru.
+2. Paste kode berikut ke file script:
+
+```javascript
+const SECRET = 'ganti_dengan_secret_acak_anda';
+
+function doPost(e) {
+   try {
+      const payload = e && e.postData && e.postData.type === 'application/json'
+         ? JSON.parse(e.postData.contents || '{}')
+         : {};
+
+      if (!payload.secret || payload.secret !== SECRET) {
+         return ContentService
+            .createTextOutput(JSON.stringify({ ok: false, error: 'Unauthorized' }))
+            .setMimeType(ContentService.MimeType.JSON);
+      }
+
+      const to = Array.isArray(payload.to) ? payload.to.join(',') : String(payload.to || '');
+      const subject = String(payload.subject || '');
+      const html = String(payload.html || '');
+      const text = String(payload.text || '');
+
+      if (!to || !subject || (!html && !text)) {
+         return ContentService
+            .createTextOutput(JSON.stringify({ ok: false, error: 'Invalid payload' }))
+            .setMimeType(ContentService.MimeType.JSON);
+      }
+
+      GmailApp.sendEmail(to, subject, text || ' ', { htmlBody: html || text || '' });
+
+      return ContentService
+         .createTextOutput(JSON.stringify({ ok: true }))
+         .setMimeType(ContentService.MimeType.JSON);
+   } catch (err) {
+      return ContentService
+         .createTextOutput(JSON.stringify({ ok: false, error: String(err && err.message ? err.message : err) }))
+         .setMimeType(ContentService.MimeType.JSON);
+   }
+}
+```
+
+3. Deploy → `New deployment` → type `Web app`.
+4. `Execute as`: Me, `Who has access`: Anyone with the link.
+5. Copy URL Web App ke variable Railway `APPS_SCRIPT_WEBHOOK_URL`.
+6. Isi `APPS_SCRIPT_WEBHOOK_SECRET` dengan nilai yang sama seperti konstanta `SECRET` di script.
+7. Set mode kirim:
+    - `MAIL_TRANSPORT=apps-script`
+    - `MAIL_FORCE_APPS_SCRIPT=true`
+8. Redeploy backend Railway.
+
+Webhook Midtrans (Notification URL):
+`https://backend-xxx.up.railway.app/api/payments/webhook`
 
 ### Vercel Variables (template)
 
@@ -307,7 +378,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ NULL;
 
 ## 7) Catatan Penting untuk Project Ini
 
-Frontend memiliki banyak endpoint fitur lanjutan. Backend modular yang aktif saat ini baru mencakup endpoint inti tertentu (auth, branding, materials upload, payments placeholder). Jadi:
+Frontend memiliki banyak endpoint fitur lanjutan. Backend modular yang aktif saat ini baru mencakup endpoint inti tertentu (auth, branding, materials upload, payments Midtrans). Jadi:
 
 1. Koneksi login + branding + health bisa dibuat stabil dulu.
 2. Endpoint lain bisa disambung bertahap per modul setelah deploy dasar berhasil.

@@ -136,9 +136,14 @@ const buildEmailTransporter = (overrides = {}) => {
 const sendAuthEmail = async ({ to, subject, html, text }) => {
   const mailTransport = readEnv('MAIL_TRANSPORT').toLowerCase();
   const forceResend = readEnvBool('MAIL_FORCE_RESEND', false) || mailTransport === 'resend';
-  const transporter = forceResend ? null : buildEmailTransporter();
+  const forceAppsScript = readEnvBool('MAIL_FORCE_APPS_SCRIPT', false) || mailTransport === 'apps-script';
+  const transporter = forceResend || forceAppsScript ? null : buildEmailTransporter();
   const resendApiKey = readEnv('RESEND_API_KEY');
+  const appsScriptUrl = readEnv('APPS_SCRIPT_WEBHOOK_URL');
+  const appsScriptSecret = readEnv('APPS_SCRIPT_WEBHOOK_SECRET');
   const from = readEnv('MAIL_FROM') || readEnv('SMTP_FROM') || readEnv('RESEND_FROM') || 'no-reply@studigi.local';
+
+  const recipients = Array.isArray(to) ? to : [to];
 
   const sendViaResend = async () => {
     if (!resendApiKey) return { delivered: false, error: 'Resend API key not configured' };
@@ -152,7 +157,7 @@ const sendAuthEmail = async ({ to, subject, html, text }) => {
         },
         body: JSON.stringify({
           from,
-          to: Array.isArray(to) ? to : [to],
+          to: recipients,
           subject,
           html,
           text,
@@ -173,30 +178,115 @@ const sendAuthEmail = async ({ to, subject, html, text }) => {
     }
   };
 
+  const sendViaAppsScript = async () => {
+    if (!appsScriptUrl) return { delivered: false, error: 'Apps Script webhook URL not configured' };
+
+    try {
+      const response = await fetch(appsScriptUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(appsScriptSecret ? { 'x-mail-secret': appsScriptSecret } : {}),
+        },
+        body: JSON.stringify({
+          to: recipients,
+          subject,
+          html,
+          text,
+          from,
+          secret: appsScriptSecret,
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return {
+          delivered: false,
+          error: payload?.error || payload?.message || `Apps Script HTTP ${response.status}`,
+        };
+      }
+
+      if (payload && typeof payload === 'object' && payload.ok === false) {
+        return {
+          delivered: false,
+          error: payload?.error || payload?.message || 'Apps Script rejected request',
+        };
+      }
+
+      return { delivered: true };
+    } catch (err) {
+      return { delivered: false, error: err?.message || 'Apps Script request failed' };
+    }
+  };
+
+  const sendViaSmtpTransport = async (smtpTransport) => {
+    if (!smtpTransport) return { delivered: false, error: 'SMTP transporter not configured' };
+    try {
+      await smtpTransport.sendMail({ from, to: recipients, subject, html, text });
+      return { delivered: true };
+    } catch (smtpErr) {
+      return { delivered: false, error: smtpErr?.message || 'SMTP send failed' };
+    }
+  };
+
+  if (forceAppsScript) {
+    const appsScriptFirst = await sendViaAppsScript();
+    if (appsScriptFirst.delivered) return appsScriptFirst;
+
+    const smtpFallback = buildEmailTransporter();
+    const smtpFallbackResult = await sendViaSmtpTransport(smtpFallback);
+    if (smtpFallbackResult.delivered) {
+      console.log(`[AUTH][MAIL_FALLBACK_SMTP] ${to} delivered via SMTP after Apps Script failure`);
+      return smtpFallbackResult;
+    }
+
+    const resendFallback = await sendViaResend();
+    if (resendFallback.delivered) {
+      console.log(`[AUTH][MAIL_FALLBACK] ${to} delivered via Resend API after Apps Script failure`);
+      return resendFallback;
+    }
+
+    return {
+      delivered: false,
+      error: `Apps Script failed: ${appsScriptFirst.error || 'unknown error'} | SMTP fallback failed: ${smtpFallbackResult.error || 'unknown error'} | Resend fallback failed: ${resendFallback.error || 'unknown error'}`,
+    };
+  }
+
   if (forceResend) {
     const resendFirst = await sendViaResend();
     if (resendFirst.delivered) return resendFirst;
 
     const smtpFallback = buildEmailTransporter();
-    if (!smtpFallback) return resendFirst;
-
-    try {
-      await smtpFallback.sendMail({ from, to, subject, html, text });
+    const smtpFallbackResult = await sendViaSmtpTransport(smtpFallback);
+    if (smtpFallbackResult.delivered) {
       console.log(`[AUTH][MAIL_FALLBACK_SMTP] ${to} delivered via SMTP after Resend failure`);
-      return { delivered: true };
-    } catch (smtpErr) {
-      return {
-        delivered: false,
-        error: `Resend failed: ${resendFirst.error || 'unknown error'} | SMTP fallback failed: ${smtpErr?.message || 'unknown error'}`,
-      };
+      return smtpFallbackResult;
     }
+
+    const appsScriptFallback = await sendViaAppsScript();
+    if (appsScriptFallback.delivered) {
+      console.log(`[AUTH][MAIL_FALLBACK_APPS_SCRIPT] ${to} delivered via Apps Script after Resend failure`);
+      return appsScriptFallback;
+    }
+
+    return {
+      delivered: false,
+      error: `Resend failed: ${resendFirst.error || 'unknown error'} | SMTP fallback failed: ${smtpFallbackResult.error || 'unknown error'} | Apps Script fallback failed: ${appsScriptFallback.error || 'unknown error'}`,
+    };
   }
 
   if (!transporter) {
-    return sendViaResend();
+    const appsScriptResult = await sendViaAppsScript();
+    if (appsScriptResult.delivered) return appsScriptResult;
+    const resendResult = await sendViaResend();
+    if (resendResult.delivered) return resendResult;
+    return {
+      delivered: false,
+      error: `Apps Script failed: ${appsScriptResult.error || 'unknown error'} | Resend failed: ${resendResult.error || 'unknown error'}`,
+    };
   }
   try {
-    await transporter.sendMail({ from, to, subject, html, text });
+    await transporter.sendMail({ from, to: recipients, subject, html, text });
     return { delivered: true };
   } catch (error) {
     const primaryError = error?.message || 'Failed to send email';
@@ -223,7 +313,7 @@ const sendAuthEmail = async ({ to, subject, html, text }) => {
             port: plan.port,
             secure: plan.secure,
           });
-          await retryTransporter.sendMail({ from, to, subject, html, text });
+          await retryTransporter.sendMail({ from, to: recipients, subject, html, text });
           console.log(`[AUTH][MAIL_RETRY_OK] ${to} via ${readEnv('SMTP_HOST')}:${plan.port} secure=${plan.secure}`);
           return { delivered: true };
         } catch (retryError) {
@@ -232,6 +322,12 @@ const sendAuthEmail = async ({ to, subject, html, text }) => {
           );
         }
       }
+    }
+
+    const appsScriptResult = await sendViaAppsScript();
+    if (appsScriptResult.delivered) {
+      console.log(`[AUTH][MAIL_FALLBACK_APPS_SCRIPT] ${to} delivered via Apps Script after SMTP failure`);
+      return appsScriptResult;
     }
 
     const resendResult = await sendViaResend();
@@ -244,6 +340,9 @@ const sendAuthEmail = async ({ to, subject, html, text }) => {
     if (isGmailHost) {
       hints.push('Pastikan SMTP_PASS adalah Gmail App Password 16 karakter tanpa spasi.');
       hints.push('Gunakan salah satu pasangan: SMTP_PORT=587 + SMTP_SECURE=false, atau SMTP_PORT=465 + SMTP_SECURE=true.');
+    }
+    if (appsScriptUrl) {
+      hints.push('Mode Apps Script aktif: cek APPS_SCRIPT_WEBHOOK_URL dan APPS_SCRIPT_WEBHOOK_SECRET jika request ditolak.');
     }
     if (String(process.env.VERCEL || '').toLowerCase() === '1') {
       hints.push('Jika backend berjalan di Vercel serverless dan SMTP gagal, pertimbangkan RESEND_API_KEY sebagai jalur kirim utama.');
