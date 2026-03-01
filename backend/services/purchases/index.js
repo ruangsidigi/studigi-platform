@@ -53,39 +53,9 @@ router.get('/purchases', requireAuth, async (req, res) => {
 });
 
 router.post('/purchases', requireAuth, async (req, res) => {
-  try {
-    const db = req.app.locals.db;
-    const { packageIds, totalPrice, paymentMethod = 'transfer' } = req.body || {};
-
-    if (!Array.isArray(packageIds) || packageIds.length === 0) {
-      return res.status(400).json({ error: 'Package IDs array is required' });
-    }
-
-    const normalizedPackageIds = [...new Set(packageIds.map((item) => Number(item)).filter((id) => Number.isInteger(id) && id > 0))];
-    if (normalizedPackageIds.length === 0) {
-      return res.status(400).json({ error: 'No valid package IDs' });
-    }
-
-    const pricePerPackage = Number(totalPrice || 0) / normalizedPackageIds.length;
-    const inserted = [];
-
-    for (const packageId of normalizedPackageIds) {
-      const result = await db.query(
-        `INSERT INTO purchases (user_id, package_id, payment_method, payment_status, total_price, created_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())
-         RETURNING *`,
-        [req.user.id, packageId, paymentMethod, 'completed', Number.isFinite(pricePerPackage) ? pricePerPackage : 0]
-      );
-      if (result.rows[0]) inserted.push(result.rows[0]);
-    }
-
-    return res.json({
-      message: 'Purchase successful',
-      purchases: inserted,
-    });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
+  return res.status(400).json({
+    error: 'Direct purchase is disabled. Use POST /api/payments/checkout to start a payment transaction.',
+  });
 });
 
 router.get('/purchases/admin/all', requireAdmin, async (req, res) => {
@@ -99,22 +69,46 @@ router.get('/purchases/admin/all', requireAdmin, async (req, res) => {
          u.email AS user_email,
          pkg.id AS package_ref_id,
          pkg.name AS package_name,
-         pkg.type AS package_type
+         pkg.type AS package_type,
+         pt.id AS payment_tx_id,
+         pt.provider_reference AS payment_tx_reference,
+         pt.status AS payment_tx_status,
+         pt.metadata AS payment_tx_metadata
        FROM purchases p
        LEFT JOIN users u ON u.id = p.user_id
        LEFT JOIN packages pkg ON pkg.id = p.package_id
+       LEFT JOIN payment_transactions pt ON pt.id = p.payment_transaction_id
        ORDER BY p.created_at DESC NULLS LAST, p.id DESC`
     );
 
-    const rows = (result.rows || []).map((row) => ({
-      ...row,
-      users: row.user_ref_id
-        ? { id: row.user_ref_id, name: row.user_name, email: row.user_email }
-        : null,
-      packages: row.package_ref_id
-        ? { id: row.package_ref_id, name: row.package_name, type: row.package_type }
-        : null,
-    }));
+    const rows = (result.rows || []).map((row) => {
+      const termsAcceptance = row.payment_tx_metadata?.terms_acceptance || null;
+
+      return {
+        ...row,
+        users: row.user_ref_id
+          ? { id: row.user_ref_id, name: row.user_name, email: row.user_email }
+          : null,
+        packages: row.package_ref_id
+          ? { id: row.package_ref_id, name: row.package_name, type: row.package_type }
+          : null,
+        payment_transaction: row.payment_tx_id
+          ? {
+              id: row.payment_tx_id,
+              reference: row.payment_tx_reference,
+              status: row.payment_tx_status,
+              terms_acceptance: termsAcceptance
+                ? {
+                    accepted: termsAcceptance.accepted === true,
+                    accepted_at: termsAcceptance.accepted_at || null,
+                    terms_version: termsAcceptance.terms_version || null,
+                    terms_file: termsAcceptance.terms_file || null,
+                  }
+                : null,
+            }
+          : null,
+      };
+    });
 
     return res.json(rows);
   } catch (error) {

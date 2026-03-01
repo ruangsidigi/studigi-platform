@@ -85,6 +85,85 @@ export const purchaseService = {
   getAllAdmin: () => api.get('/purchases/admin/all'),
 };
 
+export const paymentService = {
+  checkout: async (packageIds, paymentMethod = 'manual_transfer', extraPayload = {}) => {
+    const rawPackageIds = Array.isArray(packageIds)
+      ? packageIds
+          .map((item) => (item === null || item === undefined ? '' : String(item).trim()))
+          .filter((item) => item.length > 0)
+      : [];
+
+    const normalizedPackageIds = rawPackageIds
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item) && item > 0);
+
+    const preferredPackageIds = normalizedPackageIds.length > 0 ? normalizedPackageIds : rawPackageIds;
+    const primaryId = rawPackageIds[0] || normalizedPackageIds[0] || null;
+
+    const payload = {
+      packageIds: preferredPackageIds,
+      package_ids: preferredPackageIds,
+      rawPackageIds,
+      paymentMethod,
+      payment_method: paymentMethod,
+      ...extraPayload,
+    };
+
+    if (primaryId && rawPackageIds.length === 1) {
+      payload.bundle_id = primaryId;
+      payload.bundleId = primaryId;
+      payload.package_id = primaryId;
+    }
+
+    const totalPrice = Number(extraPayload?.totalPrice || 0);
+
+    const legacyPayload = {
+      ...payload,
+      bundle_id: primaryId,
+      bundleId: primaryId,
+      package_id: primaryId,
+    };
+
+    const attempts = [
+      { path: '/payments/checkout', body: payload },
+      { path: '/payments/checkout', body: legacyPayload },
+      {
+        path: '/purchases',
+        body: {
+          packageIds: preferredPackageIds,
+          totalPrice,
+          paymentMethod,
+          payment_method: paymentMethod,
+        },
+      },
+      {
+        path: '/purchases',
+        body: {
+          bundle_id: primaryId,
+          bundleId: primaryId,
+          package_id: primaryId,
+          totalPrice,
+          paymentMethod,
+          payment_method: paymentMethod,
+        },
+      },
+    ];
+
+    let lastError;
+    for (const attempt of attempts) {
+      try {
+        return await api.post(attempt.path, attempt.body);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
+  },
+  getById: (id) => api.get(`/payments/${id}`),
+  confirm: (id, status = 'paid') => api.post(`/payments/${id}/confirm`, { status }),
+};
+
 // User Service
 export const userService = {
   getProfile: () => api.get('/users/profile'),

@@ -9,6 +9,7 @@ const { Pool } = require('pg');
 
 const logger = pino();
 const app = express();
+const CHECKOUT_COMPAT_VERSION = 'checkout-compat-v2';
 
 // Trust proxy headers so `req.ip` is populated behind Vercel's proxy
 app.set('trust proxy', true);
@@ -73,6 +74,56 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Compatibility shim for mixed frontend/backend versions in production.
+// Some legacy handlers require `bundle_id` while newer clients send `packageIds`.
+app.use((req, _res, next) => {
+  try {
+    const requestPath = String(req.path || req.originalUrl || '').split('?')[0].replace(/\/+$/, '');
+    const isCheckoutPath =
+      requestPath === '/api/payments/checkout' ||
+      requestPath === '/payments/checkout' ||
+      requestPath.startsWith('/api/payments/checkout/') ||
+      requestPath.startsWith('/payments/checkout/');
+    const isPurchasePath =
+      requestPath === '/api/purchases' ||
+      requestPath === '/purchases' ||
+      requestPath.startsWith('/api/purchases/') ||
+      requestPath.startsWith('/purchases/');
+    const isTarget = req.method === 'POST' && (isCheckoutPath || isPurchasePath);
+    if (!isTarget || !req.body || typeof req.body !== 'object') return next();
+
+    const body = req.body;
+    const packageIds = Array.isArray(body.packageIds)
+      ? body.packageIds
+      : Array.isArray(body.package_ids)
+        ? body.package_ids
+        : [];
+
+    const primaryId =
+      body.bundle_id ||
+      body.bundleId ||
+      body.package_id ||
+      body.packageId ||
+      (packageIds.length > 0 ? packageIds[0] : null);
+
+    if (primaryId !== null && primaryId !== undefined && String(primaryId).trim() !== '') {
+      if (!body.bundle_id) body.bundle_id = primaryId;
+      if (!body.bundleId) body.bundleId = primaryId;
+      if (!body.package_id) body.package_id = primaryId;
+      if (!body.packageId) body.packageId = primaryId;
+    }
+
+    if ((!Array.isArray(body.packageIds) || body.packageIds.length === 0) && packageIds.length > 0) {
+      body.packageIds = packageIds;
+    }
+
+    if ((!Array.isArray(body.package_ids) || body.package_ids.length === 0) && Array.isArray(body.packageIds)) {
+      body.package_ids = body.packageIds;
+    }
+  } catch (_) {}
+  return next();
+});
 
 // simple request logger (only logs method/url and body size to avoid noise)
 app.use((req, res, next) => {
@@ -170,13 +221,13 @@ app.get('/health', (req, res) => {
 // also expose API-scoped health for platforms that route under /api
 app.get('/api/health', (req, res) => {
   console.log('health handler /api/health invoked', { url: req.url, originalUrl: req.originalUrl, headers: Object.keys(req.headers) });
-  return res.json({ ok: true, time: new Date().toISOString() });
+  return res.json({ ok: true, time: new Date().toISOString(), checkoutCompat: CHECKOUT_COMPAT_VERSION });
 });
 
 // Accept root path health probes since platform rewrites may change req.url
 app.get('/', (req, res) => {
   console.log('health handler / invoked (platform rewrite)', { url: req.url, originalUrl: req.originalUrl, headers: Object.keys(req.headers) });
-  return res.json({ ok: true, time: new Date().toISOString() });
+  return res.json({ ok: true, time: new Date().toISOString(), checkoutCompat: CHECKOUT_COMPAT_VERSION });
 });
 
 // DB-check endpoint: run a lightweight query to validate DB connectivity

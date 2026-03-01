@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { adminService, packageService, questionService, materialService, brandingService, campaignService } from '../services/api';
+import React, { useCallback, useEffect, useState } from 'react';
+import { adminService, packageService, questionService, materialService, brandingService, campaignService, purchaseService } from '../services/api';
 import '../styles/admin.css';
 
 const API_ROOT = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
@@ -11,6 +11,7 @@ const AdminDashboard = () => {
   const [packages, setPackages] = useState([]);
   const [categories, setCategories] = useState([]);
   const [materials, setMaterials] = useState([]);
+  const [adminPurchases, setAdminPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
@@ -37,6 +38,8 @@ const AdminDashboard = () => {
       setCategories(catJson);
       const matRes = await materialService.listAdmin();
       setMaterials(matRes.data || []);
+      const purchasesRes = await purchaseService.getAllAdmin();
+      setAdminPurchases(purchasesRes.data || []);
       setLoading(false);
     } catch (err) {
       console.error('Error loading dashboard data', err);
@@ -164,6 +167,21 @@ const AdminDashboard = () => {
 
   if (loading) return <div className="container">Loading...</div>;
 
+  const formatDateTime = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleString('id-ID');
+  };
+
+  const recentTermsAudits = (adminPurchases || [])
+    .filter((purchase) => purchase?.payment_transaction?.id)
+    .filter((purchase, index, arr) => {
+      const txId = purchase.payment_transaction.id;
+      return arr.findIndex((item) => item?.payment_transaction?.id === txId) === index;
+    })
+    .slice(0, 10);
+
   return (
     <div className="admin-container">
       <div className="admin-header">
@@ -290,6 +308,41 @@ const AdminDashboard = () => {
                 </table>
               </div>
             )}
+
+            <div className="card mt-20">
+              <div className="card-title">Audit Persetujuan Syarat & Ketentuan</div>
+              {recentTermsAudits.length === 0 ? (
+                <p className="text-muted">Belum ada data transaksi pembayaran.</p>
+              ) : (
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Payment Ref</th>
+                      <th>Pengguna</th>
+                      <th>Status</th>
+                      <th>Disetujui</th>
+                      <th>Waktu Persetujuan</th>
+                      <th>Versi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentTermsAudits.map((purchase) => {
+                      const terms = purchase?.payment_transaction?.terms_acceptance;
+                      return (
+                        <tr key={`terms-audit-${purchase.payment_transaction.id}`}>
+                          <td>{purchase?.payment_transaction?.reference || '-'}</td>
+                          <td>{purchase?.users?.name || purchase?.users?.email || '-'}</td>
+                          <td>{String(purchase?.payment_transaction?.status || '-').toUpperCase()}</td>
+                          <td>{terms?.accepted ? 'Ya' : 'Tidak / Tidak Tercatat'}</td>
+                          <td>{formatDateTime(terms?.accepted_at)}</td>
+                          <td>{terms?.terms_version || '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         )}
 
@@ -1154,7 +1207,7 @@ const BrandingSettingsForm = ({ setMessage }) => {
 
   const colorRegex = /^#([0-9a-fA-F]{6})$/;
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       const response = await brandingService.getSettings();
       const data = response.data || {};
@@ -1165,11 +1218,11 @@ const BrandingSettingsForm = ({ setMessage }) => {
     } catch (error) {
       setMessage('Gagal memuat branding settings');
     }
-  };
+  }, [setMessage]);
 
   useEffect(() => {
     loadSettings();
-  }, []);
+  }, [loadSettings]);
 
   const handleSaveColor = async (e) => {
     e.preventDefault();
@@ -1317,7 +1370,7 @@ const CampaignManager = ({ setMessage }) => {
     rulesText: JSON.stringify({ all: [] }, null, 2),
   });
 
-  const loadCampaigns = async () => {
+  const loadCampaigns = useCallback(async () => {
     try {
       setLoading(true);
       const res = await campaignService.listAdmin();
@@ -1327,11 +1380,11 @@ const CampaignManager = ({ setMessage }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setMessage]);
 
   useEffect(() => {
     loadCampaigns();
-  }, []);
+  }, [loadCampaigns]);
 
   const handleCreateCampaign = async (e) => {
     e.preventDefault();
@@ -1392,7 +1445,7 @@ const CampaignManager = ({ setMessage }) => {
   };
 
   const handleDeleteCampaign = async (campaignId, campaignTitle) => {
-    if (!window.confirm(`Hapus campaign \"${campaignTitle}\"?`)) {
+    if (!window.confirm(`Hapus campaign "${campaignTitle}"?`)) {
       return;
     }
 
@@ -1535,7 +1588,7 @@ const CategoryManager = ({ categories, setCategories, setMessage }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const res = await fetch(API_ROOT + '/api/categories');
       const json = await res.json();
@@ -1543,9 +1596,9 @@ const CategoryManager = ({ categories, setCategories, setMessage }) => {
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [setCategories]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -1687,10 +1740,8 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
         title,
         description,
       });
-      {
-        setMessage('Material uploaded'); setFile(null); setTitle(''); setDescription(''); setSelectedCategory(''); setOtherCategoryName(''); setPackageId('');
-        await reloadMaterials();
-      }
+      setMessage('Material uploaded'); setFile(null); setTitle(''); setDescription(''); setSelectedCategory(''); setOtherCategoryName(''); setPackageId('');
+      await reloadMaterials();
     } catch (err) { setMessage(err.message || 'Error uploading material'); }
   };
 
