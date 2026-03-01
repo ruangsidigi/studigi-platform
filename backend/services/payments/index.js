@@ -1,7 +1,13 @@
 const express = require('express');
 const crypto = require('crypto');
-const midtransClient = require('midtrans-client');
 const config = require('../../shared/config');
+
+let midtransClient = null;
+try {
+  midtransClient = require('midtrans-client');
+} catch (_) {
+  midtransClient = null;
+}
 
 const router = express.Router();
 
@@ -44,6 +50,7 @@ const createPaymentReference = () => `PAY-${Date.now()}-${crypto.randomBytes(3).
 
 let snapClient;
 const getSnapClient = () => {
+  if (!midtransClient) return null;
   if (!config.midtransServerKey) return null;
   if (snapClient) return snapClient;
 
@@ -137,7 +144,9 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
     const snap = getSnapClient();
     if (!snap) {
       return res.status(500).json({
-        error: 'Midtrans belum dikonfigurasi. Set MIDTRANS_SERVER_KEY terlebih dahulu.',
+        error: !midtransClient
+          ? 'Dependency midtrans-client belum terpasang di server.'
+          : 'Midtrans belum dikonfigurasi. Set MIDTRANS_SERVER_KEY terlebih dahulu.',
       });
     }
 
