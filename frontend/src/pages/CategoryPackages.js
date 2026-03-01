@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { categoryService, packageService, paymentService, purchaseService } from '../services/api';
 import '../styles/dashboard.css';
 
-const TERMS_PDF_PATH = '/terms-and-conditions.pdf';
+const TERMS_TEXT_PATH = '/terms-and-conditions.txt';
 
 const CategoryPackages = () => {
   const termsVersion = 'T&C-studigi-2026-03-01';
@@ -54,26 +54,12 @@ const CategoryPackages = () => {
       setTermsLoadError('');
 
       try {
-        const pdfjs = await import('pdfjs-dist');
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
-        const loadingTask = pdfjs.getDocument(TERMS_PDF_PATH);
-        const pdf = await loadingTask.promise;
-
-        const pageTexts = [];
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-          const page = await pdf.getPage(pageNumber);
-          const textContent = await page.getTextContent();
-          const lines = (textContent.items || [])
-            .map((item) => item?.str || '')
-            .join(' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          if (lines) pageTexts.push(lines);
+        const response = await fetch(TERMS_TEXT_PATH, { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error('Gagal mengambil dokumen teks T&C');
         }
-
-        setTermsText(pageTexts.join('\n\n'));
+        const text = await response.text();
+        setTermsText(String(text || '').replace(/\r/g, '').trim());
       } catch (err) {
         setTermsLoadError('Isi dokumen Syarat & Ketentuan belum berhasil dimuat. Silakan tutup modal lalu coba lagi.');
       } finally {
