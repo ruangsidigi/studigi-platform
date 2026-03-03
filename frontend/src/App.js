@@ -100,142 +100,183 @@ function App() {
 
   return (
     <Router>
-      <Navbar branding={branding} />
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+      <div className="app-shell">
+        <Navbar branding={branding} />
+        <main className="app-content">
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/home" element={<CategoryPackages />} />
+            <Route path="/categories/:categoryId/packages" element={<CategoryPackages />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
-        {/* Protected Routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute>
-              <Reports />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard/categories/:categoryId"
-          element={
-            <ProtectedRoute>
-              <CategoryPackages />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/bundles/:bundleId"
-          element={
-            <ProtectedRoute>
-              <BundleDetail />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute>
-              <Reports />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/review/:attemptId"
-          element={
-            <ProtectedRoute>
-              <ReviewPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/quiz/:packageId"
-          element={
-            <ProtectedRoute>
-              <Quiz />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/results/:sessionId"
-          element={
-            <ProtectedRoute>
-              <Results />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/adaptive-dashboard"
-          element={
-            <ProtectedRoute>
-              <AdaptiveDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/my-materials"
-          element={
-            <ProtectedRoute>
-              <UserMaterialsPage />
-            </ProtectedRoute>
-          }
-        />
+            {/* Protected Routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Navigate to="/dashboard/packages" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/packages"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/adaptive"
+              element={
+                <ProtectedRoute>
+                  <AdaptiveDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/report"
+              element={
+                <ProtectedRoute>
+                  <Reports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/categories/:categoryId"
+              element={
+                <CategoryPackages />
+              }
+            />
+            <Route
+              path="/bundles/:bundleId"
+              element={
+                <ProtectedRoute>
+                  <BundleDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/review/:attemptId"
+              element={
+                <ProtectedRoute>
+                  <ReviewPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/quiz/:packageId"
+              element={
+                <ProtectedRoute>
+                  <Quiz />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/results/:sessionId"
+              element={
+                <ProtectedRoute>
+                  <Results />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/adaptive-dashboard" element={<Navigate to="/dashboard/adaptive" />} />
+            <Route path="/reports" element={<Navigate to="/dashboard/report" />} />
+            <Route
+              path="/my-materials"
+              element={
+                <ProtectedRoute>
+                  <UserMaterialsPage />
+                </ProtectedRoute>
+              }
+            />
 
-        {/* Admin Routes */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/cms/library"
-          element={
-            <ProtectedRoute requiredRole={['admin', 'content_manager', 'reviewer']}>
-              <CMSContentLibraryPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/cms/upload"
-          element={
-            <ProtectedRoute requiredRole={['admin', 'content_manager']}>
-              <CMSUploadCenterPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/cms/workflow"
-          element={
-            <ProtectedRoute requiredRole={['admin', 'reviewer']}>
-              <CMSWorkflowApprovalPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/cms/bundles"
-          element={
-            <ProtectedRoute requiredRole={['admin', 'content_manager']}>
-              <CMSBundleBuilderPage />
-            </ProtectedRoute>
-          }
-        />
+            {/* Admin Routes */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/cms/library"
+              element={
+                <ProtectedRoute requiredRole={['admin', 'content_manager', 'reviewer']}>
+                  <CMSContentLibraryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/cms/upload"
+              element={
+                <ProtectedRoute requiredRole={['admin', 'content_manager']}>
+                  <CMSUploadCenterPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/cms/workflow"
+              element={
+                <ProtectedRoute requiredRole={['admin', 'reviewer']}>
+                  <CMSWorkflowApprovalPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/cms/bundles"
+              element={
+                <ProtectedRoute requiredRole={['admin', 'content_manager']}>
+                  <CMSBundleBuilderPage />
+                </ProtectedRoute>
+              }
+            />
 
-        {/* Default Route */}
-        <Route path="/" element={<Navigate to="/dashboard" />} />
-      </Routes>
+            {/* Default Route */}
+            <Route path="/" element={<Navigate to="/home" />} />
+          </Routes>
+        </main>
+
+        <footer className="site-footer">
+          <div className="site-footer-content">
+            <p className="site-footer-title">Kontak Bisnis</p>
+            <div className="site-footer-links">
+              <a
+                className="site-footer-link"
+                href="https://api.whatsapp.com/send?phone=6282279910090"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                WhatsApp: +62 822-7991-0090
+              </a>
+              <a className="site-footer-link" href="mailto:ruangsidigi@gmail.com">
+                Email: ruangsidigi@gmail.com
+              </a>
+              <a
+                className="site-footer-link"
+                href="https://instagram.com/studigi.id"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Instagram: @studigi.id
+              </a>
+              <a
+                className="site-footer-link"
+                href="https://www.tiktok.com/@studigi.id"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                TikTok: @studigi.id
+              </a>
+            </div>
+          </div>
+        </footer>
+      </div>
     </Router>
   );
 }

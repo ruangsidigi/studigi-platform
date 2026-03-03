@@ -1,27 +1,65 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { categoryService, campaignService } from '../services/api';
+import { campaignService, packageService, purchaseService } from '../services/api';
 import SmartCampaignBanner from '../components/SmartCampaignBanner';
+import DashboardSubmenu from '../components/DashboardSubmenu';
 import '../styles/dashboard.css';
 
 const Dashboard = () => {
-  const [categories, setCategories] = useState([]);
+  const [ownedPackages, setOwnedPackages] = useState([]);
+  const [pendingPackages, setPendingPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [campaigns, setCampaigns] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchCategories();
+    fetchOwnedPackages();
     fetchPersonalizedCampaigns();
   }, []);
 
-  const fetchCategories = async () => {
+  const fetchOwnedPackages = async () => {
     try {
-      const response = await categoryService.getWithPackages();
-      setCategories(response.data || []);
+      const [purchasesRes, allPackagesRes] = await Promise.all([
+        purchaseService.getAll(),
+        packageService.getAll(),
+      ]);
+
+      const allPackages = Array.isArray(allPackagesRes.data) ? allPackagesRes.data : [];
+      const packageMap = new Map(allPackages.map((item) => [String(item.id), item]));
+      const purchases = Array.isArray(purchasesRes.data) ? purchasesRes.data : [];
+
+      const completedStatuses = ['completed', 'paid', 'success'];
+      const pendingStatuses = ['pending'];
+
+      const owned = [];
+      const pending = [];
+
+      purchases.forEach((purchase) => {
+        const normalizedStatus = String(purchase.payment_status || '').toLowerCase();
+        const pkg = packageMap.get(String(purchase.package_id));
+        if (!pkg) return;
+
+        if (completedStatuses.includes(normalizedStatus)) {
+          owned.push(pkg);
+        } else if (pendingStatuses.includes(normalizedStatus)) {
+          pending.push(pkg);
+        }
+      });
+
+      const dedupeById = (list) => {
+        const used = new Set();
+        return list.filter((item) => {
+          if (used.has(item.id)) return false;
+          used.add(item.id);
+          return true;
+        });
+      };
+
+      setOwnedPackages(dedupeById(owned));
+      setPendingPackages(dedupeById(pending));
     } catch (err) {
-      setError('Gagal memuat kategori');
+      setError('Gagal memuat paket yang sudah dibeli');
     } finally {
       setLoading(false);
     }
@@ -56,16 +94,9 @@ const Dashboard = () => {
   return (
     <div className="container">
       <div className="dashboard-header">
-        <h1>Pilih Kategori Tes</h1>
-        <p className="text-muted">Kategori akan otomatis muncul sesuai data yang dibuat admin.</p>
-        <div className="dashboard-actions">
-          <button className="btn btn-primary" onClick={() => navigate('/adaptive-dashboard')}>
-            Buka Adaptive Learning Dashboard
-          </button>
-          <button className="btn btn-info" onClick={() => navigate('/my-materials')}>
-            Buka Materi Saya
-          </button>
-        </div>
+        <h1>Dashboard</h1>
+        <p className="text-muted">Kelola paket yang sudah dibeli, adaptive learning, dan report hasil belajar.</p>
+        <DashboardSubmenu />
       </div>
 
       <SmartCampaignBanner campaigns={campaigns} onClickCampaign={handleCampaignClick} />
@@ -73,28 +104,47 @@ const Dashboard = () => {
       {error && <div className="alert alert-danger">{error}</div>}
 
       <div className="card">
-        <div className="card-title">Kategori Dinamis</div>
-        {categories.length === 0 ? (
-          <p className="text-muted">Belum ada kategori dengan paket aktif.</p>
+        <div className="card-title">Paket yang Sudah Dibeli</div>
+        {ownedPackages.length === 0 ? (
+          <p className="text-muted">Belum ada paket aktif. Silakan beli paket dari menu Home.</p>
         ) : (
-          <div className="categories-grid">
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                className="category-card"
-                onClick={() => navigate(`/dashboard/categories/${category.id}`)}
-              >
-                <h3>{category.name}</h3>
-                <p className="package-desc">{category.description || 'Kategori tes'}</p>
-                <div className="category-meta">
-                  <span>{category.package_count} paket</span>
-                  <span>{category.bundle_count} bundling</span>
+          <div className="packages-grid">
+            {ownedPackages.map((pkg) => (
+              <div key={pkg.id} className="package-card">
+                <h3>{pkg.name}</h3>
+                <p className="package-type">
+                  {pkg.type === 'tryout' ? '📝 Tryout' : pkg.type === 'latihan' ? '📚 Latihan' : '📦 Bundle'}
+                </p>
+                <p className="package-desc">{pkg.description || 'Paket latihan siap dikerjakan.'}</p>
+                <div className="package-info">
+                  <span>{pkg.question_count || 0} soal</span>
+                  <span className="package-price">Rp {(pkg.price || 0).toLocaleString('id-ID')}</span>
                 </div>
-              </button>
+                <button className="btn btn-success participant-start-btn" onClick={() => navigate(`/quiz/${pkg.id}`)}>
+                  Mulai
+                </button>
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {pendingPackages.length > 0 && (
+        <div className="card">
+          <div className="card-title">Menunggu Pembayaran</div>
+          <div className="packages-grid">
+            {pendingPackages.map((pkg) => (
+              <div key={pkg.id} className="package-card">
+                <h3>{pkg.name}</h3>
+                <p className="package-desc">Pembayaran paket ini masih diproses.</p>
+                <button className="btn btn-secondary" disabled>
+                  Menunggu Pembayaran
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

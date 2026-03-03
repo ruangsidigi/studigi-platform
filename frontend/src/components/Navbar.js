@@ -14,13 +14,13 @@ const Navbar = ({ branding }) => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/home');
   };
 
   return (
     <nav className="navbar">
       <div className="navbar-container">
-        <Link to="/" className="navbar-logo">
+        <Link to="/home" className="navbar-logo">
           {branding?.logoUrl && !logoFailed ? (
             <img
               src={branding.logoUrl}
@@ -33,6 +33,13 @@ const Navbar = ({ branding }) => {
           )}
         </Link>
         <div className="navbar-menu">
+          <Link to="/home" className="navbar-link">
+            Home
+          </Link>
+          <Link to="/dashboard/packages" className="navbar-link">
+            Dashboard
+          </Link>
+
           {user ? (
             <>
               <span className="navbar-user">Hi, {user.name}</span>
@@ -41,25 +48,14 @@ const Navbar = ({ branding }) => {
                   Admin Dashboard
                 </Link>
               )}
-              <Link to="/dashboard" className="navbar-link">
-                Dashboard
-              </Link>
-              <Link to="/reports" className="navbar-link">
-                Report
-              </Link>
               <button onClick={handleLogout} className="navbar-logout">
                 Logout
               </button>
             </>
           ) : (
-            <>
-              <Link to="/login" className="navbar-link">
-                Login
-              </Link>
-              <Link to="/register" className="navbar-link">
-                Register
-              </Link>
-            </>
+            <Link to="/login" className="navbar-link">
+              Login
+            </Link>
           )}
         </div>
       </div>

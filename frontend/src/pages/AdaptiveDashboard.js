@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { adaptiveService } from '../services/api';
+import DashboardSubmenu from '../components/DashboardSubmenu';
 import '../styles/adaptive-dashboard.css';
 
 const AdaptiveDashboard = () => {
@@ -42,6 +43,7 @@ const AdaptiveDashboard = () => {
       <div className="adaptive-header">
         <h1>Adaptive Learning Dashboard</h1>
         <p>Pantau skill, kelemahan, dan rekomendasi belajar berikutnya.</p>
+        <DashboardSubmenu />
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}

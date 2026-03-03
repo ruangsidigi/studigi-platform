@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { reportService } from '../services/api';
 import QuestionDetailModal from '../components/QuestionDetailModal';
+import DashboardSubmenu from '../components/DashboardSubmenu';
 import '../styles/reports.css';
 
 const Reports = () => {
@@ -163,6 +164,7 @@ const Reports = () => {
       <div className="dashboard-header">
         <h1>Report Belajar</h1>
         <p className="text-muted">Analisis performa, progres, dan insight belajar kamu.</p>
+        <DashboardSubmenu />
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
