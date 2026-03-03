@@ -1,20 +1,34 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
 import { categoryService, packageService, paymentService, purchaseService } from '../services/api';
 import '../styles/dashboard.css';
 
 const TERMS_TEXT_PATH = '/terms-and-conditions.txt';
+const CART_STORAGE_KEY = 'studigi:cart';
 
 const CategoryPackages = () => {
   const termsVersion = 'T&C-studigi-2026-03-01';
 
   const { categoryId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useContext(AuthContext);
+  const isHomeMode = !categoryId;
 
   const [category, setCategory] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [packages, setPackages] = useState([]);
   const [purchases, setPurchases] = useState([]);
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => {
+    try {
+      const raw = localStorage.getItem(CART_STORAGE_KEY);
+      const parsed = JSON.parse(raw || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  });
   const [leaderboardDetail, setLeaderboardDetail] = useState(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -26,25 +40,91 @@ const CategoryPackages = () => {
   const [error, setError] = useState('');
 
   const fetchData = useCallback(async () => {
-    try {
-      const [categoryRes, purchasesRes] = await Promise.all([
-        categoryService.getPackagesByCategory(categoryId),
-        purchaseService.getAll(),
-      ]);
+    setLoading(true);
+    setError('');
 
-      setCategory(categoryRes.data?.category || null);
-      setPackages(categoryRes.data?.packages || []);
-      setPurchases(purchasesRes.data || []);
+    try {
+      if (isHomeMode) {
+        const [allPackagesRes, allCategoriesRes, groupedCategoriesRes] = await Promise.allSettled([
+          packageService.getAll(),
+          categoryService.getAll(),
+          categoryService.getWithPackages(),
+        ]);
+
+        const packageRows = allPackagesRes.status === 'fulfilled' && Array.isArray(allPackagesRes.value?.data)
+          ? allPackagesRes.value.data
+          : [];
+
+        const explicitCategories = allCategoriesRes.status === 'fulfilled' && Array.isArray(allCategoriesRes.value?.data)
+          ? allCategoriesRes.value.data
+          : [];
+
+        const categoryNameMap = new Map(
+          explicitCategories.map((item) => [String(item.id), item.name])
+        );
+
+        const normalizedPackages = packageRows.map((pkg) => ({
+          ...pkg,
+          category_name: categoryNameMap.get(String(pkg.category_id)) || pkg.category_name || 'Lainnya',
+        }));
+
+        setPackages(normalizedPackages);
+        setCategory(null);
+
+        if (explicitCategories.length > 0) {
+          const categoryUsage = new Map();
+          for (const pkg of normalizedPackages) {
+            const key = String(pkg.category_id || '');
+            if (!key) continue;
+            categoryUsage.set(key, (categoryUsage.get(key) || 0) + 1);
+          }
+
+          const builtCategories = explicitCategories.map((item) => ({
+            ...item,
+            package_count: categoryUsage.get(String(item.id)) || 0,
+          }));
+
+          setCategories(builtCategories);
+        } else if (groupedCategoriesRes.status === 'fulfilled' && Array.isArray(groupedCategoriesRes.value?.data)) {
+          setCategories(groupedCategoriesRes.value.data || []);
+        } else {
+          setCategories([]);
+        }
+      } else {
+        const categoryRes = await categoryService.getPackagesByCategory(categoryId);
+        setCategory(categoryRes.data?.category || null);
+        setPackages(categoryRes.data?.packages || []);
+      }
     } catch (err) {
       setError('Gagal memuat daftar paket kategori');
+      setPackages([]);
+      setCategories([]);
+      setCategory(null);
+    }
+
+    if (!user) {
+      setPurchases([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const purchasesRes = await purchaseService.getAll();
+      setPurchases(purchasesRes.data || []);
+    } catch (err) {
+      setPurchases([]);
     } finally {
       setLoading(false);
     }
-  }, [categoryId]);
+  }, [categoryId, isHomeMode, user]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+  }, [cart]);
 
   useEffect(() => {
     if (!showTermsModal || termsText) return;
@@ -82,6 +162,16 @@ const CategoryPackages = () => {
   const handleCheckout = () => {
     if (cart.length === 0) {
       alert('Silakan pilih paket terlebih dahulu');
+      return;
+    }
+
+    if (!user) {
+      navigate('/login', {
+        state: {
+          redirectTo: location.pathname + location.search,
+          reason: 'checkout',
+        },
+      });
       return;
     }
 
@@ -156,6 +246,21 @@ const CategoryPackages = () => {
     }
   };
 
+  const categoryMap = useMemo(
+    () =>
+      new Map(
+        categories.map((item) => [
+          String(item.id),
+          {
+            id: item.id,
+            name: item.name,
+            packageCount: item.package_count || (Array.isArray(item.packages) ? item.packages.length : 0),
+          },
+        ])
+      ),
+    [categories]
+  );
+
   if (loading) return <div className="container">Loading...</div>;
 
   const completedStatuses = ['completed', 'paid', 'success'];
@@ -172,18 +277,44 @@ const CategoryPackages = () => {
   return (
     <div className="container">
       <div className="dashboard-header">
-        <h1>{category?.name || 'Kategori'}</h1>
-        <button className="btn btn-secondary" onClick={() => navigate('/dashboard')}>
-          ← Kembali ke Kategori
-        </button>
+        <h1>{isHomeMode ? 'Home - Katalog Paket' : (category?.name || 'Kategori')}</h1>
+        {isHomeMode ? (
+          <p className="text-muted">Lihat kategori dan paket soal, tambah ke keranjang, lalu checkout.</p>
+        ) : (
+          <button className="btn btn-secondary" onClick={() => navigate('/home')}>
+            ← Kembali ke Home
+          </button>
+        )}
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
 
+      {isHomeMode && categories.length > 0 && (
+        <div className="card">
+          <div className="card-title">Kategori Tersedia</div>
+          <div className="categories-grid">
+            {categories.map((item) => (
+              <button
+                key={item.id}
+                className="category-card"
+                onClick={() => navigate(`/categories/${item.id}/packages`)}
+              >
+                <h3>{item.name}</h3>
+                <p className="package-desc">{item.description || 'Kategori tes'}</p>
+                <div className="category-meta">
+                  <span>{item.package_count || (item.packages || []).length} paket</span>
+                  <span>Lihat Paket</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="dashboard-layout">
         <div className="main-content">
           <div className="card">
-            <div className="card-title">Daftar Paket</div>
+            <div className="card-title">{isHomeMode ? 'Semua Paket' : 'Daftar Paket'}</div>
             <div className="packages-grid">
               {packages.map((pkg) => (
                 <div
@@ -211,6 +342,11 @@ const CategoryPackages = () => {
                   <p className="package-type">
                     {pkg.type === 'tryout' ? '📝 Tryout' : pkg.type === 'latihan' ? '📚 Latihan' : '📦 Bundle'}
                   </p>
+                  {isHomeMode && (
+                    <p className="text-muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                      Kategori: {pkg.category_name || categoryMap.get(String(pkg.category_id))?.name || '-'}
+                    </p>
+                  )}
                   <p className="package-desc">{pkg.description}</p>
 
                   <div className="package-info">
@@ -240,7 +376,7 @@ const CategoryPackages = () => {
                     Lihat Ranking
                   </button>
 
-                  {ownedPackageIds.includes(pkg.id) ? (
+                  {user && ownedPackageIds.includes(pkg.id) ? (
                     <button
                       className="btn btn-success participant-start-btn"
                       onClick={(event) => {
@@ -250,19 +386,20 @@ const CategoryPackages = () => {
                     >
                       Mulai
                     </button>
-                  ) : pendingPackageIds.includes(pkg.id) ? (
+                  ) : user && pendingPackageIds.includes(pkg.id) ? (
                     <button className="btn btn-secondary participant-cart-btn" disabled>
                       Menunggu Pembayaran
                     </button>
                   ) : (
                     <button
                       className="btn btn-primary participant-cart-btn"
+                      disabled={cart.some((item) => item.id === pkg.id)}
                       onClick={(event) => {
                         event.stopPropagation();
                         handleAddToCart(pkg);
                       }}
                     >
-                      Tambah ke Keranjang
+                      {cart.some((item) => item.id === pkg.id) ? 'Sudah di Keranjang' : 'Tambah ke Keranjang'}
                     </button>
                   )}
                 </div>
@@ -316,7 +453,7 @@ const CategoryPackages = () => {
                 </div>
 
                 <button className="btn btn-success" onClick={handleCheckout}>
-                  Checkout
+                  {user ? 'Checkout' : 'Login untuk Checkout'}
                 </button>
               </>
             )}
