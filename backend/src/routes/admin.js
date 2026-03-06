@@ -6,6 +6,23 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+const upsertFaviconUrl = async (db, faviconUrl) => {
+  await db.query('ALTER TABLE branding_settings ADD COLUMN IF NOT EXISTS favicon_url TEXT');
+
+  await db.query(
+    `WITH updated AS (
+       UPDATE branding_settings
+       SET favicon_url = $1,
+           updated_at = NOW()
+       RETURNING id
+     )
+     INSERT INTO branding_settings (favicon_url, header_color, created_at, updated_at)
+     SELECT $1, '#103c21', NOW(), NOW()
+     WHERE NOT EXISTS (SELECT 1 FROM updated)`,
+    [faviconUrl]
+  );
+};
+
 // Dashboard stats
 router.get('/stats', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
@@ -178,6 +195,7 @@ router.post('/upload-favicon', authenticateToken, authorizeRole(['admin']), uplo
     if (!req.file) return res.status(400).json({ error: 'File is required' });
     const fileExt = (req.file.originalname.split('.').pop() || 'ico').toLowerCase();
     const filename = `favicon/favicon.${fileExt}`;
+    const db = req.app.locals.db;
 
     // upload to 'materials' bucket so we reuse existing storage
     const { data: uploadData, error: uploadError } = await supabase.storage.from('materials').upload(filename, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
@@ -188,11 +206,12 @@ router.post('/upload-favicon', authenticateToken, authorizeRole(['admin']), uplo
       if (isRlsError) {
         const mimeType = req.file.mimetype || 'image/x-icon';
         const dataUrl = `data:${mimeType};base64,${req.file.buffer.toString('base64')}`;
+        await upsertFaviconUrl(db, dataUrl);
         return res.json({
-          message: 'Favicon uploaded (browser-local fallback)',
+          message: 'Favicon uploaded',
           publicUrl: dataUrl,
-          persisted: false,
-          warning: 'Storage blocked by RLS policy; favicon is applied locally in this browser.',
+          persisted: true,
+          source: 'database-fallback',
         });
       }
 
@@ -201,7 +220,10 @@ router.post('/upload-favicon', authenticateToken, authorizeRole(['admin']), uplo
 
     const { data: publicUrlData } = supabase.storage.from('materials').getPublicUrl(filename);
     const publicUrl = publicUrlData?.publicUrl || null;
-    res.json({ message: 'Favicon uploaded', publicUrl });
+    if (publicUrl) {
+      await upsertFaviconUrl(db, publicUrl);
+    }
+    res.json({ message: 'Favicon uploaded', publicUrl, persisted: true, source: 'storage' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

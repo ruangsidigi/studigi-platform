@@ -67,6 +67,7 @@ router.get('/branding', async (req, res) => {
     return res.json({
       logo: null,
       logoUrl: null,
+      faviconUrl: null,
       header_color: '#103c21',
       headerColor: '#103c21',
       buttonColor: '#007bff',
@@ -77,6 +78,8 @@ router.get('/branding', async (req, res) => {
   res.json({
     logo: logoValue,
     logoUrl: logoValue,
+    faviconUrl: rows[0].favicon_url || null,
+    favicon_url: rows[0].favicon_url || null,
     header_color: rows[0].header_color,
     headerColor: rows[0].header_color,
     buttonColor: rows[0].button_color || '#007bff',
