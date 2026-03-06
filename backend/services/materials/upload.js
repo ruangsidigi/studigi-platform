@@ -191,12 +191,55 @@ async function handleMaterialUpload(req, res) {
     if (!allowed.includes(req.file.mimetype)) return res.status(400).json({ error: 'Invalid file type' });
     const url = await uploadToStorage({ buffer: req.file.buffer, mimeType: req.file.mimetype, folder: 'materials' });
     const db = req.app.locals.db;
-    const result = await db.query(
-      `INSERT INTO materials (title, storage_key, storage_bucket, mime_type, size_bytes, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-      [req.body.title || req.file.originalname, url, config.storageBucket, req.file.mimetype, req.file.size]
+    const materialColumnsResult = await db.query(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'materials'`
     );
-    await db.query(`INSERT INTO audit_logs (actor_id, action, resource_type, resource_id, after) VALUES ($1,$2,$3,$4,$5)`,
-      [req.user?.id || null, 'create_material', 'material', result.rows[0].id, { url }]);
+    const materialColumns = new Set((materialColumnsResult.rows || []).map((row) => String(row.column_name || '').toLowerCase()));
+
+    const insertColumns = [];
+    const insertValues = [];
+
+    const pushInsert = (column, value) => {
+      if (!materialColumns.has(column)) return;
+      insertColumns.push(column);
+      insertValues.push(value);
+    };
+
+    const parseOptionalInt = (value) => {
+      const n = Number(value);
+      return Number.isInteger(n) && n > 0 ? n : null;
+    };
+
+    const packageIds = parsePackageIds(req.body || {});
+    const title = (req.body?.title || req.file.originalname || '').trim() || 'Untitled Material';
+
+    pushInsert('title', title);
+    pushInsert('description', req.body?.description || null);
+    pushInsert('category_id', parseOptionalInt(req.body?.categoryId || req.body?.category_id));
+    pushInsert('package_id', packageIds.length ? packageIds[0] : parseOptionalInt(req.body?.packageId || req.body?.package_id));
+    pushInsert('storage_key', url);
+    pushInsert('storage_bucket', config.storageBucket || null);
+    pushInsert('mime_type', req.file.mimetype || 'application/pdf');
+    pushInsert('size_bytes', req.file.size || null);
+    pushInsert('created_by', req.user?.id || null);
+    pushInsert('file_url', url);
+    pushInsert('file_path', url);
+
+    if (!insertColumns.length) {
+      return res.status(500).json({ error: 'Table materials tidak memiliki kolom yang didukung untuk upload' });
+    }
+
+    const valuePlaceholders = insertColumns.map((_, index) => `$${index + 1}`).join(',');
+    const result = await db.query(
+      `INSERT INTO materials (${insertColumns.join(', ')}) VALUES (${valuePlaceholders}) RETURNING id`,
+      insertValues
+    );
+    try {
+      await db.query(`INSERT INTO audit_logs (actor_id, action, resource_type, resource_id, after) VALUES ($1,$2,$3,$4,$5)`,
+        [req.user?.id || null, 'create_material', 'material', result.rows[0].id, { url }]);
+    } catch (_) {}
     res.json({ id: result.rows[0].id, url });
   } catch (err) {
     console.error(err);

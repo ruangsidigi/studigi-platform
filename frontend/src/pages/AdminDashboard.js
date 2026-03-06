@@ -1199,6 +1199,7 @@ export default AdminDashboard;
 
 const BrandingSettingsForm = ({ setMessage }) => {
   const BRANDING_LOGO_CACHE_KEY = 'brandingLogoUrl';
+  const FAVICON_CACHE_KEY = 'appFaviconUrl';
 
   const extractBrandingPayload = (response) => {
     const raw = response?.data || response || {};
@@ -1220,6 +1221,7 @@ const BrandingSettingsForm = ({ setMessage }) => {
   const [lineColor, setLineColor] = useState('#dddddd');
   const [logoFile, setLogoFile] = useState(null);
   const [logoUrl, setLogoUrl] = useState('');
+  const [faviconFile, setFaviconFile] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const colorRegex = /^#([0-9a-fA-F]{6})$/;
@@ -1312,6 +1314,57 @@ const BrandingSettingsForm = ({ setMessage }) => {
     }
   };
 
+  const applyFavicon = (faviconUrl) => {
+    const nextUrl = String(faviconUrl || '').trim();
+    if (!nextUrl) return;
+
+    let iconLink = document.querySelector("link[rel='icon']");
+    if (!iconLink) {
+      iconLink = document.createElement('link');
+      iconLink.setAttribute('rel', 'icon');
+      document.head.appendChild(iconLink);
+    }
+
+    iconLink.setAttribute('href', nextUrl);
+  };
+
+  const handleUploadFavicon = async (e) => {
+    e.preventDefault();
+
+    if (!faviconFile) {
+      setMessage('Pilih file favicon (.ico/png)');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const form = new FormData();
+      form.append('file', faviconFile);
+
+      const res = await fetch(API_ROOT + '/api/admin/upload-favicon', {
+        method: 'POST',
+        body: form,
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setMessage(json.error || 'Error uploading favicon');
+        return;
+      }
+
+      const nextFavicon = `/api/favicon.ico?t=${Date.now()}`;
+      applyFavicon(nextFavicon);
+      localStorage.setItem(FAVICON_CACHE_KEY, nextFavicon);
+      setFaviconFile(null);
+      setMessage('Favicon uploaded');
+    } catch (error) {
+      setMessage('Error upload favicon: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div>
       <form onSubmit={handleSaveColor} style={{ marginBottom: 16 }}>
@@ -1368,6 +1421,18 @@ const BrandingSettingsForm = ({ setMessage }) => {
           />
         </div>
         <button className="btn btn-success" disabled={loading}>Upload Logo</button>
+      </form>
+
+      <form onSubmit={handleUploadFavicon} style={{ marginTop: 12 }}>
+        <div className="form-group">
+          <label>Upload Favicon (ICO/PNG)</label>
+          <input
+            type="file"
+            accept=".ico,image/x-icon,image/png"
+            onChange={(e) => setFaviconFile(e.target.files[0])}
+          />
+        </div>
+        <button className="btn btn-success" disabled={loading}>Upload Favicon</button>
       </form>
 
       <div style={{ marginTop: 14 }}>
@@ -1688,29 +1753,13 @@ const CategoryManager = ({ categories, setCategories, setMessage }) => {
 
 // Material uploader component
 const MaterialUploader = ({ categories, setCategories, packages, materials, setMaterials, setMessage }) => {
-  const FAVICON_CACHE_KEY = 'appFaviconUrl';
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [otherCategoryName, setOtherCategoryName] = useState('');
   const [packageId, setPackageId] = useState('');
-  const [faviconFile, setFaviconFile] = useState(null);
   const [attachPackageByMaterial, setAttachPackageByMaterial] = useState({});
-
-  const applyFavicon = (faviconUrl) => {
-    const nextUrl = String(faviconUrl || '').trim();
-    if (!nextUrl) return;
-
-    let iconLink = document.querySelector("link[rel='icon']");
-    if (!iconLink) {
-      iconLink = document.createElement('link');
-      iconLink.setAttribute('rel', 'icon');
-      document.head.appendChild(iconLink);
-    }
-
-    iconLink.setAttribute('href', nextUrl);
-  };
 
   const ensureCategoryIdByName = async (rawName) => {
     const normalizedName = String(rawName || '').trim();
@@ -1845,35 +1894,8 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
     }
   };
 
-  const handleFaviconUpload = async (e) => {
-    e.preventDefault();
-    if (!faviconFile) { setMessage('Pilih file favicon (.ico/png)'); return; }
-    try {
-      const form = new FormData();
-      form.append('file', faviconFile);
-      const res = await fetch(API_ROOT + '/api/admin/upload-favicon', {
-        method: 'POST', body: form, headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      const json = await res.json();
-      if (res.ok) {
-        const nextFavicon = `/api/favicon.ico?t=${Date.now()}`;
-        applyFavicon(nextFavicon);
-        localStorage.setItem(FAVICON_CACHE_KEY, nextFavicon);
-        setMessage('Favicon uploaded');
-        setFaviconFile(null);
-      } else setMessage(json.error || 'Error uploading favicon');
-    } catch (err) { setMessage('Error uploading favicon'); }
-  };
-
   return (
     <div>
-      <div style={{ marginBottom: 12 }}>
-        <div className="card-title">Upload Favicon (optional)</div>
-        <form onSubmit={handleFaviconUpload} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input type="file" accept=".ico,image/x-icon,image/png" onChange={(e)=>setFaviconFile(e.target.files[0])} />
-          <button className="btn btn-sm btn-primary">Upload Favicon</button>
-        </form>
-      </div>
       <form onSubmit={handleUpload}>
         <div className="form-row">
           <div className="form-group">
