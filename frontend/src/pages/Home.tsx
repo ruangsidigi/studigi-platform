@@ -1,45 +1,190 @@
-import React from 'react';
-import TryoutCard from '../components/TryoutCard.tsx';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Clock3, FileText, ShoppingCart } from 'lucide-react';
+import { AuthContext } from '../context/AuthContext';
+import { packageService } from '../services/api';
+import CartWidget, { CartItem } from '../components/CartWidget.tsx';
 
-const tryoutData = [
-  {
-    title: 'SKD CPNS Full Paket 1',
-    description: 'Latihan TWK, TIU, TKP lengkap dengan pembahasan.',
-    questions: 110,
-    duration: 100,
-    category: 'CPNS',
-    actionTo: '/dashboard/packages',
-  },
-  {
-    title: 'SKD CPNS Full Paket 2',
-    description: 'Paket terbaru dengan simulasi waktu ujian real.',
-    questions: 110,
-    duration: 100,
-    category: 'CPNS',
-    actionTo: '/dashboard/packages',
-  },
-  {
-    title: 'PPPK Teknis Simulasi',
-    description: 'Paket latihan kompetensi teknis dan manajerial.',
-    questions: 90,
-    duration: 90,
-    category: 'PPPK',
-    actionTo: '/dashboard/packages',
-  },
-];
+const CATEGORY_TABS = ['CPNS', 'PPPK', 'BUMN', 'TOEFL', 'Lainnya'] as const;
+
+const getCategoryName = (pkg: any) => String(pkg?.category_name || pkg?.category || '').trim().toUpperCase();
+
+const normalizePackageToCartItem = (pkg: any): CartItem => ({
+  id: Number(pkg.id),
+  name: String(pkg.name || 'Paket Tryout'),
+  category: getCategoryName(pkg) || String(pkg.type || 'TRYOUT').toUpperCase(),
+  price: Number(pkg.price || 0),
+});
 
 export default function Home() {
+  const navigate = useNavigate();
+  const { user } = useContext(AuthContext as any);
+  const [packages, setPackages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeCategory, setActiveCategory] = useState<(typeof CATEGORY_TABS)[number]>('CPNS');
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+
+  useEffect(() => {
+    const loadPackages = async () => {
+      try {
+        setLoading(true);
+        const response = await packageService.getAll();
+        const allPackages = Array.isArray(response.data) ? response.data : [];
+        const validPackages = allPackages.filter((item) => Number(item?.id) > 0);
+        setPackages(validPackages);
+        setError('');
+      } catch (loadErr) {
+        setError('Gagal memuat katalog tryout.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPackages();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('studigi:cart') || '[]');
+      setCartItems(Array.isArray(stored) ? stored : []);
+    } catch (readErr) {
+      setCartItems([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('studigi:cart', JSON.stringify(cartItems));
+    window.dispatchEvent(new CustomEvent('studigi:cart-updated', { detail: { count: cartItems.length } }));
+  }, [cartItems]);
+
+  const filteredPackages = useMemo(() => {
+    if (activeCategory === 'Lainnya') {
+      return packages.filter((pkg) => !['CPNS', 'PPPK', 'BUMN', 'TOEFL'].includes(getCategoryName(pkg)));
+    }
+    return packages.filter((pkg) => getCategoryName(pkg) === activeCategory);
+  }, [packages, activeCategory]);
+
+  const handleAddToCart = (pkg: any) => {
+    const mapped = normalizePackageToCartItem(pkg);
+    setCartItems((prev) => {
+      if (prev.some((item) => item.id === mapped.id)) return prev;
+      return [...prev, mapped];
+    });
+  };
+
+  const handleRemoveCart = (id: number) => {
+    setCartItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleCheckout = () => {
+    navigate('/login', {
+      state: {
+        redirectTo: '/payment',
+        fromCart: true,
+      },
+    });
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-20 md:pb-4 lg:pb-2">
       <section className="rounded-2xl bg-[var(--header-color,#103c21)] p-5 text-white sm:p-6">
         <h2 className="text-xl font-semibold sm:text-2xl">Tryout Marketplace</h2>
-        <p className="mt-1 text-sm text-emerald-100">Pilih paket terbaik untuk persiapan CPNS dan PPPK.</p>
+        <p className="mt-1 text-sm text-emerald-100">Kategori: CPNS, PPPK, BUMN, TOEFL, dan lainnya.</p>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {tryoutData.map((item) => (
-          <TryoutCard key={item.title} {...item} />
-        ))}
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+        <div className="flex flex-wrap gap-2">
+          {CATEGORY_TABS.map((category) => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => setActiveCategory(category)}
+              className={[
+                'rounded-xl px-4 py-2 text-sm font-medium transition-colors',
+                activeCategory === category
+                  ? 'bg-[var(--header-color,#103c21)] text-white'
+                  : 'bg-slate-100 text-[var(--secondary-color,#69655e)] hover:bg-slate-200',
+              ].join(' ')}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_330px]">
+        <div className="space-y-4">
+          {loading && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">Loading katalog...</div>
+          )}
+
+          {error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error}</div>
+          )}
+
+          {!loading && !error && filteredPackages.length === 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
+              Belum ada paket pada kategori ini.
+            </div>
+          )}
+
+          {!loading &&
+            !error &&
+            filteredPackages.length > 0 &&
+            filteredPackages.map((pkg) => {
+              const inCart = cartItems.some((item) => item.id === Number(pkg.id));
+              const categoryLabel = getCategoryName(pkg) || String(pkg.type || 'TRYOUT').toUpperCase();
+              return (
+                <article key={pkg.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">{categoryLabel}</span>
+                    <span className="text-sm font-semibold text-[var(--header-color,#103c21)]">
+                      Rp {Number(pkg.price || 0).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+
+                  <h3 className="text-base font-semibold text-slate-900">{pkg.name}</h3>
+                  <p className="mt-1 text-sm text-[var(--secondary-color,#69655e)]">{pkg.description || 'Paket tryout terbaik untuk latihan.'}</p>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-600">
+                    <div className="flex items-center gap-1.5">
+                      <FileText size={13} />
+                      <span>{Number(pkg.question_count || 0)} soal</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Clock3 size={13} />
+                      <span>{Number(pkg.duration || 100)} menit</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAddToCart(pkg)}
+                      disabled={inCart}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <ShoppingCart size={15} />
+                      {inCart ? 'Sudah di Cart' : 'Add to Cart'}
+                    </button>
+
+                    {user && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/quiz/${pkg.id}`)}
+                        className="rounded-xl border border-[var(--secondary-color,#69655e)] px-4 py-2 text-sm font-semibold text-[var(--secondary-color,#69655e)] hover:bg-slate-50"
+                      >
+                        Start Tryout
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+        </div>
+
+        <CartWidget items={cartItems} onRemove={handleRemoveCart} onCheckout={handleCheckout} />
       </section>
     </div>
   );

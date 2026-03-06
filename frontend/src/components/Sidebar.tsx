@@ -43,12 +43,12 @@ export default function Sidebar() {
           </div>
           <div className="hidden lg:block">
             <p className="text-sm font-semibold text-slate-900">Studigi</p>
-            <p className="text-xs text-slate-500">Tryout Platform</p>
+            <p className="text-xs text-[var(--secondary-color,#69655e)]">Tryout Platform</p>
           </div>
         </div>
 
         <nav className="space-y-1 p-3">
-          <p className="hidden px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wider text-slate-500 lg:block">Menu</p>
+          <p className="hidden px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wider text-[var(--secondary-color,#69655e)] lg:block">Menu</p>
           {sidebarItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -58,7 +58,7 @@ export default function Sidebar() {
                   'flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors lg:justify-start',
                   isActive
                     ? 'bg-[var(--header-color,#103c21)] text-white'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                    : 'text-[var(--secondary-color,#69655e)] hover:bg-slate-100 hover:text-slate-900',
                 ].join(' ')
               }
             >
@@ -82,14 +82,14 @@ export default function Sidebar() {
             <>
               <NavLink
                 to="/login"
-                className="mb-1 flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 lg:justify-start"
+                className="mb-1 flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--secondary-color,#69655e)] transition-colors hover:bg-slate-100 hover:text-slate-900 lg:justify-start"
               >
                 <LogIn size={17} />
                 <span className="hidden lg:inline">Login</span>
               </NavLink>
               <NavLink
                 to="/register"
-                className="flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 lg:justify-start"
+                className="flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--secondary-color,#69655e)] transition-colors hover:bg-slate-100 hover:text-slate-900 lg:justify-start"
               >
                 <UserPlus size={17} />
                 <span className="hidden lg:inline">Sign Up</span>

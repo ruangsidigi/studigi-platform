@@ -28,6 +28,7 @@ import LibraryPage from './pages/Library.tsx';
 import ActivityPage from './pages/Activity.tsx';
 import PayoutsPage from './pages/Payouts.tsx';
 import SettingsPage from './pages/Settings.tsx';
+import PaymentPage from './pages/Payment.tsx';
 import DashboardLayout from './layouts/DashboardLayout.tsx';
 
 // Styles
@@ -58,14 +59,17 @@ function App() {
       const headerColor = settings.headerColor || '#103c21';
       const buttonColor = settings.buttonColor || '#007bff';
       const lineColor = settings.lineColor || '#dddddd';
+      const secondaryColor = '#69655e';
 
       document.documentElement.style.setProperty('--header-color', headerColor);
       document.documentElement.style.setProperty('--button-color', buttonColor);
       document.documentElement.style.setProperty('--line-color', lineColor);
+      document.documentElement.style.setProperty('--secondary-color', secondaryColor);
     } catch (error) {
       document.documentElement.style.setProperty('--header-color', '#103c21');
       document.documentElement.style.setProperty('--button-color', '#007bff');
       document.documentElement.style.setProperty('--line-color', '#dddddd');
+      document.documentElement.style.setProperty('--secondary-color', '#69655e');
     }
   }, []);
 
@@ -124,6 +128,16 @@ function App() {
                 <DashboardLayout>
                   <SettingsPage />
                 </DashboardLayout>
+              }
+            />
+            <Route
+              path="/payment"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <PaymentPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
               }
             />
             <Route

@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, Bell, ShoppingCart, Search, LogOut } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
@@ -11,8 +11,9 @@ interface NavbarProps {
 export default function Navbar({ title, onMenuClick }: NavbarProps) {
   const { user, logout } = useContext(AuthContext as any);
   const navigate = useNavigate();
+  const [cartCount, setCartCount] = useState(0);
 
-  const cartCount = (() => {
+  const getCartCount = () => {
     try {
       const raw = localStorage.getItem('studigi:cart');
       const parsed = JSON.parse(raw || '[]');
@@ -20,7 +21,22 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
     } catch (error) {
       return 0;
     }
-  })();
+  };
+
+  useEffect(() => {
+    setCartCount(getCartCount());
+
+    const onCartUpdated = () => {
+      setCartCount(getCartCount());
+    };
+
+    window.addEventListener('studigi:cart-updated', onCartUpdated);
+    window.addEventListener('storage', onCartUpdated);
+    return () => {
+      window.removeEventListener('studigi:cart-updated', onCartUpdated);
+      window.removeEventListener('storage', onCartUpdated);
+    };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -66,7 +82,7 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
           type="button"
           className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100"
           aria-label="Cart"
-          onClick={() => navigate('/home')}
+          onClick={() => navigate('/home#cart-widget')}
         >
           <ShoppingCart size={18} />
           {cartCount > 0 && (
