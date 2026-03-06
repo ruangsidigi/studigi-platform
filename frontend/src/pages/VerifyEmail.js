@@ -33,17 +33,17 @@ const VerifyEmail = () => {
   }, [token]);
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h2>Verifikasi Email</h2>
+    <div className="verify-page">
+      <div className="verify-page__dot" />
+
+      <div className="verify-card">
+        <h2 className="verify-card__title">Verifikasi Email</h2>
 
         {loading && <div className="alert alert-info">Memproses verifikasi...</div>}
         {!loading && success && <div className="alert alert-success">{success}</div>}
         {!loading && error && <div className="alert alert-danger">{error}</div>}
 
-        <p className="auth-link">
-          <Link to="/login">Lanjut ke Login</Link>
-        </p>
+        <Link to="/login" className="verify-card__login-btn">Lanjut ke Login</Link>
       </div>
     </div>
   );
