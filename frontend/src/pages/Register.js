@@ -36,7 +36,7 @@ const Register = () => {
       <div className="register-page__container">
         <h2 className="register-page__title">Create an account</h2>
         <p className="register-page__subtitle">
-          Already have an acount? <Link to="/login">Log in</Link>
+          Already have an account? <Link to="/login">Log in</Link>
         </p>
 
         {error && <div className="alert alert-danger">{error}</div>}
