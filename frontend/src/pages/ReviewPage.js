@@ -202,8 +202,8 @@ const ReviewPage = () => {
           <div className="review-title-row">
             <button 
               className="btn-icon-back"
-              onClick={() => navigate(-1)}
-              title="Kembali ke halaman sebelumnya"
+              onClick={() => navigate('/activity')}
+              title="Kembali ke halaman Activity"
             >
               ← Kembali
             </button>
