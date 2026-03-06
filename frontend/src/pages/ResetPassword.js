@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/api';
 import '../styles/auth.css';
 
@@ -44,43 +44,58 @@ const ResetPassword = () => {
 
   if (!token) {
     return (
-      <div className="auth-container">
-        <div className="auth-card">
+      <div className="reset-page">
+        <div className="reset-page__dot" />
+        <div className="reset-card">
+          <h2 className="reset-card__title">Reset Password</h2>
           <div className="alert alert-danger">Invalid reset link</div>
+          <Link to="/forgot-password" className="reset-card__back-link">Request a new reset link</Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h2>Reset Password</h2>
+    <div className="reset-page">
+      <div className="reset-page__dot" />
+
+      <div className="reset-card">
+        <h2 className="reset-card__title">Reset Password</h2>
+        <p className="reset-card__subtitle">Masukkan password baru untuk akun Anda.</p>
+
         {error && <div className="alert alert-danger">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
+
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
+          <div className="form-group reset-card__field">
             <label>New Password</label>
             <input
               type="password"
+              placeholder="Enter new password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+              minLength={8}
               required
             />
           </div>
-          <div className="form-group">
+
+          <div className="form-group reset-card__field">
             <label>Confirm Password</label>
             <input
               type="password"
+              placeholder="Confirm new password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
           </div>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+
+          <button type="submit" className="reset-card__submit" disabled={loading}>
             {loading ? 'Resetting...' : 'Reset Password'}
           </button>
         </form>
+
+        <Link to="/login" className="reset-card__back-link">Back to login</Link>
       </div>
     </div>
   );
