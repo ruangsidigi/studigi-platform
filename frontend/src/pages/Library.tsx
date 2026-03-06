@@ -19,8 +19,19 @@ export default function Library() {
         return;
       }
 
+      const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
+
       try {
         setLoading(true);
+
+        if (isAdmin) {
+          const allPackagesRes = await packageService.getAll();
+          const allPackages = Array.isArray(allPackagesRes.data) ? allPackagesRes.data : [];
+          setOwnedPackages(allPackages);
+          setError('');
+          return;
+        }
+
         const [purchasesRes, allPackagesRes] = await Promise.all([
           purchaseService.getAll(),
           packageService.getAll(),
@@ -79,7 +90,11 @@ export default function Library() {
     <div className="mx-auto max-w-7xl space-y-6 pb-20 md:pb-4 lg:pb-2">
       <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
         <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">Library</h2>
-        <p className="mt-1 text-sm text-slate-600">Semua paket tryout yang sudah kamu beli.</p>
+        <p className="mt-1 text-sm text-slate-600">
+          {String(user?.role || '').toLowerCase() === 'admin'
+            ? 'Mode Admin: semua paket bisa langsung dikerjakan tanpa pembelian.'
+            : 'Semua paket tryout yang sudah kamu beli.'}
+        </p>
       </section>
 
       {!user && (

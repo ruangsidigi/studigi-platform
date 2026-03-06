@@ -7,6 +7,13 @@ const adaptiveService = require('../services/adaptiveService');
 
 const router = express.Router();
 
+const isAdminUser = (user) => {
+  const role = String(user?.role || '').toLowerCase();
+  const email = String(user?.email || '').toLowerCase();
+  const adminEmail = String(process.env.ADMIN_EMAIL || 'admin@skdcpns.com').toLowerCase();
+  return role === 'admin' || email === adminEmail;
+};
+
 // Start a tryout session
 router.post('/start', authenticateToken, async (req, res) => {
   try {
@@ -17,16 +24,17 @@ router.post('/start', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Package ID is required' });
     }
 
-    // Check if user has access to this package
-    const { data: purchase } = await supabase
-      .from('purchases')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('package_id', packageId)
-      .single();
+    if (!isAdminUser(req.user)) {
+      const { data: purchase } = await supabase
+        .from('purchases')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('package_id', packageId)
+        .single();
 
-    if (!purchase) {
-      return res.status(403).json({ error: 'User does not have access to this package' });
+      if (!purchase) {
+        return res.status(403).json({ error: 'User does not have access to this package' });
+      }
     }
 
     // Create session
