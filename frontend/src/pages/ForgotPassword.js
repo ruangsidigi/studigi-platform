@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
 import '../styles/auth.css';
 
@@ -28,28 +28,33 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h2>Forgot Password</h2>
+    <div className="forgot-page">
+      <div className="forgot-page__dot" />
+
+      <div className="forgot-card">
+        <h2 className="forgot-card__title">Forgot Password</h2>
+        <p className="forgot-card__subtitle">Masukkan email akun untuk menerima link reset password.</p>
+
         {error && <div className="alert alert-danger">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
+
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
+          <div className="form-group forgot-card__field">
             <label>Email</label>
             <input
               type="email"
+              placeholder="Enter your email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <button type="submit" className="forgot-card__submit" disabled={loading}>
             {loading ? 'Sending...' : 'Send Reset Link'}
           </button>
         </form>
-        <p className="auth-link">
-          <a href="/login">Back to login</a>
-        </p>
+
+        <Link to="/login" className="forgot-card__back-link">Back to login</Link>
       </div>
     </div>
   );
