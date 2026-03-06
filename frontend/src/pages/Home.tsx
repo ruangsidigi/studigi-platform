@@ -78,6 +78,11 @@ export default function Home() {
   };
 
   const handleCheckout = () => {
+    if (user) {
+      navigate('/payment');
+      return;
+    }
+
     navigate('/login', {
       state: {
         redirectTo: '/payment',
