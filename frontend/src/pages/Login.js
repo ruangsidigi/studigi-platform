@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { authService, campaignService } from '../services/api';
 import '../styles/auth.css';
@@ -11,6 +11,7 @@ const Login = () => {
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
@@ -66,45 +67,72 @@ const Login = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h2>Login</h2>
-        {error && <div className="alert alert-danger">{error}</div>}
-        {info && <div className="alert alert-info">{info}</div>}
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
-        <p className="auth-link">
-          Don't have account? <a href="/register">Register here</a>
-        </p>
-        <p className="auth-link">
-          <a href="/forgot-password">Forgot password?</a>
-        </p>
-        <p className="auth-link">
-          <button type="button" className="btn btn-primary" onClick={handleResendVerification} disabled={resendLoading}>
-            {resendLoading ? 'Mengirim ulang...' : 'Kirim Ulang Verifikasi Email'}
-          </button>
-        </p>
+    <div className="login-page">
+      <div className="login-page__container">
+        <div className="login-page__avatar" />
+        <div className="login-card">
+          <h2 className="login-card__title">Sign in</h2>
+
+          {error && <div className="alert alert-danger">{error}</div>}
+          {info && <div className="alert alert-info">{info}</div>}
+
+          <form onSubmit={handleSubmit}>
+            <div className="form-group login-card__field">
+              <label>Email or mobile phone number</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group login-card__field">
+              <div className="login-card__label-row">
+                <label>Your password</label>
+                <button
+                  type="button"
+                  className="login-card__show-toggle"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+
+            <button type="submit" className="login-card__submit" disabled={loading}>
+              {loading ? 'Logging in...' : 'Log in'}
+            </button>
+
+            <p className="login-card__terms">
+              By continuing, you agree to the <a href="/terms-and-conditions.txt" target="_blank" rel="noreferrer">Terms of use</a> and <a href="/terms-and-conditions.txt" target="_blank" rel="noreferrer">Privacy Policy</a>.
+            </p>
+
+            <div className="login-card__links-row">
+              <button
+                type="button"
+                className="login-card__text-link"
+                onClick={handleResendVerification}
+                disabled={resendLoading}
+              >
+                {resendLoading ? 'Sending...' : 'Other issue with sign in'}
+              </button>
+              <Link to="/forgot-password" className="login-card__text-link">Forget your password</Link>
+            </div>
+          </form>
+
+          <div className="login-card__divider"><span>New to our community</span></div>
+
+          <Link to="/register" className="login-card__register-btn">
+            Create an account
+          </Link>
+        </div>
       </div>
     </div>
   );
