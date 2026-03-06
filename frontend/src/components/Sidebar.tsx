@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Home,
@@ -12,6 +12,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
+import { brandingService } from '../services/api';
 
 const navItems = [
   { to: '/home', label: 'Home', icon: Home },
@@ -24,10 +25,32 @@ const navItems = [
 export default function Sidebar() {
   const { user, logout } = useContext(AuthContext as any);
   const navigate = useNavigate();
+  const [logoUrl, setLogoUrl] = useState<string>('');
   const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
   const sidebarItems = isAdmin
     ? [{ to: '/admin', label: 'Dashboard Admin', icon: GraduationCap }, ...navItems]
     : navItems;
+
+  useEffect(() => {
+    const loadBranding = async () => {
+      try {
+        const response = await brandingService.getSettings();
+        const settings = response?.data || {};
+        setLogoUrl(String(settings.logoUrl || '').trim());
+      } catch (error) {
+        setLogoUrl('');
+      }
+    };
+
+    loadBranding();
+
+    const handleBrandingUpdated = () => {
+      loadBranding();
+    };
+
+    window.addEventListener('branding-updated', handleBrandingUpdated);
+    return () => window.removeEventListener('branding-updated', handleBrandingUpdated);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -38,9 +61,18 @@ export default function Sidebar() {
     <aside className="hidden shrink-0 border-r border-slate-200 bg-white md:block md:w-20 lg:w-64">
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-center border-b border-slate-200 px-3 py-4 lg:justify-start lg:px-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--header-color,#103c21)] text-white">
-            <GraduationCap size={18} />
-          </div>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="Studigi logo"
+              className="h-9 w-9 rounded-lg object-cover"
+              onError={() => setLogoUrl('')}
+            />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--header-color,#103c21)] text-white">
+              <GraduationCap size={18} />
+            </div>
+          )}
           <div className="hidden lg:block">
             <p className="text-sm font-semibold text-slate-900">Studigi</p>
             <p className="text-xs text-[var(--secondary-color,#69655e)]">Tryout Platform</p>
