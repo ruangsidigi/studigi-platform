@@ -2,17 +2,29 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock3, FileText, ShoppingCart } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
-import { packageService } from '../services/api';
+import { categoryService, packageService } from '../services/api';
 import CartWidget, { CartItem } from '../components/CartWidget.tsx';
 
 const CATEGORY_TABS = ['CPNS', 'PPPK', 'BUMN', 'TOEFL', 'Lainnya'] as const;
 
-const getCategoryName = (pkg: any) => String(pkg?.category_name || pkg?.category || '').trim().toUpperCase();
+const normalizeCategoryName = (value: any) => String(value || '').trim().toUpperCase();
 
-const normalizePackageToCartItem = (pkg: any): CartItem => ({
+const getCategoryName = (pkg: any, categoryMap: Record<string, string>) => {
+  const directCategoryName = normalizeCategoryName(pkg?.category_name || pkg?.category || '');
+  if (directCategoryName) return directCategoryName;
+
+  const categoryId = String(pkg?.category_id || '').trim();
+  if (categoryId && categoryMap[categoryId]) {
+    return normalizeCategoryName(categoryMap[categoryId]);
+  }
+
+  return '';
+};
+
+const normalizePackageToCartItem = (pkg: any, categoryMap: Record<string, string>): CartItem => ({
   id: Number(pkg.id),
   name: String(pkg.name || 'Paket Tryout'),
-  category: getCategoryName(pkg) || String(pkg.type || 'TRYOUT').toUpperCase(),
+  category: getCategoryName(pkg, categoryMap) || 'LAINNYA',
   price: Number(pkg.price || 0),
 });
 
@@ -20,6 +32,7 @@ export default function Home() {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext as any);
   const [packages, setPackages] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeCategory, setActiveCategory] = useState<(typeof CATEGORY_TABS)[number]>('CPNS');
@@ -29,10 +42,16 @@ export default function Home() {
     const loadPackages = async () => {
       try {
         setLoading(true);
-        const response = await packageService.getAll();
-        const allPackages = Array.isArray(response.data) ? response.data : [];
+        const [packagesResponse, categoriesResponse] = await Promise.all([
+          packageService.getAll(),
+          categoryService.getAll().catch(() => ({ data: [] })),
+        ]);
+
+        const allPackages = Array.isArray(packagesResponse.data) ? packagesResponse.data : [];
+        const allCategories = Array.isArray(categoriesResponse.data) ? categoriesResponse.data : [];
         const validPackages = allPackages.filter((item) => Number(item?.id) > 0);
         setPackages(validPackages);
+        setCategories(allCategories);
         setError('');
       } catch (loadErr) {
         setError('Gagal memuat katalog tryout.');
@@ -43,6 +62,16 @@ export default function Home() {
 
     loadPackages();
   }, []);
+
+  const categoryMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    categories.forEach((category) => {
+      const id = String(category?.id || '').trim();
+      const name = String(category?.name || '').trim();
+      if (id && name) map[id] = name;
+    });
+    return map;
+  }, [categories]);
 
   useEffect(() => {
     try {
@@ -60,13 +89,13 @@ export default function Home() {
 
   const filteredPackages = useMemo(() => {
     if (activeCategory === 'Lainnya') {
-      return packages.filter((pkg) => !['CPNS', 'PPPK', 'BUMN', 'TOEFL'].includes(getCategoryName(pkg)));
+      return packages.filter((pkg) => !['CPNS', 'PPPK', 'BUMN', 'TOEFL'].includes(getCategoryName(pkg, categoryMap)));
     }
-    return packages.filter((pkg) => getCategoryName(pkg) === activeCategory);
-  }, [packages, activeCategory]);
+    return packages.filter((pkg) => getCategoryName(pkg, categoryMap) === activeCategory);
+  }, [packages, activeCategory, categoryMap]);
 
   const handleAddToCart = (pkg: any) => {
-    const mapped = normalizePackageToCartItem(pkg);
+    const mapped = normalizePackageToCartItem(pkg, categoryMap);
     setCartItems((prev) => {
       if (prev.some((item) => item.id === mapped.id)) return prev;
       return [...prev, mapped];
@@ -139,7 +168,7 @@ export default function Home() {
             filteredPackages.length > 0 &&
             filteredPackages.map((pkg) => {
               const inCart = cartItems.some((item) => item.id === Number(pkg.id));
-              const categoryLabel = getCategoryName(pkg) || String(pkg.type || 'TRYOUT').toUpperCase();
+              const categoryLabel = getCategoryName(pkg, categoryMap) || 'LAINNYA';
               return (
                 <article key={pkg.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
