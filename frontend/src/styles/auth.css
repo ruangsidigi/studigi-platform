@@ -174,6 +174,125 @@
   background: #f8f8f8;
 }
 
+.register-page {
+  min-height: calc(100vh - 70px);
+  background: #f2f2f2;
+  padding: 28px 20px 34px;
+}
+
+.register-page__dot {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #bfbfbf;
+  margin-bottom: 10px;
+}
+
+.register-page__container {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.register-page__title {
+  text-align: center;
+  margin: 0;
+  color: #2f2f2f;
+  font-size: 46px;
+  font-weight: 600;
+}
+
+.register-page__subtitle {
+  text-align: center;
+  margin: 8px 0 46px;
+  color: #444;
+  font-size: 16px;
+}
+
+.register-page__subtitle a {
+  color: #2f2f2f;
+  text-decoration: underline;
+}
+
+.register-form__field {
+  margin-bottom: 20px;
+}
+
+.register-form__field label {
+  font-size: 16px;
+  color: #575757;
+}
+
+.register-form__field input {
+  height: 45px;
+  border: 1.5px solid #cfcfcf;
+  border-radius: 12px;
+  font-size: 16px;
+  background: #f7f7f7;
+}
+
+.register-form__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.register-form__show-toggle {
+  border: none;
+  background: transparent;
+  color: #858585;
+  font-size: 16px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.register-form__hint {
+  margin-top: 6px;
+  display: block;
+  color: #666;
+  font-size: 13px;
+}
+
+.register-form__terms {
+  margin: 28px 0 12px;
+  color: #333;
+  font-size: 16px;
+}
+
+.register-form__terms a {
+  color: #2f2f2f;
+  text-decoration: underline;
+}
+
+.register-form__submit {
+  width: 100%;
+  height: 52px;
+  border: none;
+  border-radius: 999px;
+  background: #b8b8b8;
+  color: #fff;
+  font-size: 38px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.register-form__submit:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
+}
+
+.register-page__back-login {
+  margin-top: 10px;
+  border: none;
+  background: transparent;
+  color: #4b4b4b;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+}
+
 .auth-link {
   text-align: center;
   margin-top: 15px;
@@ -233,6 +352,25 @@
 
   .login-card__register-btn {
     font-size: 18px;
+  }
+
+  .register-page {
+    min-height: calc(100vh - 56px);
+    padding: 18px 14px 26px;
+  }
+
+  .register-page__title {
+    font-size: 34px;
+  }
+
+  .register-page__subtitle {
+    margin-bottom: 28px;
+    font-size: 14px;
+  }
+
+  .register-form__submit {
+    font-size: 28px;
+    height: 48px;
   }
 }
 

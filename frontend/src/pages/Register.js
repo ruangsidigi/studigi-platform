@@ -7,7 +7,7 @@ const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,11 +17,6 @@ const Register = () => {
     e.preventDefault();
     setError('');
     setSuccess('');
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
 
     setLoading(true);
     try {
@@ -35,60 +30,75 @@ const Register = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h2>Register</h2>
+    <div className="register-page">
+      <div className="register-page__dot" />
+
+      <div className="register-page__container">
+        <h2 className="register-page__title">Create an account</h2>
+        <p className="register-page__subtitle">
+          Already have an acount? <Link to="/login">Log in</Link>
+        </p>
+
         {error && <div className="alert alert-danger">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Name</label>
+
+        <form className="register-form" onSubmit={handleSubmit}>
+          <div className="form-group register-form__field">
+            <label>What should we call you?</label>
             <input
               type="text"
+              placeholder="Enter your profile name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
           </div>
-          <div className="form-group">
-            <label>Email</label>
+
+          <div className="form-group register-form__field">
+            <label>What's your email?</label>
             <input
               type="email"
+              placeholder="Enter your email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
-          <div className="form-group">
-            <label>Password</label>
+
+          <div className="form-group register-form__field">
+            <div className="register-form__label-row">
+              <label>Create a password</label>
+              <button
+                type="button"
+                className="register-form__show-toggle"
+                onClick={() => setShowPassword((prev) => !prev)}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              minLength={8}
               required
             />
+            <small className="register-form__hint">Use 8 or more characters with a mix of letters, numbers &amp; symbols</small>
           </div>
-          <div className="form-group">
-            <label>Confirm Password</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-          </div>
-          <button type="submit" className="btn btn-success" disabled={loading}>
-            {loading ? 'Registering...' : 'Register'}
+
+          <p className="register-form__terms">
+            By creating an account, you agree to the <a href="/terms-and-conditions.txt" target="_blank" rel="noreferrer">Terms of use</a> and <a href="/terms-and-conditions.txt" target="_blank" rel="noreferrer">Privacy Policy</a>.
+          </p>
+
+          <button type="submit" className="register-form__submit" disabled={loading}>
+            {loading ? 'Creating account...' : 'Create an account'}
           </button>
         </form>
-        <p className="auth-link">
-          Already have account? <Link to="/login">Login here</Link>
-        </p>
-        <p className="auth-link">
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/login')}>
-            Buka Halaman Login
-          </button>
-        </p>
+
+        <button type="button" className="register-page__back-login" onClick={() => navigate('/login')}>
+          Back to login
+        </button>
       </div>
     </div>
   );
