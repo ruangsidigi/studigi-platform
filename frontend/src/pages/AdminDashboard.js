@@ -1856,11 +1856,10 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
       });
       const json = await res.json();
       if (res.ok) {
-        const rawUrl = String(json.publicUrl || '').trim();
-        const nextFavicon = rawUrl || `/favicon.ico?t=${Date.now()}`;
+        const nextFavicon = `/api/favicon.ico?t=${Date.now()}`;
         applyFavicon(nextFavicon);
         localStorage.setItem(FAVICON_CACHE_KEY, nextFavicon);
-        setMessage(json.warning || 'Favicon uploaded');
+        setMessage('Favicon uploaded');
         setFaviconFile(null);
       } else setMessage(json.error || 'Error uploading favicon');
     } catch (err) { setMessage('Error uploading favicon'); }

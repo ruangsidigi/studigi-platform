@@ -247,6 +247,54 @@ app.get('/api/db-check', async (req, res) => {
   }
 });
 
+const resolveFavicon = async (db) => {
+  const result = await db.query(
+    `SELECT favicon_url
+     FROM branding_settings
+     WHERE favicon_url IS NOT NULL AND favicon_url <> ''
+     ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+     LIMIT 1`
+  );
+  return result?.rows?.[0]?.favicon_url || null;
+};
+
+const sendFaviconResponse = (res, faviconUrl) => {
+  const value = String(faviconUrl || '').trim();
+  if (!value) return res.status(404).end();
+
+  res.setHeader('Cache-Control', 'no-store');
+
+  if (/^data:image\//i.test(value)) {
+    const match = value.match(/^data:([^;]+);base64,(.+)$/i);
+    if (!match) return res.status(404).end();
+    const mimeType = match[1] || 'image/x-icon';
+    const payload = match[2] || '';
+    const body = Buffer.from(payload, 'base64');
+    res.setHeader('Content-Type', mimeType);
+    return res.status(200).send(body);
+  }
+
+  return res.redirect(value);
+};
+
+app.get('/favicon.ico', async (req, res) => {
+  try {
+    const faviconUrl = await resolveFavicon(req.app.locals.db);
+    return sendFaviconResponse(res, faviconUrl);
+  } catch (error) {
+    return res.status(404).end();
+  }
+});
+
+app.get('/api/favicon.ico', async (req, res) => {
+  try {
+    const faviconUrl = await resolveFavicon(req.app.locals.db);
+    return sendFaviconResponse(res, faviconUrl);
+  } catch (error) {
+    return res.status(404).end();
+  }
+});
+
 // Attach middleware and routes
 const authMiddleware = require('../shared/middleware/auth');
 app.use(authMiddleware);
