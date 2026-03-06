@@ -1,6 +1,17 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { Home, BookOpen, Activity, CreditCard, Settings, GraduationCap } from 'lucide-react';
+import React, { useContext } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import {
+  Home,
+  BookOpen,
+  Activity,
+  CreditCard,
+  Settings,
+  GraduationCap,
+  LogIn,
+  UserPlus,
+  LogOut,
+} from 'lucide-react';
+import { AuthContext } from '../context/AuthContext';
 
 const navItems = [
   { to: '/home', label: 'Home', icon: Home },
@@ -11,6 +22,14 @@ const navItems = [
 ];
 
 export default function Sidebar() {
+  const { user, logout } = useContext(AuthContext as any);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <aside className="hidden shrink-0 border-r border-slate-200 bg-white md:block md:w-20 lg:w-64">
       <div className="flex h-full flex-col">
@@ -25,6 +44,7 @@ export default function Sidebar() {
         </div>
 
         <nav className="space-y-1 p-3">
+          <p className="hidden px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wider text-slate-500 lg:block">Menu</p>
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -43,6 +63,36 @@ export default function Sidebar() {
             </NavLink>
           ))}
         </nav>
+
+        <div className="mt-auto border-t border-slate-200 p-3">
+          {user ? (
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex w-full items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 lg:justify-start"
+            >
+              <LogOut size={17} />
+              <span className="hidden lg:inline">Logout</span>
+            </button>
+          ) : (
+            <>
+              <NavLink
+                to="/login"
+                className="mb-1 flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 lg:justify-start"
+              >
+                <LogIn size={17} />
+                <span className="hidden lg:inline">Login</span>
+              </NavLink>
+              <NavLink
+                to="/register"
+                className="flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 lg:justify-start"
+              >
+                <UserPlus size={17} />
+                <span className="hidden lg:inline">Sign Up</span>
+              </NavLink>
+            </>
+          )}
+        </div>
       </div>
     </aside>
   );

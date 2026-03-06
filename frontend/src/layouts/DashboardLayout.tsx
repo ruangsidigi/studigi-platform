@@ -17,7 +17,7 @@ const mobileItems = [
 ];
 
 const titles: Record<string, string> = {
-  '/home': 'Home',
+  '/home': 'Marketplace Tryout',
   '/library': 'Tryout Library',
   '/activity': 'Activity',
   '/payouts': 'Payouts',
