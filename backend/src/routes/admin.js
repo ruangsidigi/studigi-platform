@@ -181,7 +181,23 @@ router.post('/upload-favicon', authenticateToken, authorizeRole(['admin']), uplo
 
     // upload to 'materials' bucket so we reuse existing storage
     const { data: uploadData, error: uploadError } = await supabase.storage.from('materials').upload(filename, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
-    if (uploadError) return res.status(500).json({ error: uploadError.message });
+    if (uploadError) {
+      const message = String(uploadError.message || 'Upload failed');
+      const isRlsError = message.toLowerCase().includes('row-level security');
+
+      if (isRlsError) {
+        const mimeType = req.file.mimetype || 'image/x-icon';
+        const dataUrl = `data:${mimeType};base64,${req.file.buffer.toString('base64')}`;
+        return res.json({
+          message: 'Favicon uploaded (browser-local fallback)',
+          publicUrl: dataUrl,
+          persisted: false,
+          warning: 'Storage blocked by RLS policy; favicon is applied locally in this browser.',
+        });
+      }
+
+      return res.status(500).json({ error: message });
+    }
 
     const { data: publicUrlData } = supabase.storage.from('materials').getPublicUrl(filename);
     const publicUrl = publicUrlData?.publicUrl || null;

@@ -34,6 +34,22 @@ import DashboardLayout from './layouts/DashboardLayout.tsx';
 // Styles
 import './styles/global.css';
 
+const FAVICON_CACHE_KEY = 'appFaviconUrl';
+
+const applyFavicon = (faviconUrl) => {
+  const nextUrl = String(faviconUrl || '').trim();
+  if (!nextUrl || typeof document === 'undefined') return;
+
+  let iconLink = document.querySelector("link[rel='icon']");
+  if (!iconLink) {
+    iconLink = document.createElement('link');
+    iconLink.setAttribute('rel', 'icon');
+    document.head.appendChild(iconLink);
+  }
+
+  iconLink.setAttribute('href', nextUrl);
+};
+
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const { user } = useContext(AuthContext);
 
@@ -52,6 +68,13 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 };
 
 function App() {
+  useEffect(() => {
+    const cachedFavicon = localStorage.getItem(FAVICON_CACHE_KEY);
+    if (cachedFavicon) {
+      applyFavicon(cachedFavicon);
+    }
+  }, []);
+
   const loadBranding = useCallback(async () => {
     try {
       const response = await brandingService.getSettings();
@@ -65,6 +88,12 @@ function App() {
       document.documentElement.style.setProperty('--button-color', buttonColor);
       document.documentElement.style.setProperty('--line-color', lineColor);
       document.documentElement.style.setProperty('--secondary-color', secondaryColor);
+
+      const faviconFromApi = String(settings.faviconUrl || settings.favicon_url || '').trim();
+      if (faviconFromApi) {
+        localStorage.setItem(FAVICON_CACHE_KEY, faviconFromApi);
+        applyFavicon(faviconFromApi);
+      }
     } catch (error) {
       document.documentElement.style.setProperty('--header-color', '#103c21');
       document.documentElement.style.setProperty('--button-color', '#007bff');

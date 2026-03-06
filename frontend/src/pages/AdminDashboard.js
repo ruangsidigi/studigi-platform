@@ -1688,6 +1688,7 @@ const CategoryManager = ({ categories, setCategories, setMessage }) => {
 
 // Material uploader component
 const MaterialUploader = ({ categories, setCategories, packages, materials, setMaterials, setMessage }) => {
+  const FAVICON_CACHE_KEY = 'appFaviconUrl';
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -1696,6 +1697,20 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
   const [packageId, setPackageId] = useState('');
   const [faviconFile, setFaviconFile] = useState(null);
   const [attachPackageByMaterial, setAttachPackageByMaterial] = useState({});
+
+  const applyFavicon = (faviconUrl) => {
+    const nextUrl = String(faviconUrl || '').trim();
+    if (!nextUrl) return;
+
+    let iconLink = document.querySelector("link[rel='icon']");
+    if (!iconLink) {
+      iconLink = document.createElement('link');
+      iconLink.setAttribute('rel', 'icon');
+      document.head.appendChild(iconLink);
+    }
+
+    iconLink.setAttribute('href', nextUrl);
+  };
 
   const ensureCategoryIdByName = async (rawName) => {
     const normalizedName = String(rawName || '').trim();
@@ -1841,9 +1856,11 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
       });
       const json = await res.json();
       if (res.ok) {
-        setMessage('Favicon uploaded');
-        // poke favicon URL to warm
-        try { await fetch('/favicon.ico'); } catch (e) {}
+        const rawUrl = String(json.publicUrl || '').trim();
+        const nextFavicon = rawUrl || `/favicon.ico?t=${Date.now()}`;
+        applyFavicon(nextFavicon);
+        localStorage.setItem(FAVICON_CACHE_KEY, nextFavicon);
+        setMessage(json.warning || 'Favicon uploaded');
         setFaviconFile(null);
       } else setMessage(json.error || 'Error uploading favicon');
     } catch (err) { setMessage('Error uploading favicon'); }
