@@ -1,10 +1,7 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext';
 import { brandingService } from './services/api';
-
-// Components
-import Navbar from './components/Navbar';
 
 // Pages
 import Login from './pages/Login';
@@ -26,6 +23,12 @@ import CMSWorkflowApprovalPage from './pages/CMSWorkflowApprovalPage';
 import CMSBundleBuilderPage from './pages/CMSBundleBuilderPage';
 import AdaptiveDashboard from './pages/AdaptiveDashboard';
 import UserMaterialsPage from './pages/UserMaterialsPage';
+import HomePage from './pages/Home.tsx';
+import LibraryPage from './pages/Library.tsx';
+import ActivityPage from './pages/Activity.tsx';
+import PayoutsPage from './pages/Payouts.tsx';
+import SettingsPage from './pages/Settings.tsx';
+import DashboardLayout from './layouts/DashboardLayout.tsx';
 
 // Styles
 import './styles/global.css';
@@ -48,13 +51,6 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 };
 
 function App() {
-  const [branding, setBranding] = useState({
-    logoUrl: null,
-    headerColor: '#103c21',
-    buttonColor: '#007bff',
-    lineColor: '#dddddd',
-  });
-
   const loadBranding = useCallback(async () => {
     try {
       const response = await brandingService.getSettings();
@@ -62,20 +58,6 @@ function App() {
       const headerColor = settings.headerColor || '#103c21';
       const buttonColor = settings.buttonColor || '#007bff';
       const lineColor = settings.lineColor || '#dddddd';
-      const rawLogoUrl = settings.logoUrl || null;
-      const isDataUrl = typeof rawLogoUrl === 'string' && rawLogoUrl.startsWith('data:');
-      const logoUrl = rawLogoUrl
-        ? (isDataUrl
-          ? rawLogoUrl
-          : `${rawLogoUrl}${rawLogoUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(settings.updatedAt || Date.now())}`)
-        : null;
-
-      setBranding({
-        logoUrl,
-        headerColor,
-        buttonColor,
-        lineColor,
-      });
 
       document.documentElement.style.setProperty('--header-color', headerColor);
       document.documentElement.style.setProperty('--button-color', buttonColor);
@@ -101,12 +83,57 @@ function App() {
   return (
     <Router>
       <div className="app-shell">
-        <Navbar branding={branding} />
         <main className="app-content">
           <Routes>
             {/* Public Routes */}
-            <Route path="/home" element={<CategoryPackages />} />
-            <Route path="/categories/:categoryId/packages" element={<CategoryPackages />} />
+            <Route
+              path="/home"
+              element={
+                <DashboardLayout>
+                  <HomePage />
+                </DashboardLayout>
+              }
+            />
+            <Route
+              path="/library"
+              element={
+                <DashboardLayout>
+                  <LibraryPage />
+                </DashboardLayout>
+              }
+            />
+            <Route
+              path="/activity"
+              element={
+                <DashboardLayout>
+                  <ActivityPage />
+                </DashboardLayout>
+              }
+            />
+            <Route
+              path="/payouts"
+              element={
+                <DashboardLayout>
+                  <PayoutsPage />
+                </DashboardLayout>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <DashboardLayout>
+                  <SettingsPage />
+                </DashboardLayout>
+              }
+            />
+            <Route
+              path="/categories/:categoryId/packages"
+              element={
+                <DashboardLayout>
+                  <CategoryPackages />
+                </DashboardLayout>
+              }
+            />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
@@ -126,7 +153,9 @@ function App() {
               path="/dashboard/packages"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <DashboardLayout>
+                    <Dashboard />
+                  </DashboardLayout>
                 </ProtectedRoute>
               }
             />
@@ -134,7 +163,9 @@ function App() {
               path="/dashboard/adaptive"
               element={
                 <ProtectedRoute>
-                  <AdaptiveDashboard />
+                  <DashboardLayout>
+                    <AdaptiveDashboard />
+                  </DashboardLayout>
                 </ProtectedRoute>
               }
             />
@@ -142,14 +173,18 @@ function App() {
               path="/dashboard/report"
               element={
                 <ProtectedRoute>
-                  <Reports />
+                  <DashboardLayout>
+                    <Reports />
+                  </DashboardLayout>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/dashboard/categories/:categoryId"
               element={
-                <CategoryPackages />
+                <DashboardLayout>
+                  <CategoryPackages />
+                </DashboardLayout>
               }
             />
             <Route
@@ -190,7 +225,9 @@ function App() {
               path="/my-materials"
               element={
                 <ProtectedRoute>
-                  <UserMaterialsPage />
+                  <DashboardLayout>
+                    <UserMaterialsPage />
+                  </DashboardLayout>
                 </ProtectedRoute>
               }
             />

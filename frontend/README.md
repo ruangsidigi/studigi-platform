@@ -32,6 +32,22 @@ Frontend akan berjalan di `http://localhost:3000`
 npm run build
 ```
 
+## Environment
+
+Project ini memakai file env terpisah agar production tidak pernah fallback ke localhost:
+
+- `.env.development` → `REACT_APP_API_URL=http://localhost:5000/api`
+- `.env.production` → `REACT_APP_API_URL=https://studigi.up.railway.app/api`
+
+Jika deploy di Vercel, tetap direkomendasikan set Environment Variable di dashboard:
+
+- `REACT_APP_API_URL=https://studigi.up.railway.app/api`
+
+Project ini juga menyediakan [frontend/vercel.json](vercel.json) untuk rewrite:
+
+- `/api/*` -> `https://studigi.up.railway.app/api/*`
+- route SPA -> `/index.html`
+
 ## Features
 
 - ✅ User authentication (login, register)

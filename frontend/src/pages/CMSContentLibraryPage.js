@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { cmsService } from '../services/api';
 import '../styles/cms-admin.css';
 
@@ -9,7 +9,7 @@ const CMSContentLibraryPage = () => {
   const [contentType, setContentType] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [contentRes, analyticsRes] = await Promise.all([
@@ -23,11 +23,11 @@ const CMSContentLibraryPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [status, contentType]);
 
   useEffect(() => {
     loadData();
-  }, [status, contentType]);
+  }, [loadData]);
 
   return (
     <div className="cms-page">

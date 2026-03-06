@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { authService, campaignService } from '../services/api';
 import '../styles/auth.css';
@@ -13,6 +13,7 @@ const Login = () => {
   const [resendLoading, setResendLoading] = useState(false);
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,7 +31,14 @@ const Login = () => {
       } catch (campaignErr) {
       }
 
-      navigate(response.data.user.role === 'admin' ? '/admin' : '/dashboard');
+      const redirectTo = location.state?.redirectTo;
+      if (response.data.user.role === 'admin') {
+        navigate('/admin');
+      } else if (typeof redirectTo === 'string' && redirectTo.length > 0) {
+        navigate(redirectTo);
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed');
     } finally {

@@ -17,6 +17,55 @@ body {
   color: #333;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
+.app-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-content {
+  flex: 1;
+}
+
+.site-footer {
+  border-top: 1px solid var(--line-color, #dddddd);
+  background-color: white;
+  margin-top: 20px;
+}
+
+.site-footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 20px;
+}
+
+.site-footer-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.site-footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.site-footer-link {
+  color: var(--button-color, #007bff);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.site-footer-link:hover {
+  color: var(--button-hover-color, #0056b3);
+}
+
 .container {
   max-width: 1200px;
   margin: 0 auto;

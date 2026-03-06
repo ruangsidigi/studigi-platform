@@ -32,12 +32,7 @@ const ReviewPage = () => {
   const [selectedFilter, setSelectedFilter] = useState('all'); // all, correct, incorrect, unanswered, bookmarked
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState(new Set());
 
-  // Initialize - Load review data
-  useEffect(() => {
-    initLoad();
-  }, [attemptId]);
-
-  const initLoad = async () => {
+  const initLoad = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -61,7 +56,18 @@ const ReviewPage = () => {
 
       // Load first question automatically
       if (res.data.review.length > 0) {
-        loadQuestion(res.data.review[0].questionNumber);
+        const firstQuestionNumber = res.data.review[0].questionNumber;
+        setCurrentQuestion(firstQuestionNumber);
+        setLoadingQuestion(true);
+        try {
+          const detailRes = await reviewService.getQuestionDetail(attemptId, firstQuestionNumber);
+          setQuestionDetail(detailRes.data);
+        } catch (detailErr) {
+          console.error('Error loading question:', detailErr.response?.data || detailErr.message || detailErr);
+          setError(detailErr.response?.data?.error || 'Gagal memuat soal');
+        } finally {
+          setLoadingQuestion(false);
+        }
       }
     } catch (err) {
       console.error('Error loading review:', err.response?.data || err.message || err);
@@ -69,7 +75,12 @@ const ReviewPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [attemptId]);
+
+  // Initialize - Load review data
+  useEffect(() => {
+    initLoad();
+  }, [initLoad]);
 
   const loadQuestion = useCallback(
     async (questionNumber) => {
