@@ -1198,6 +1198,23 @@ const EditQuestionsTab = () => {
 export default AdminDashboard;
 
 const BrandingSettingsForm = ({ setMessage }) => {
+  const BRANDING_LOGO_CACHE_KEY = 'brandingLogoUrl';
+
+  const extractBrandingPayload = (response) => {
+    const raw = response?.data || response || {};
+    if (raw?.settings && typeof raw.settings === 'object') return raw.settings;
+    if (raw?.data && typeof raw.data === 'object') return raw.data;
+    return raw;
+  };
+
+  const normalizeLogoUrl = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (/^https?:\/\//i.test(raw) || /^data:image\//i.test(raw)) return raw;
+    if (raw.startsWith('/')) return `${window.location.origin}${raw}?t=${Date.now()}`;
+    return raw;
+  };
+
   const [headerColor, setHeaderColor] = useState('#103c21');
   const [buttonColor, setButtonColor] = useState('#007bff');
   const [lineColor, setLineColor] = useState('#dddddd');
@@ -1210,11 +1227,15 @@ const BrandingSettingsForm = ({ setMessage }) => {
   const loadSettings = useCallback(async () => {
     try {
       const response = await brandingService.getSettings();
-      const data = response.data || {};
+      const data = extractBrandingPayload(response);
       setHeaderColor(data.headerColor || '#103c21');
       setButtonColor(data.buttonColor || '#007bff');
       setLineColor(data.lineColor || '#dddddd');
-      setLogoUrl(data.logoUrl || '');
+      const nextLogo = normalizeLogoUrl(data.logoUrl || data.logo_url || data.logo || '');
+      setLogoUrl(nextLogo);
+      if (nextLogo) {
+        localStorage.setItem(BRANDING_LOGO_CACHE_KEY, nextLogo);
+      }
     } catch (error) {
       setMessage('Gagal memuat branding settings');
     }
@@ -1271,10 +1292,18 @@ const BrandingSettingsForm = ({ setMessage }) => {
     try {
       setLoading(true);
       const response = await brandingService.uploadLogo(logoFile);
-      const nextLogoUrl = response.data?.settings?.logoUrl || response.data?.url || '';
+      const data = response?.data || {};
+      const nextLogoUrl = normalizeLogoUrl(
+        data?.settings?.logoUrl || data?.logoUrl || data?.logo_url || data?.url || ''
+      );
       setLogoUrl(nextLogoUrl);
       setLogoFile(null);
-      window.dispatchEvent(new CustomEvent('branding-updated'));
+      if (nextLogoUrl) {
+        localStorage.setItem(BRANDING_LOGO_CACHE_KEY, nextLogoUrl);
+      } else {
+        localStorage.removeItem(BRANDING_LOGO_CACHE_KEY);
+      }
+      window.dispatchEvent(new CustomEvent('branding-updated', { detail: { logoUrl: nextLogoUrl } }));
       setMessage('Logo branding berhasil diupload');
     } catch (error) {
       setMessage('Error upload logo: ' + (error.response?.data?.error || error.message));

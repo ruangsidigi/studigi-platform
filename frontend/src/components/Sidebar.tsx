@@ -14,6 +14,36 @@ import {
 import { AuthContext } from '../context/AuthContext';
 import { brandingService } from '../services/api';
 
+const BRANDING_LOGO_CACHE_KEY = 'brandingLogoUrl';
+
+const extractBrandingPayload = (response: any) => {
+  const raw = response?.data ?? response ?? {};
+  if (raw?.settings && typeof raw.settings === 'object') return raw.settings;
+  if (raw?.data && typeof raw.data === 'object') return raw.data;
+  return raw;
+};
+
+const getApiOrigin = () => {
+  const configured = String(process.env.REACT_APP_API_URL || '').trim();
+  if (configured) {
+    try {
+      const parsed = new URL(configured, window.location.origin);
+      return parsed.origin;
+    } catch (_) {}
+  }
+  return window.location.origin;
+};
+
+const normalizeLogoUrl = (value: any) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^data:image\//i.test(raw)) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^\/api\//i.test(raw)) return `${window.location.origin}${raw}?t=${Date.now()}`;
+  if (raw.startsWith('/')) return `${getApiOrigin()}${raw}`;
+  return raw;
+};
+
 const navItems = [
   { to: '/home', label: 'Home', icon: Home },
   { to: '/library', label: 'Library', icon: BookOpen },
@@ -32,19 +62,37 @@ export default function Sidebar() {
     : navItems;
 
   useEffect(() => {
+    const cachedLogo = normalizeLogoUrl(localStorage.getItem(BRANDING_LOGO_CACHE_KEY));
+    if (cachedLogo) {
+      setLogoUrl(cachedLogo);
+    }
+
     const loadBranding = async () => {
       try {
         const response = await brandingService.getSettings();
-        const settings = response?.data || {};
-        setLogoUrl(String(settings.logoUrl || '').trim());
+        const settings = extractBrandingPayload(response);
+        const nextLogo = normalizeLogoUrl(settings?.logoUrl || settings?.logo_url || settings?.logo || '');
+        setLogoUrl(nextLogo);
+        if (nextLogo) {
+          localStorage.setItem(BRANDING_LOGO_CACHE_KEY, nextLogo);
+        } else {
+          localStorage.removeItem(BRANDING_LOGO_CACHE_KEY);
+        }
       } catch (error) {
-        setLogoUrl('');
+        const fallbackLogo = normalizeLogoUrl(localStorage.getItem(BRANDING_LOGO_CACHE_KEY));
+        setLogoUrl(fallbackLogo);
       }
     };
 
     loadBranding();
 
-    const handleBrandingUpdated = () => {
+    const handleBrandingUpdated = (event: any) => {
+      const eventLogo = normalizeLogoUrl(event?.detail?.logoUrl);
+      if (eventLogo) {
+        setLogoUrl(eventLogo);
+        localStorage.setItem(BRANDING_LOGO_CACHE_KEY, eventLogo);
+        return;
+      }
       loadBranding();
     };
 
@@ -65,8 +113,11 @@ export default function Sidebar() {
             <img
               src={logoUrl}
               alt="Studigi logo"
-              className="h-9 w-9 rounded-lg object-cover"
-              onError={() => setLogoUrl('')}
+              className="h-9 w-9 rounded-lg bg-white object-contain p-0.5"
+              onError={() => {
+                localStorage.removeItem(BRANDING_LOGO_CACHE_KEY);
+                setLogoUrl('');
+              }}
             />
           ) : (
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--header-color,#103c21)] text-white">
