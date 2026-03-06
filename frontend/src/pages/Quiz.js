@@ -1,85 +1,74 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { questionService, tryoutService, bundleService, packageService } from '../services/api';
-import Timer from '../components/Timer';
-import '../styles/quiz.css';
+import { GraduationCap, Clock3, Flag, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Quiz = () => {
   const { packageId } = useParams();
   const navigate = useNavigate();
+
   const [questions, setQuestions] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
+  const [markedQuestions, setMarkedQuestions] = useState({});
   const [sessionId, setSessionId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [imageErrors, setImageErrors] = useState({});
   const [isBundling, setIsBundling] = useState(false);
   const [bundleDetail, setBundleDetail] = useState(null);
+  const [packageInfo, setPackageInfo] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(100 * 60);
   const [questionStartAt, setQuestionStartAt] = useState(Date.now());
+  const [isFinishing, setIsFinishing] = useState(false);
 
-  // Convert Google Drive sharing link to direct image URL
   const convertGoogleDriveUrl = (url) => {
     if (!url) return null;
+    if (String(url).startsWith('data:image/')) return url;
+    if (/\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url)) return url;
 
-    if (String(url).startsWith('data:image/')) {
-      return url;
-    }
-    
-    // If already a direct image URL (ends with common image extensions)
-    if (/\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url)) {
-      return url;
-    }
-    
-    // Handle Google Drive share link format
-    // Extract FILE ID from various Google Drive URL formats
     let fileId = null;
-    
-    // Format 1: https://drive.google.com/file/d/FILE_ID/view?usp=...
+
     const match1 = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (match1) {
-      fileId = match1[1];
-    }
-    
-    // Format 2: https://drive.google.com/open?id=FILE_ID
+    if (match1) fileId = match1[1];
+
     const match2 = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
-    if (!fileId && match2) {
-      fileId = match2[1];
-    }
-    
-    if (fileId) {
-      return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
-    }
-    
-    // If it's already a direct Google Drive URL
-    if (url.includes('drive.google.com/uc')) {
-      return url;
-    }
-    
+    if (!fileId && match2) fileId = match2[1];
+
+    if (fileId) return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
+    if (url.includes('drive.google.com/uc')) return url;
     return url;
   };
 
   const startSession = useCallback(async () => {
     try {
-      // Load package info first
-      const pkgRes = await packageService.getById(parseInt(packageId));
-      const pkg = pkgRes.data;
+      setLoading(true);
+      setError('');
 
-      // Check if it's a bundling
-      if (pkg.type === 'bundling' || pkg.type === 'bundle' || (Array.isArray(pkg.included_package_ids) && pkg.included_package_ids.length > 0)) {
+      const pkgRes = await packageService.getById(parseInt(packageId, 10));
+      const pkg = pkgRes.data;
+      setPackageInfo(pkg);
+      setTimeLeft((Number(pkg?.duration) || 100) * 60);
+
+      const isBundleType =
+        pkg.type === 'bundling' ||
+        pkg.type === 'bundle' ||
+        (Array.isArray(pkg.included_package_ids) && pkg.included_package_ids.length > 0);
+
+      if (isBundleType) {
         setIsBundling(true);
-        const bundleRes = await bundleService.getById(parseInt(packageId));
+        const bundleRes = await bundleService.getById(parseInt(packageId, 10));
         setBundleDetail(bundleRes.data);
         setLoading(false);
         return;
       }
 
-      // Normal package - load questions
-      const sessionRes = await tryoutService.start(parseInt(packageId));
+      setIsBundling(false);
+      const sessionRes = await tryoutService.start(parseInt(packageId, 10));
       setSessionId(sessionRes.data.session.id);
 
-      const questionsRes = await questionService.getByPackage(parseInt(packageId));
-      setQuestions(questionsRes.data);
+      const questionsRes = await questionService.getByPackage(parseInt(packageId, 10));
+      setQuestions(Array.isArray(questionsRes.data) ? questionsRes.data : []);
       setLoading(false);
     } catch (err) {
       setError('Failed to start tryout');
@@ -95,231 +84,373 @@ const Quiz = () => {
     setQuestionStartAt(Date.now());
   }, [currentQuestion]);
 
+  const finishTryout = useCallback(
+    async ({ force = false } = {}) => {
+      if (!sessionId || isFinishing) return;
+      if (!force && !window.confirm('Yakin ingin menyelesaikan tryout sekarang?')) return;
+
+      try {
+        setIsFinishing(true);
+        await tryoutService.finish(sessionId);
+        navigate(`/review/${sessionId}`);
+      } catch (err) {
+        alert('Error finishing tryout: ' + (err.response?.data?.error || err.message));
+      } finally {
+        setIsFinishing(false);
+      }
+    },
+    [sessionId, isFinishing, navigate]
+  );
+
+  useEffect(() => {
+    if (!sessionId || loading || isBundling || questions.length === 0) return undefined;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          finishTryout({ force: true });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [sessionId, loading, isBundling, questions.length, finishTryout]);
+
   const handleSelectAnswer = async (option) => {
-    const newAnswers = { ...answers, [questions[currentQuestion].id]: option };
-    setAnswers(newAnswers);
+    const current = questions[currentQuestion];
+    if (!current) return;
+
+    const updatedAnswers = { ...answers, [current.id]: option };
+    setAnswers(updatedAnswers);
 
     const elapsed = Math.max(1000, Date.now() - questionStartAt);
 
-    // Auto-submit answer
     try {
-      await tryoutService.submitAnswer(sessionId, questions[currentQuestion].id, option, {
+      await tryoutService.submitAnswer(sessionId, current.id, option, {
         timeSpentMs: elapsed,
         difficulty: 'medium',
       });
     } catch (err) {
       console.error('Error submitting answer:', err);
     }
-
-    // Move to next question
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-    }
   };
 
-  const handleFinish = async () => {
-    if (!window.confirm('Are you sure you want to finish the tryout?')) return;
+  const toggleMarkQuestion = () => {
+    const currentId = questions[currentQuestion]?.id;
+    if (!currentId) return;
 
-    try {
-      await tryoutService.finish(sessionId);
-      navigate(`/review/${sessionId}`);
-    } catch (err) {
-      alert('Error finishing tryout: ' + err.response?.data?.error);
-    }
-  };
-
-  const handleTimeUp = () => {
-    handleFinish();
+    setMarkedQuestions((prev) => ({
+      ...prev,
+      [currentId]: !prev[currentId],
+    }));
   };
 
   const handleImageError = (questionId) => {
-    setImageErrors({ ...imageErrors, [questionId]: true });
-    console.error(`Failed to load image for question ${questionId}`);
+    setImageErrors((prev) => ({ ...prev, [questionId]: true }));
   };
 
   const handleImageLoad = (questionId) => {
-    setImageErrors({ ...imageErrors, [questionId]: false });
+    setImageErrors((prev) => ({ ...prev, [questionId]: false }));
   };
 
-  if (loading) return <div className="quiz-container">Loading...</div>;
-  if (error) return <div className="quiz-container alert alert-danger">{error}</div>;
+  if (loading) return <div className="mx-auto max-w-7xl p-6 text-sm text-slate-600">Loading...</div>;
+  if (error) return <div className="mx-auto max-w-7xl p-6 text-sm text-red-600">{error}</div>;
 
-  // Show bundle selection if it's a bundling
   if (isBundling && bundleDetail) {
     const bundle = bundleDetail.bundle;
     const packages = bundleDetail.packages || [];
 
     return (
-      <div className="bundle-quiz-container" style={{ padding: '20px' }}>
-        <div className="container">
-          <div className="dashboard-header">
-            <h1>Pilih Paket dari Bundling</h1>
-            <button className="btn btn-secondary" onClick={() => navigate(-1)}>
-              ← Kembali
-            </button>
+      <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Pilih Paket dari Bundling</h1>
+            <p className="mt-1 text-sm text-slate-600">Pilih salah satu paket untuk mulai sesi.</p>
           </div>
+          <button
+            type="button"
+            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            onClick={() => navigate(-1)}
+          >
+            Kembali
+          </button>
+        </div>
 
-          <div className="bundle-hero" style={{ marginBottom: '30px' }}>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <h2>{bundle.name}</h2>
-              <p className="text-muted">{bundle.description || 'Paket bundling pilihan.'}</p>
+              <h2 className="text-base font-semibold text-slate-900 sm:text-lg">{bundle.name}</h2>
+              <p className="mt-1 text-sm text-slate-600">{bundle.description || 'Paket bundling pilihan.'}</p>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '12px', color: '#666' }}>Total paket</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1d7a7a', marginBottom: '10px' }}>
-                {packages.length} Paket
-              </div>
+            <div className="text-right">
+              <p className="text-xs text-slate-500">Total paket</p>
+              <p className="text-xl font-semibold text-[var(--header-color,#0f5132)]">{packages.length}</p>
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-title">Paket dalam Bundling</div>
-            <div className="bundle-package-grid">
-              {packages.length === 0 ? (
-                <p className="text-muted">Belum ada paket di bundling ini.</p>
-              ) : (
-                packages.map((pkg) => (
-                  <div key={pkg.id} className="bundle-package-card">
-                    <div className="bundle-package-header">
-                      <h3>{pkg.name}</h3>
-                      <span className="bundle-package-type">
-                        {pkg.type === 'tryout' ? '📝 Tryout' : pkg.type === 'latihan' ? '📚 Latihan' : '📦 Bundle'}
-                      </span>
-                    </div>
-                    <p className="package-desc">{pkg.description || 'Deskripsi paket.'}</p>
-                    <div className="package-info" style={{ marginBottom: '15px' }}>
-                      <span>{pkg.question_count || 0} soal</span>
-                      <span className="package-price">Rp {(pkg.price || 0).toLocaleString('id-ID')}</span>
-                    </div>
-                    <button
-                      className="btn btn-success"
-                      onClick={() => navigate(`/quiz/${pkg.id}`)}
-                      style={{ width: '100%' }}
-                    >
-                      Mulai Mengerjakan
-                    </button>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {packages.length === 0 ? (
+              <p className="text-sm text-slate-600">Belum ada paket di bundling ini.</p>
+            ) : (
+              packages.map((pkg) => (
+                <article key={pkg.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold text-slate-900 sm:text-base">{pkg.name}</h3>
+                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
+                      {pkg.type === 'tryout' ? 'Tryout' : pkg.type === 'latihan' ? 'Latihan' : 'Bundle'}
+                    </span>
                   </div>
-                ))
-              )}
-            </div>
+                  <p className="mb-3 text-sm text-slate-600">{pkg.description || 'Deskripsi paket.'}</p>
+                  <div className="mb-4 flex items-center justify-between text-xs text-slate-500">
+                    <span>{pkg.question_count || 0} soal</span>
+                    <span>Rp {(pkg.price || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full rounded-xl bg-[var(--header-color,#0f5132)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                    onClick={() => navigate(`/quiz/${pkg.id}`)}
+                  >
+                    Mulai Mengerjakan
+                  </button>
+                </article>
+              ))
+            )}
           </div>
         </div>
       </div>
     );
   }
 
-  if (questions.length === 0) return <div className="quiz-container">No questions found</div>;
+  if (questions.length === 0) {
+    return <div className="mx-auto max-w-7xl p-6 text-sm text-slate-600">No questions found</div>;
+  }
 
   const question = questions[currentQuestion];
   const currentAnswer = answers[question.id];
+  const currentQuestionNumber = currentQuestion + 1;
+  const answeredCount = Object.keys(answers).length;
+  const markedCount = Object.values(markedQuestions).filter(Boolean).length;
+  const unansweredCount = Math.max(questions.length - answeredCount, 0);
+  const progressPercent = Math.round((answeredCount / questions.length) * 100);
+  const isCurrentMarked = Boolean(markedQuestions[question.id]);
+
+  const optionEntries = ['A', 'B', 'C', 'D', 'E']
+    .map((label) => ({
+      label,
+      text: question[`option_${label.toLowerCase()}`],
+    }))
+    .filter((item) => String(item.text || '').trim().length > 0);
+
+  const hours = Math.floor(timeLeft / 3600);
+  const minutes = Math.floor((timeLeft % 3600) / 60);
+  const seconds = timeLeft % 60;
+  const timerText =
+    hours > 0
+      ? `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+      : `${minutes}:${String(seconds).padStart(2, '0')}`;
+
+  const getQuestionStatusClass = (questionId, index) => {
+    if (index === currentQuestion) return 'bg-[var(--header-color,#0f5132)] text-white';
+    if (answers[questionId]) return 'bg-emerald-500 text-white';
+    if (markedQuestions[questionId]) return 'bg-amber-500 text-white';
+    return 'bg-slate-100 text-slate-600';
+  };
 
   return (
-    <div className="quiz-container">
-      <div className="quiz-header">
-        <div className="quiz-nav">
-          <span className="quiz-title">Studigi</span>
-          <Timer initialMinutes={100} onTimeUp={handleTimeUp} />
+    <div className="min-h-screen bg-[#f3f4f6]">
+      <div className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex h-[68px] max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--header-color,#0f5132)] text-white">
+                <GraduationCap size={18} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900 sm:text-lg">
+                  {packageInfo?.name || 'Tryout Session'}
+                </p>
+                <p className="text-xs text-slate-500 sm:text-sm">
+                  Soal {currentQuestionNumber} dari {questions.length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-[var(--header-color,#0f5132)]">
+              <Clock3 size={16} />
+              <span>{timerText}</span>
+            </div>
+            <button
+              type="button"
+              disabled={isFinishing}
+              onClick={() => finishTryout()}
+              className="rounded-full bg-[var(--header-color,#0f5132)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            >
+              {isFinishing ? 'Memproses...' : 'Selesai'}
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="quiz-content">
-        <div className="question-section">
-          <div className="question-number">
-            <span>Soal Nomor {question.number}</span>
-            <span className="question-progress">{currentQuestion + 1}/{questions.length}</span>
-          </div>
-          <div className="question-text">{question.question_text}</div>
+      <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_292px]">
+          <div className="space-y-5">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="mb-3 flex items-center justify-between text-sm text-slate-600">
+                <span>Progress: {answeredCount}/{questions.length} dijawab</span>
+                <span className="font-semibold text-slate-700">{progressPercent}%</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-100">
+                <div
+                  className="h-2 rounded-full bg-[var(--header-color,#0f5132)] transition-all"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </section>
 
-          {question.image_url && !imageErrors[question.id] && (
-            <div className="question-image">
-              <img 
-                src={convertGoogleDriveUrl(question.image_url)} 
-                alt="Question" 
-                onLoad={() => handleImageLoad(question.id)}
-                onError={() => handleImageError(question.id)}
-                style={{ maxWidth: '100%', width: 'auto', height: 'auto' }}
-                crossOrigin="anonymous"
-              />
-            </div>
-          )}
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-[var(--header-color,#0f5132)]">
+                  {(question.category || 'SOAL').toUpperCase()}
+                </span>
+                <span className="text-sm font-medium text-slate-600">Soal {question.number || currentQuestionNumber}</span>
+              </div>
 
-          {question.image_url && imageErrors[question.id] && (
-            <div className="question-image" style={{ padding: '20px', backgroundColor: '#fff3cd', color: '#856404', borderRadius: '4px', marginBottom: '20px', border: '1px solid #ffc107' }}>
-              <p>⚠️ Gambar tidak bisa ditampilkan</p>
-              <details style={{ marginTop: '10px', fontSize: '12px' }}>
-                <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>Detail teknis</summary>
-                <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px', fontFamily: 'monospace' }}>
-                  <div><strong>URL original:</strong></div>
-                  <div style={{ wordBreak: 'break-all' }}>{question.image_url}</div>
-                  <div style={{ marginTop: '10px' }}><strong>URL dikonversi:</strong></div>
-                  <div style={{ wordBreak: 'break-all' }}>{convertGoogleDriveUrl(question.image_url)}</div>
-                  <div style={{ marginTop: '10px' }}>
-                    <strong>Solusi:</strong>
-                    <ul>
-                      <li>Pastikan file di Google Drive bisa diakses publik</li>
-                      <li>Atau coba upload gambar ke ImgBB (https://imgbb.com) atau Imgur</li>
-                      <li>Cek akses sharing: "Anyone with the link" atau "Public"</li>
-                    </ul>
-                  </div>
+              <p className="mb-5 text-lg leading-relaxed text-slate-900">{question.question_text}</p>
+
+              {question.image_url && !imageErrors[question.id] && (
+                <div className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-white p-2">
+                  <img
+                    src={convertGoogleDriveUrl(question.image_url)}
+                    alt="Question"
+                    onLoad={() => handleImageLoad(question.id)}
+                    onError={() => handleImageError(question.id)}
+                    className="mx-auto h-auto max-w-full"
+                    crossOrigin="anonymous"
+                  />
                 </div>
-              </details>
+              )}
+
+              {question.image_url && imageErrors[question.id] && (
+                <div className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+                  Gambar tidak bisa ditampilkan untuk soal ini.
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {optionEntries.map((option) => (
+                  <button
+                    key={option.label}
+                    type="button"
+                    className={[
+                      'flex w-full items-center gap-3 rounded-2xl border px-4 py-4 text-left transition-colors',
+                      currentAnswer === option.label
+                        ? 'border-[var(--header-color,#0f5132)] bg-emerald-50'
+                        : 'border-slate-200 bg-slate-50 hover:bg-slate-100',
+                    ].join(' ')}
+                    onClick={() => handleSelectAnswer(option.label)}
+                  >
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-lg font-semibold text-slate-600">
+                      {option.label}
+                    </span>
+                    <span className="text-lg text-slate-800">{option.text}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="flex items-center justify-between gap-3 rounded-2xl bg-transparent py-1">
+              <button
+                type="button"
+                disabled={currentQuestion === 0}
+                onClick={() => setCurrentQuestion((prev) => Math.max(prev - 1, 0))}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-3 text-[30px] font-semibold text-slate-400 enabled:text-slate-700 enabled:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <ChevronLeft size={18} />
+                Sebelumnya
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleMarkQuestion}
+                className={[
+                  'inline-flex items-center gap-2 rounded-2xl border px-6 py-3 text-2xl font-semibold',
+                  isCurrentMarked
+                    ? 'border-amber-300 bg-amber-50 text-amber-700'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                ].join(' ')}
+              >
+                <Flag size={17} />
+                Tandai
+              </button>
+
+              <button
+                type="button"
+                disabled={currentQuestion === questions.length - 1}
+                onClick={() => setCurrentQuestion((prev) => Math.min(prev + 1, questions.length - 1))}
+                className="inline-flex items-center gap-2 rounded-2xl bg-[var(--header-color,#0f5132)] px-6 py-3 text-[30px] font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Berikutnya
+                <ChevronRight size={18} />
+              </button>
+            </section>
+          </div>
+
+          <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+            <h3 className="mb-4 text-2xl font-semibold text-slate-900">Navigator Soal</h3>
+
+            <div className="mb-5 grid grid-cols-7 gap-2">
+              {questions.map((q, idx) => (
+                <button
+                  key={q.id}
+                  type="button"
+                  onClick={() => setCurrentQuestion(idx)}
+                  className={`h-10 rounded-full text-sm font-semibold transition-colors ${getQuestionStatusClass(q.id, idx)}`}
+                >
+                  {idx + 1}
+                </button>
+              ))}
             </div>
-          )}
 
-          <div className="options">
-            {['A', 'B', 'C', 'D', 'E'].map((option) => (
-              <button
-                key={option}
-                className={`option-btn ${currentAnswer === option ? 'selected' : ''}`}
-                onClick={() => handleSelectAnswer(option)}
-              >
-                <span className="option-label">{option}</span>
-                <span>{question[`option_${option.toLowerCase()}`]}</span>
-              </button>
-            ))}
-          </div>
+            <div className="space-y-2 border-t border-slate-200 pt-4 text-[15px] text-slate-600">
+              <div className="flex items-center gap-2">
+                <span className="h-4 w-4 rounded-full bg-[var(--header-color,#0f5132)]" />
+                <span>Soal Aktif</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-4 w-4 rounded-full bg-emerald-500" />
+                <span>Sudah Dijawab</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-4 w-4 rounded-full bg-amber-500" />
+                <span>Ditandai</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-4 w-4 rounded-full bg-slate-200" />
+                <span>Belum Dijawab</span>
+              </div>
+            </div>
+
+            <div className="mt-4 border-t border-slate-200 pt-4 text-sm">
+              <div className="flex items-center justify-between py-0.5 text-slate-700">
+                <span>Dijawab</span>
+                <span className="font-semibold text-emerald-600">{answeredCount}</span>
+              </div>
+              <div className="flex items-center justify-between py-0.5 text-slate-700">
+                <span>Ditandai</span>
+                <span className="font-semibold text-amber-600">{markedCount}</span>
+              </div>
+              <div className="flex items-center justify-between py-0.5 text-slate-700">
+                <span>Belum Dijawab</span>
+                <span className="font-semibold text-slate-600">{unansweredCount}</span>
+              </div>
+            </div>
+          </aside>
         </div>
-
-        <aside className="question-navigator">
-          <h4>Navigasi Soal</h4>
-          <div className="question-grid">
-            {questions.map((q, idx) => (
-              <button
-                key={q.id}
-                className={`question-btn ${
-                  idx === currentQuestion ? 'current' : answers[q.id] ? 'answered' : ''
-                }`}
-                onClick={() => setCurrentQuestion(idx)}
-              >
-                {idx + 1}
-              </button>
-            ))}
-          </div>
-          <div className="legend">
-            <div><span className="legend-current">■</span> Current</div>
-            <div><span className="legend-answered">■</span> Answered</div>
-          </div>
-        </aside>
-      </div>
-
-      <div className="quiz-footer">
-        <button
-          disabled={currentQuestion === 0}
-          onClick={() => setCurrentQuestion(currentQuestion - 1)}
-          className="btn btn-primary"
-        >
-          ← Previous
-        </button>
-        <button onClick={handleFinish} className="btn btn-danger">
-          Finish Tryout
-        </button>
-        <button
-          disabled={currentQuestion === questions.length - 1}
-          onClick={() => setCurrentQuestion(currentQuestion + 1)}
-          className="btn btn-primary"
-        >
-          Next →
-        </button>
       </div>
     </div>
   );
