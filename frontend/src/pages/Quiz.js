@@ -269,7 +269,7 @@ const Quiz = () => {
                 <GraduationCap size={18} />
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-900 sm:text-lg">
+                <p className="truncate text-base font-semibold text-slate-900">
                   {packageInfo?.name || 'Tryout Session'}
                 </p>
                 <p className="text-xs text-slate-500 sm:text-sm">
@@ -320,7 +320,7 @@ const Quiz = () => {
                 <span className="text-sm font-medium text-slate-600">Soal {question.number || currentQuestionNumber}</span>
               </div>
 
-              <p className="mb-5 text-lg leading-relaxed text-slate-900">{question.question_text}</p>
+              <p className="mb-5 text-base leading-relaxed text-slate-900">{question.question_text}</p>
 
               {question.image_url && !imageErrors[question.id] && (
                 <div className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-white p-2">
@@ -357,7 +357,7 @@ const Quiz = () => {
                     <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-lg font-semibold text-slate-600">
                       {option.label}
                     </span>
-                    <span className="text-lg text-slate-800">{option.text}</span>
+                    <span className="text-base text-slate-800">{option.text}</span>
                   </button>
                 ))}
               </div>
@@ -368,7 +368,7 @@ const Quiz = () => {
                 type="button"
                 disabled={currentQuestion === 0}
                 onClick={() => setCurrentQuestion((prev) => Math.max(prev - 1, 0))}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-3 text-[30px] font-semibold text-slate-400 enabled:text-slate-700 enabled:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-3 text-base font-semibold text-slate-400 enabled:text-slate-700 enabled:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <ChevronLeft size={18} />
                 Sebelumnya
@@ -378,7 +378,7 @@ const Quiz = () => {
                 type="button"
                 onClick={toggleMarkQuestion}
                 className={[
-                  'inline-flex items-center gap-2 rounded-2xl border px-6 py-3 text-2xl font-semibold',
+                  'inline-flex items-center gap-2 rounded-2xl border px-6 py-3 text-base font-semibold',
                   isCurrentMarked
                     ? 'border-amber-300 bg-amber-50 text-amber-700'
                     : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
@@ -392,7 +392,7 @@ const Quiz = () => {
                 type="button"
                 disabled={currentQuestion === questions.length - 1}
                 onClick={() => setCurrentQuestion((prev) => Math.min(prev + 1, questions.length - 1))}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[var(--header-color,#0f5132)] px-6 py-3 text-[30px] font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-2xl bg-[var(--header-color,#0f5132)] px-6 py-3 text-base font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Berikutnya
                 <ChevronRight size={18} />
@@ -401,7 +401,7 @@ const Quiz = () => {
           </div>
 
           <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-            <h3 className="mb-4 text-2xl font-semibold text-slate-900">Navigator Soal</h3>
+            <h3 className="mb-4 text-base font-semibold text-slate-900">Navigator Soal</h3>
 
             <div className="mb-5 grid grid-cols-7 gap-2">
               {questions.map((q, idx) => (
