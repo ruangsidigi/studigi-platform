@@ -9,6 +9,7 @@ const ownedTryouts = [
     duration: 100,
     category: 'CPNS',
     actionLabel: 'Mulai Tryout',
+    actionTo: '/quiz/1',
   },
   {
     title: 'PPPK Teknis Simulasi',
@@ -17,6 +18,7 @@ const ownedTryouts = [
     duration: 90,
     category: 'PPPK',
     actionLabel: 'Lanjutkan',
+    actionTo: '/my-materials',
   },
 ];
 

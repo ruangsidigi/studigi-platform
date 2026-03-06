@@ -8,6 +8,7 @@ const tryoutData = [
     questions: 110,
     duration: 100,
     category: 'CPNS',
+    actionTo: '/dashboard/packages',
   },
   {
     title: 'SKD CPNS Full Paket 2',
@@ -15,6 +16,7 @@ const tryoutData = [
     questions: 110,
     duration: 100,
     category: 'CPNS',
+    actionTo: '/dashboard/packages',
   },
   {
     title: 'PPPK Teknis Simulasi',
@@ -22,6 +24,7 @@ const tryoutData = [
     questions: 90,
     duration: 90,
     category: 'PPPK',
+    actionTo: '/dashboard/packages',
   },
 ];
 
