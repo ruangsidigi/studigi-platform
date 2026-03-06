@@ -237,7 +237,9 @@ function App() {
               path="/admin"
               element={
                 <ProtectedRoute requiredRole="admin">
-                  <AdminDashboard />
+                  <DashboardLayout>
+                    <AdminDashboard />
+                  </DashboardLayout>
                 </ProtectedRoute>
               }
             />
@@ -245,7 +247,9 @@ function App() {
               path="/admin/cms/library"
               element={
                 <ProtectedRoute requiredRole={['admin', 'content_manager', 'reviewer']}>
-                  <CMSContentLibraryPage />
+                  <DashboardLayout>
+                    <CMSContentLibraryPage />
+                  </DashboardLayout>
                 </ProtectedRoute>
               }
             />
@@ -253,7 +257,9 @@ function App() {
               path="/admin/cms/upload"
               element={
                 <ProtectedRoute requiredRole={['admin', 'content_manager']}>
-                  <CMSUploadCenterPage />
+                  <DashboardLayout>
+                    <CMSUploadCenterPage />
+                  </DashboardLayout>
                 </ProtectedRoute>
               }
             />
@@ -261,7 +267,9 @@ function App() {
               path="/admin/cms/workflow"
               element={
                 <ProtectedRoute requiredRole={['admin', 'reviewer']}>
-                  <CMSWorkflowApprovalPage />
+                  <DashboardLayout>
+                    <CMSWorkflowApprovalPage />
+                  </DashboardLayout>
                 </ProtectedRoute>
               }
             />
@@ -269,7 +277,9 @@ function App() {
               path="/admin/cms/bundles"
               element={
                 <ProtectedRoute requiredRole={['admin', 'content_manager']}>
-                  <CMSBundleBuilderPage />
+                  <DashboardLayout>
+                    <CMSBundleBuilderPage />
+                  </DashboardLayout>
                 </ProtectedRoute>
               }
             />

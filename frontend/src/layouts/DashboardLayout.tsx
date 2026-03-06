@@ -3,6 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { X, Home, BookOpen, Activity, CreditCard, Settings } from 'lucide-react';
 import Sidebar from '../components/Sidebar.tsx';
 import Navbar from '../components/Navbar.tsx';
+import { useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -27,6 +29,11 @@ const titles: Record<string, string> = {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { user } = useContext(AuthContext as any);
+  const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
+  const drawerItems = isAdmin
+    ? [{ to: '/admin', label: 'Dashboard Admin', icon: Home }, ...mobileItems]
+    : mobileItems;
 
   const pageTitle = useMemo(() => titles[location.pathname] || 'Dashboard', [location.pathname]);
 
@@ -50,7 +57,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </button>
               </div>
               <nav className="space-y-1">
-                {mobileItems.map(({ to, label, icon: Icon }) => (
+                {drawerItems.map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}
                     to={to}

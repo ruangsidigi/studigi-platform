@@ -24,6 +24,10 @@ const navItems = [
 export default function Sidebar() {
   const { user, logout } = useContext(AuthContext as any);
   const navigate = useNavigate();
+  const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
+  const sidebarItems = isAdmin
+    ? [{ to: '/admin', label: 'Dashboard Admin', icon: GraduationCap }, ...navItems]
+    : navItems;
 
   const handleLogout = () => {
     logout();
@@ -45,7 +49,7 @@ export default function Sidebar() {
 
         <nav className="space-y-1 p-3">
           <p className="hidden px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wider text-slate-500 lg:block">Menu</p>
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {sidebarItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
