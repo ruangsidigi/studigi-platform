@@ -27,13 +27,11 @@ const UserMaterialsPage = () => {
 
   const handleOpenMaterial = async (materialId) => {
     try {
-      const response = await materialService.getAccessUrl(materialId);
-      const url = response.data?.access_url;
-      if (!url) {
-        setError('URL material tidak tersedia.');
-        return;
-      }
-      window.open(url, '_blank', 'noopener,noreferrer');
+      const response = await materialService.downloadFile(materialId);
+      const blob = new Blob([response.data], { type: response.headers?.['content-type'] || 'application/pdf' });
+      const objectUrl = window.URL.createObjectURL(blob);
+      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 60 * 1000);
     } catch (err) {
       setError(err.response?.data?.error || 'Tidak bisa membuka materi.');
     }

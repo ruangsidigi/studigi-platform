@@ -212,6 +212,7 @@ export const materialService = {
   listByPackage: (packageId) => api.get(`/materials/package/${packageId}`),
   listMyMaterials: () => api.get('/materials/my'),
   getAccessUrl: (id) => api.get(`/materials/${id}/access`),
+  downloadFile: (id) => api.get(`/materials/${id}/file`, { responseType: 'blob' }),
 };
 
 // Report Service

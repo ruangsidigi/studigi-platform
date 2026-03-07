@@ -304,7 +304,28 @@ function extractSupabasePublicObject(url) {
   }
 }
 
-async function resolveMaterialAccessUrl(material) {
+function buildSupabasePrivateObjectUrl(base, bucket, key) {
+  const b = String(base || '').replace(/\/$/, '');
+  if (!b || !bucket || !key) return null;
+  if (/\/storage\/v1\/object\//i.test(b)) {
+    if (/\/public\//i.test(b)) {
+      return b.replace(/\/public\//i, '/').replace(/\/$/, '') + `/${bucket}/${key}`;
+    }
+    return `${b}/${bucket}/${key}`;
+  }
+  return `${b}/storage/v1/object/${bucket}/${key}`;
+}
+
+function getSupabaseServiceHeaders() {
+  const key = String(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '').trim();
+  if (!key) return null;
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+  };
+}
+
+function buildMaterialAccessCandidates(material) {
   const candidates = [];
   const bucketCandidates = [];
   const keyCandidates = [];
@@ -316,20 +337,34 @@ async function resolveMaterialAccessUrl(material) {
     if (!list.includes(normalized)) list.push(normalized);
   };
 
+  const pushCandidate = (url, options = {}) => {
+    const normalized = String(url || '').trim();
+    if (!normalized) return;
+    if (candidates.some((item) => item.url === normalized)) return;
+    candidates.push({
+      url: normalized,
+      requiresServiceAuth: Boolean(options.requiresServiceAuth),
+    });
+  };
+
   const rawValues = [material?.file_url, material?.storage_key]
     .map((value) => String(value || '').trim())
     .filter(Boolean);
 
   for (const raw of rawValues) {
-    if (/^data:/i.test(raw)) return raw;
+    if (/^data:/i.test(raw)) {
+      pushCandidate(raw);
+      continue;
+    }
 
     if (/^https?:\/\//i.test(raw)) {
-      pushUnique(candidates, raw);
+      pushCandidate(raw);
       const parsed = extractSupabasePublicObject(raw);
       if (parsed) {
         pushUnique(bucketCandidates, parsed.bucket);
         pushUnique(keyCandidates, parsed.key);
         pushUnique(baseCandidates, parsed.origin);
+        pushCandidate(buildSupabasePrivateObjectUrl(parsed.origin, parsed.bucket, parsed.key), { requiresServiceAuth: true });
       }
       continue;
     }
@@ -337,7 +372,6 @@ async function resolveMaterialAccessUrl(material) {
     const trimmed = raw.replace(/^\/+/, '');
     if (!trimmed) continue;
 
-    // Could be `bucket/key` or just `key`.
     const slashIndex = trimmed.indexOf('/');
     if (slashIndex > 0) {
       pushUnique(bucketCandidates, trimmed.slice(0, slashIndex));
@@ -348,8 +382,6 @@ async function resolveMaterialAccessUrl(material) {
 
   pushUnique(bucketCandidates, material?.storage_bucket);
   pushUnique(bucketCandidates, config.storageBucket);
-
-  // Common fallback names used in existing deployments.
   pushUnique(bucketCandidates, 'materials');
   pushUnique(bucketCandidates, 'materials-pdf');
   pushUnique(bucketCandidates, 'public');
@@ -375,47 +407,103 @@ async function resolveMaterialAccessUrl(material) {
   for (const base of baseCandidates) {
     for (const bucket of bucketCandidates) {
       for (const key of keyCandidates) {
-        const built = buildFromBaseBucketKey(base, bucket, key);
-        if (built) pushUnique(candidates, built);
+        pushCandidate(buildFromBaseBucketKey(base, bucket, key));
+        pushCandidate(buildSupabasePrivateObjectUrl(base, bucket, key), { requiresServiceAuth: true });
       }
     }
   }
 
-  // As last fallback, if we only have key and configured bucket exists.
   if (config.storageBucket) {
     for (const key of keyCandidates) {
-      pushUnique(candidates, buildPublicStorageUrl(config.storageBucket, key));
+      pushCandidate(buildPublicStorageUrl(config.storageBucket, key));
     }
   }
 
+  return candidates;
+}
+
+async function resolveMaterialAccessUrl(material) {
+  const candidates = buildMaterialAccessCandidates(material);
   if (!candidates.length) return null;
 
-  for (const candidate of candidates) {
-    if (!/^https?:\/\//i.test(candidate)) return candidate;
+  const serviceHeaders = getSupabaseServiceHeaders();
 
-    if (!candidate.includes('/storage/v1/object/public/')) {
-      return candidate;
-    }
+  for (const candidate of candidates) {
+    if (/^data:/i.test(candidate.url)) return candidate.url;
+    if (!/^https?:\/\//i.test(candidate.url)) return candidate.url;
+
+    const headers = candidate.requiresServiceAuth && serviceHeaders
+      ? { ...serviceHeaders, Range: 'bytes=0-0' }
+      : { Range: 'bytes=0-0' };
 
     try {
       const probe = await axios.request({
-        url: candidate,
+        url: candidate.url,
         method: 'GET',
-        headers: { Range: 'bytes=0-0' },
+        headers,
         responseType: 'arraybuffer',
         timeout: 7000,
         validateStatus: () => true,
       });
 
       if (probe.status >= 200 && probe.status < 400) {
-        return candidate;
+        return candidate.url;
       }
     } catch (_) {
       // Try next candidate.
     }
   }
 
-  return candidates[0];
+  return candidates[0].url;
+}
+
+async function fetchMaterialStream(material) {
+  const candidates = buildMaterialAccessCandidates(material);
+  if (!candidates.length) return null;
+
+  const serviceHeaders = getSupabaseServiceHeaders();
+
+  for (const candidate of candidates) {
+    const url = String(candidate.url || '');
+    if (!url) continue;
+
+    if (/^data:application\/pdf;base64,/i.test(url)) {
+      const payload = url.replace(/^data:application\/pdf;base64,/i, '');
+      return {
+        type: 'buffer',
+        body: Buffer.from(payload, 'base64'),
+        contentType: 'application/pdf',
+      };
+    }
+
+    if (!/^https?:\/\//i.test(url)) continue;
+
+    const headers = candidate.requiresServiceAuth && serviceHeaders ? { ...serviceHeaders } : undefined;
+
+    try {
+      const response = await axios.request({
+        url,
+        method: 'GET',
+        headers,
+        responseType: 'stream',
+        timeout: 15000,
+        validateStatus: () => true,
+      });
+
+      if (response.status >= 200 && response.status < 400) {
+        return {
+          type: 'stream',
+          body: response.data,
+          contentType: response.headers?.['content-type'] || 'application/pdf',
+          contentLength: response.headers?.['content-length'] || null,
+        };
+      }
+    } catch (_) {
+      // Try next candidate.
+    }
+  }
+
+  return null;
 }
 
 async function uploadToStorage({ buffer, mimeType, folder = 'materials' }) {
@@ -702,6 +790,51 @@ router.get('/materials/:id/access', requireAuth, async (req, res) => {
     const accessUrl = await resolveMaterialAccessUrl(material);
     if (!accessUrl) return res.status(404).json({ error: 'Material URL not found' });
     return res.json({ access_url: accessUrl });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/materials/:id/file', requireAuth, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const materialId = Number(req.params.id);
+    if (!Number.isInteger(materialId)) return res.status(400).json({ error: 'Invalid material id' });
+
+    const materialResult = await db.query('SELECT * FROM materials WHERE id = $1 LIMIT 1', [materialId]);
+    const material = materialResult.rows[0];
+    if (!material) return res.status(404).json({ error: 'Material not found' });
+
+    if (!isAdminUser(req.user)) {
+      const packageMap = await loadPackageMap(db);
+      const attached = packageMap.get(materialId) || [];
+      const materialPackageIds = attached.map((item) => Number(item.package_id)).filter((id) => Number.isInteger(id));
+
+      if (!materialPackageIds.length) return res.status(403).json({ error: 'No access to this material' });
+
+      const ownedPackageIds = await getOwnedPackageIds(db, req.user.id);
+      const hasAccess = materialPackageIds.some((id) => ownedPackageIds.includes(id));
+      if (!hasAccess) return res.status(403).json({ error: 'No access to this material' });
+    }
+
+    const fetched = await fetchMaterialStream(material);
+    if (!fetched) return res.status(404).json({ error: 'Material file could not be resolved' });
+
+    const fileName = `${String(material.title || 'material').replace(/[^a-z0-9-_]+/gi, '_') || 'material'}.pdf`;
+    res.setHeader('Content-Type', fetched.contentType || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    if (fetched.contentLength) {
+      res.setHeader('Content-Length', String(fetched.contentLength));
+    }
+
+    if (fetched.type === 'buffer') {
+      return res.status(200).send(fetched.body);
+    }
+
+    fetched.body.on('error', () => {
+      if (!res.headersSent) res.status(500).end('Failed to stream file');
+    });
+    return fetched.body.pipe(res);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
