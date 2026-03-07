@@ -27,7 +27,12 @@ const BundleDetail = () => {
         const fetchedPurchases = purchasesRes.data || [];
         setPurchases(fetchedPurchases);
 
-        const ownedIds = new Set(fetchedPurchases.map((purchase) => String(purchase.package_id)));
+        const paidStatuses = new Set(['paid', 'completed', 'success', 'settlement']);
+        const ownedIds = new Set(
+          fetchedPurchases
+            .filter((purchase) => paidStatuses.has(String(purchase?.payment_status || '').toLowerCase()))
+            .map((purchase) => String(purchase.package_id))
+        );
         const bundleOwned = ownedIds.has(String(bundleId));
 
         if (bundleOwned || isAdmin) {
@@ -50,7 +55,14 @@ const BundleDetail = () => {
     fetchDetail();
   }, [bundleId, isAdmin]);
 
-  const ownedIds = useMemo(() => new Set((purchases || []).map((p) => String(p.package_id))), [purchases]);
+  const ownedIds = useMemo(() => {
+    const paidStatuses = new Set(['paid', 'completed', 'success', 'settlement']);
+    return new Set(
+      (purchases || [])
+        .filter((purchase) => paidStatuses.has(String(purchase?.payment_status || '').toLowerCase()))
+        .map((purchase) => String(purchase.package_id))
+    );
+  }, [purchases]);
   const bundleOwned = ownedIds.has(String(bundleId));
   const canViewBundleMaterials = bundleOwned || isAdmin;
 

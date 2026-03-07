@@ -189,6 +189,10 @@ export default function Home() {
             filteredPackages.map((pkg) => {
               const inCart = cartItems.some((item) => item.id === Number(pkg.id));
               const categoryLabel = getCategoryName(pkg, categoryMap) || 'LAINNYA';
+              const isBundlePackage =
+                String(pkg?.type || '').toLowerCase() === 'bundling' ||
+                String(pkg?.type || '').toLowerCase() === 'bundle' ||
+                (Array.isArray(pkg?.included_package_ids) && pkg.included_package_ids.length > 0);
               return (
                 <article key={pkg.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -213,6 +217,16 @@ export default function Home() {
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
+                    {isBundlePackage && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/bundles/${pkg.id}`)}
+                        className="rounded-xl border border-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-[var(--header-color,#103c21)] hover:bg-emerald-50"
+                      >
+                        Detail
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => handleAddToCart(pkg)}
