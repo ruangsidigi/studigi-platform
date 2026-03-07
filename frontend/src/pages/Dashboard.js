@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Boxes, CircleDollarSign, FileText, Package } from 'lucide-react';
+import { CircleDollarSign, FileText, Package } from 'lucide-react';
 import { packageService, purchaseService } from '../services/api';
 import DashboardStatCard from '../components/dashboard/DashboardStatCard';
 import TryoutPackageCard from '../components/dashboard/TryoutPackageCard';
@@ -68,7 +68,6 @@ const Dashboard = () => {
       (sum, pkg) => sum + Number(pkg.question_count || 0),
       0
     );
-    const estimatedValue = ownedPackages.reduce((sum, pkg) => sum + Number(pkg.price || 0), 0);
 
     return [
       {
@@ -88,12 +87,6 @@ const Dashboard = () => {
         value: totalQuestions,
         helper: 'Akumulasi dari paket aktif',
         icon: FileText,
-      },
-      {
-        title: 'Nilai Investasi',
-        value: `Rp ${estimatedValue.toLocaleString('id-ID')}`,
-        helper: 'Total harga paket aktif',
-        icon: Boxes,
       },
     ];
   }, [ownedPackages, pendingPackages]);
