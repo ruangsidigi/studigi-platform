@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Clock3, FileText, ShoppingCart } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
-import { categoryService, packageService } from '../services/api';
+import { categoryService, packageService, purchaseService } from '../services/api';
 import CartWidget, { CartItem } from '../components/CartWidget.tsx';
 
 const CATEGORY_TABS = ['CPNS', 'PPPK', 'BUMN', 'TOEFL', 'Lainnya'] as const;
@@ -38,21 +38,33 @@ export default function Home() {
   const [error, setError] = useState('');
   const [activeCategory, setActiveCategory] = useState<(typeof CATEGORY_TABS)[number]>('CPNS');
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [ownedPackageIds, setOwnedPackageIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const loadPackages = async () => {
       try {
         setLoading(true);
-        const [packagesResponse, categoriesResponse] = await Promise.all([
+        const [packagesResponse, categoriesResponse, purchasesResponse] = await Promise.all([
           packageService.getAll(),
           categoryService.getAll().catch(() => ({ data: [] })),
+          user ? purchaseService.getAll().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
         ]);
 
         const allPackages = Array.isArray(packagesResponse.data) ? packagesResponse.data : [];
         const allCategories = Array.isArray(categoriesResponse.data) ? categoriesResponse.data : [];
+        const allPurchases = Array.isArray(purchasesResponse.data) ? purchasesResponse.data : [];
         const validPackages = allPackages.filter((item) => Number(item?.id) > 0);
         setPackages(validPackages);
         setCategories(allCategories);
+
+        const paidStatuses = new Set(['paid', 'completed', 'success', 'settlement']);
+        const paidPackageIds = new Set(
+          allPurchases
+            .filter((purchase) => paidStatuses.has(String(purchase?.payment_status || '').toLowerCase()))
+            .map((purchase) => Number(purchase?.package_id))
+            .filter((id) => Number.isInteger(id) && id > 0)
+        );
+        setOwnedPackageIds(paidPackageIds);
         setError('');
       } catch (loadErr) {
         setError('Gagal memuat katalog tryout.');
@@ -62,7 +74,7 @@ export default function Home() {
     };
 
     loadPackages();
-  }, []);
+  }, [user]);
 
   const categoryMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -217,16 +229,6 @@ export default function Home() {
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {isBundlePackage && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/bundles/${pkg.id}`)}
-                        className="rounded-xl border border-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-[var(--header-color,#103c21)] hover:bg-emerald-50"
-                      >
-                        Detail
-                      </button>
-                    )}
-
                     <button
                       type="button"
                       onClick={() => handleAddToCart(pkg)}
@@ -237,7 +239,17 @@ export default function Home() {
                       {inCart ? 'Sudah di Cart' : 'Add to Cart'}
                     </button>
 
-                    {user && (
+                    {isBundlePackage && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/bundles/${pkg.id}`)}
+                        className="rounded-xl border border-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-[var(--header-color,#103c21)] hover:bg-emerald-50"
+                      >
+                        Detail
+                      </button>
+                    )}
+
+                    {user && ownedPackageIds.has(Number(pkg.id)) && (
                       <button
                         type="button"
                         onClick={() => navigate(`/quiz/${pkg.id}`)}
