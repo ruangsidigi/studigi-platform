@@ -28,13 +28,6 @@ const BundleDetail = () => {
         setBundleMaterials(Array.isArray(materialsPreviewRes.data) ? materialsPreviewRes.data : []);
         const fetchedPurchases = purchasesRes.data || [];
         setPurchases(fetchedPurchases);
-
-        const paidStatuses = new Set(['paid', 'completed', 'success', 'settlement']);
-        const ownedIds = new Set(
-          fetchedPurchases
-            .filter((purchase) => paidStatuses.has(String(purchase?.payment_status || '').toLowerCase()))
-            .map((purchase) => String(purchase.package_id))
-        );
       } catch (err) {
         setError('Gagal memuat detail bundling');
       } finally {
@@ -111,13 +104,29 @@ const BundleDetail = () => {
                     <span>{pkg.question_count || 0} soal</span>
                     <span className="package-price">Rp {(pkg.price || 0).toLocaleString('id-ID')}</span>
                   </div>
-                  <button
-                    className={`btn ${owned ? 'btn-success' : 'btn-secondary'}`}
-                    onClick={() => owned && navigate(`/quiz/${pkg.id}`)}
-                    disabled={!owned}
-                  >
-                    {owned ? 'Mulai' : 'Belum dibeli'}
-                  </button>
+                  {owned ? (
+                    <button
+                      className="btn btn-success"
+                      onClick={() => navigate(`/quiz/${pkg.id}`)}
+                    >
+                      Mulai
+                    </button>
+                  ) : (
+                    <div
+                      className="participant-lock"
+                      title="Terkunci"
+                      aria-label="Terkunci"
+                      style={{
+                        marginTop: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 20,
+                      }}
+                    >
+                      🔒
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -149,9 +158,20 @@ const BundleDetail = () => {
                     Buka PDF
                   </button>
                 ) : (
-                  <button className="btn btn-secondary participant-cart-btn" disabled>
-                    Belum dibayar
-                  </button>
+                  <div
+                    className="participant-lock"
+                    title="Terkunci"
+                    aria-label="Terkunci"
+                    style={{
+                      marginTop: 10,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 20,
+                    }}
+                  >
+                    🔒
+                  </div>
                 )}
               </div>
             ))}
