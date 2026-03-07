@@ -2,7 +2,7 @@
 const express = require('express');
 const multer = require('multer');
 const axios = require('axios');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../../shared/config');
 
@@ -325,6 +325,59 @@ function getSupabaseServiceHeaders() {
   };
 }
 
+function extractBucketAndKeyFromRawValue(rawValue, material) {
+  const raw = String(rawValue || '').trim();
+  if (!raw || /^data:/i.test(raw)) return null;
+
+  if (/^https?:\/\//i.test(raw)) {
+    const parsed = extractSupabasePublicObject(raw);
+    if (parsed?.bucket && parsed?.key) {
+      return { bucket: parsed.bucket, key: parsed.key };
+    }
+    return null;
+  }
+
+  const trimmed = raw.replace(/^\/+/, '');
+  if (!trimmed) return null;
+
+  const slashIndex = trimmed.indexOf('/');
+  if (slashIndex > 0) {
+    return {
+      bucket: trimmed.slice(0, slashIndex),
+      key: trimmed.slice(slashIndex + 1),
+    };
+  }
+
+  const fallbackBucket = String(material?.storage_bucket || config.storageBucket || '').trim();
+  if (!fallbackBucket) return null;
+  return { bucket: fallbackBucket, key: trimmed };
+}
+
+function collectStorageObjectCandidates(material) {
+  const candidates = [];
+  const pushUnique = (bucket, key) => {
+    const normalizedBucket = String(bucket || '').trim();
+    const normalizedKey = String(key || '').replace(/^\/+/, '').trim();
+    if (!normalizedBucket || !normalizedKey) return;
+    if (candidates.some((item) => item.bucket === normalizedBucket && item.key === normalizedKey)) return;
+    candidates.push({ bucket: normalizedBucket, key: normalizedKey });
+  };
+
+  const raws = [material?.file_url, material?.storage_key].filter(Boolean);
+  for (const raw of raws) {
+    const extracted = extractBucketAndKeyFromRawValue(raw, material);
+    if (extracted) pushUnique(extracted.bucket, extracted.key);
+  }
+
+  const fallbackBucket = String(material?.storage_bucket || config.storageBucket || '').trim();
+  if (fallbackBucket) {
+    const extracted = extractSupabasePublicObject(material?.file_url || material?.storage_key || '');
+    if (extracted?.key) pushUnique(fallbackBucket, extracted.key);
+  }
+
+  return candidates;
+}
+
 function buildMaterialAccessCandidates(material) {
   const candidates = [];
   const bucketCandidates = [];
@@ -500,6 +553,44 @@ async function fetchMaterialStream(material) {
       }
     } catch (_) {
       // Try next candidate.
+    }
+  }
+
+  // Final fallback: fetch object directly from S3-compatible storage.
+  const objectCandidates = collectStorageObjectCandidates(material);
+  for (const objectRef of objectCandidates) {
+    try {
+      if (!s3) break;
+      const result = await s3.send(new GetObjectCommand({
+        Bucket: objectRef.bucket,
+        Key: objectRef.key,
+      }));
+
+      if (!result || !result.Body) continue;
+
+      const contentType = result.ContentType || 'application/pdf';
+      const contentLength = result.ContentLength ? Number(result.ContentLength) : null;
+
+      if (typeof result.Body.pipe === 'function') {
+        return {
+          type: 'stream',
+          body: result.Body,
+          contentType,
+          contentLength,
+        };
+      }
+
+      if (typeof result.Body.transformToByteArray === 'function') {
+        const bytes = await result.Body.transformToByteArray();
+        return {
+          type: 'buffer',
+          body: Buffer.from(bytes),
+          contentType,
+          contentLength,
+        };
+      }
+    } catch (_) {
+      // Continue trying next candidate.
     }
   }
 
