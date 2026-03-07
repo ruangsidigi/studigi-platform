@@ -122,10 +122,59 @@ const withMaterialPackages = (materials, packageMap) => {
 };
 
 const getOwnedPackageIds = async (db, userId) => {
-  const result = await db.query('SELECT package_id FROM purchases WHERE user_id = $1', [userId]);
-  return [...new Set((result.rows || [])
-    .map((row) => Number(row.package_id))
-    .filter((id) => Number.isInteger(id) && id > 0))];
+  const completedStatuses = ['paid', 'completed', 'success', 'settlement'];
+
+  const result = await db.query(
+    `SELECT package_id
+     FROM purchases
+     WHERE user_id = $1
+       AND LOWER(COALESCE(payment_status, '')) = ANY($2::text[])
+       AND package_id IS NOT NULL`,
+    [userId, completedStatuses]
+  );
+
+  const owned = new Set(
+    (result.rows || [])
+      .map((row) => Number(row.package_id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  );
+
+  if (!owned.size) return [];
+
+  const ownedIds = [...owned];
+
+  // Include sub-packages from bundle_packages when user owns bundle package(s).
+  try {
+    const bundleLinks = await db.query(
+      'SELECT package_id FROM bundle_packages WHERE bundle_id = ANY($1::int[])',
+      [ownedIds]
+    );
+    for (const row of bundleLinks.rows || []) {
+      const subPackageId = Number(row.package_id);
+      if (Number.isInteger(subPackageId) && subPackageId > 0) owned.add(subPackageId);
+    }
+  } catch (_) {
+    // Ignore when bundle_packages table does not exist.
+  }
+
+  // Fallback expansion using packages.included_package_ids for legacy data.
+  try {
+    const pkgRows = await db.query(
+      'SELECT id, included_package_ids FROM packages WHERE id = ANY($1::int[])',
+      [ownedIds]
+    );
+    for (const row of pkgRows.rows || []) {
+      const included = Array.isArray(row.included_package_ids) ? row.included_package_ids : [];
+      for (const includedId of included) {
+        const normalized = Number(includedId);
+        if (Number.isInteger(normalized) && normalized > 0) owned.add(normalized);
+      }
+    }
+  } catch (_) {
+    // Ignore legacy schema mismatches.
+  }
+
+  return [...owned];
 };
 
 const filterMaterialsByAccessiblePackages = (materials, packageMap, allowedPackageIds) => {

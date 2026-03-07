@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { questionService, tryoutService, bundleService, packageService } from '../services/api';
+import { questionService, tryoutService, bundleService, packageService, materialService } from '../services/api';
 import { GraduationCap, Clock3, Flag, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Quiz = () => {
@@ -17,6 +17,7 @@ const Quiz = () => {
   const [imageErrors, setImageErrors] = useState({});
   const [isBundling, setIsBundling] = useState(false);
   const [bundleDetail, setBundleDetail] = useState(null);
+  const [bundleMaterials, setBundleMaterials] = useState([]);
   const [packageInfo, setPackageInfo] = useState(null);
   const [timeLeft, setTimeLeft] = useState(100 * 60);
   const [questionStartAt, setQuestionStartAt] = useState(Date.now());
@@ -59,11 +60,20 @@ const Quiz = () => {
         setIsBundling(true);
         const bundleRes = await bundleService.getById(parseInt(packageId, 10));
         setBundleDetail(bundleRes.data);
+
+        try {
+          const materialsRes = await materialService.listByPackage(parseInt(packageId, 10));
+          setBundleMaterials(Array.isArray(materialsRes.data) ? materialsRes.data : []);
+        } catch (_) {
+          setBundleMaterials([]);
+        }
+
         setLoading(false);
         return;
       }
 
       setIsBundling(false);
+      setBundleMaterials([]);
       const sessionRes = await tryoutService.start(parseInt(packageId, 10));
       setSessionId(sessionRes.data.session.id);
 
@@ -164,6 +174,18 @@ const Quiz = () => {
     const bundle = bundleDetail.bundle;
     const packages = bundleDetail.packages || [];
 
+    const openBundleMaterial = async (materialId) => {
+      try {
+        const response = await materialService.getAccessUrl(materialId);
+        const url = response.data?.access_url;
+        if (url) {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        }
+      } catch (_) {
+        alert('Materi bundling tidak dapat dibuka saat ini.');
+      }
+    };
+
     return (
       <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
         <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5">
@@ -220,6 +242,37 @@ const Quiz = () => {
               ))
             )}
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Materi Bundling</h2>
+              <p className="mt-1 text-sm text-slate-600">Materi PDF yang di-attach ke paket bundling ini.</p>
+            </div>
+          </div>
+
+          {bundleMaterials.length === 0 ? (
+            <p className="text-sm text-slate-600">Belum ada materi untuk bundling ini.</p>
+          ) : (
+            <div className="space-y-3">
+              {bundleMaterials.map((material) => (
+                <div key={material.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{material.title}</p>
+                    <p className="text-xs text-slate-500">{material.description || 'Materi PDF bundling'}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-xl bg-[var(--header-color,#0f5132)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                    onClick={() => openBundleMaterial(material.id)}
+                  >
+                    Buka PDF
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
