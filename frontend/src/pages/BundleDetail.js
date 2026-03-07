@@ -18,12 +18,14 @@ const BundleDetail = () => {
   useEffect(() => {
     const fetchDetail = async () => {
       try {
-        const [detailRes, purchasesRes] = await Promise.all([
+        const [detailRes, purchasesRes, materialsPreviewRes] = await Promise.all([
           bundleService.getById(bundleId),
           purchaseService.getAll(),
+          materialService.listByPackagePreview(bundleId).catch(() => ({ data: [] })),
         ]);
 
         setBundleDetail(detailRes.data);
+        setBundleMaterials(Array.isArray(materialsPreviewRes.data) ? materialsPreviewRes.data : []);
         const fetchedPurchases = purchasesRes.data || [];
         setPurchases(fetchedPurchases);
 
@@ -33,18 +35,6 @@ const BundleDetail = () => {
             .filter((purchase) => paidStatuses.has(String(purchase?.payment_status || '').toLowerCase()))
             .map((purchase) => String(purchase.package_id))
         );
-        const bundleOwned = ownedIds.has(String(bundleId));
-
-        if (bundleOwned || isAdmin) {
-          try {
-            const materialsRes = await materialService.listByPackage(bundleId);
-            setBundleMaterials(materialsRes.data || []);
-          } catch (materialErr) {
-            setBundleMaterials([]);
-          }
-        } else {
-          setBundleMaterials([]);
-        }
       } catch (err) {
         setError('Gagal memuat detail bundling');
       } finally {
@@ -137,33 +127,39 @@ const BundleDetail = () => {
 
       <div className="card mt-20">
         <div className="card-title">Materi Bundle</div>
-        {!canViewBundleMaterials ? (
-          <p className="text-muted">Beli bundling ini untuk membuka materi PDF.</p>
-        ) : bundleMaterials.length === 0 ? (
+        {bundleMaterials.length === 0 ? (
           <p className="text-muted">Belum ada materi yang di-attach ke bundling ini.</p>
         ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Judul</th>
-                <th>Deskripsi</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bundleMaterials.map((material) => (
-                <tr key={material.id}>
-                  <td>{material.title}</td>
-                  <td>{material.description || '-'}</td>
-                  <td>
-                    <button className="btn btn-primary btn-sm" onClick={() => openMaterial(material.id)}>
-                      Buka PDF
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="bundle-package-grid">
+            {bundleMaterials.map((material) => (
+              <div key={material.id} className="bundle-package-card">
+                <div className="bundle-package-header">
+                  <h3>{material.title}</h3>
+                  <span className="bundle-package-type">PDF</span>
+                </div>
+                <p className="package-desc">{material.description || 'Materi pembelajaran untuk bundle ini.'}</p>
+
+                <div className="package-info">
+                  <span>Materi PDF</span>
+                  <span className="package-price">#{material.id}</span>
+                </div>
+
+                {canViewBundleMaterials ? (
+                  <button className="btn btn-success participant-start-btn" onClick={() => openMaterial(material.id)}>
+                    Buka PDF
+                  </button>
+                ) : (
+                  <button className="btn btn-secondary participant-cart-btn" disabled>
+                    Belum dibayar
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!canViewBundleMaterials && bundleMaterials.length > 0 && (
+          <p className="text-muted" style={{ marginTop: 12 }}>Beli bundling ini untuk membuka materi PDF.</p>
         )}
       </div>
     </div>

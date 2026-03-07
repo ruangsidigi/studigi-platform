@@ -156,6 +156,15 @@ const withMaterialPackages = (materials, packageMap) => {
   });
 };
 
+const toMaterialPreview = (material) => ({
+  id: material.id,
+  title: material.title || 'Untitled Material',
+  description: material.description || '',
+  created_at: material.created_at || null,
+  attached_packages: Array.isArray(material.attached_packages) ? material.attached_packages : [],
+  package_ids: Array.isArray(material.package_ids) ? material.package_ids : [],
+});
+
 const getOwnedPackageIds = async (db, userId) => {
   const completedStatuses = ['paid', 'completed', 'success', 'settlement'];
 
@@ -850,6 +859,28 @@ router.get('/materials/package/:packageId', requireAuth, async (req, res) => {
     const filtered = allNormalized.filter((material) =>
       (material.package_ids || []).some((id) => targetSet.has(Number(id)))
     );
+    return res.json(filtered);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/materials/package/:packageId/preview', requireAuth, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const packageId = Number(req.params.packageId);
+    if (!Number.isInteger(packageId)) return res.status(400).json({ error: 'Invalid package id' });
+
+    const targetPackageIds = await getBundleRelatedPackageIds(db, packageId);
+    const packageMap = await loadPackageMap(db);
+    const allMaterialsResult = await db.query('SELECT * FROM materials ORDER BY created_at DESC NULLS LAST, id DESC');
+    const allNormalized = withMaterialPackages(allMaterialsResult.rows || [], packageMap);
+
+    const targetSet = new Set(targetPackageIds.map((id) => Number(id)));
+    const filtered = allNormalized
+      .filter((material) => (material.package_ids || []).some((id) => targetSet.has(Number(id))))
+      .map(toMaterialPreview);
+
     return res.json(filtered);
   } catch (error) {
     return res.status(500).json({ error: error.message });

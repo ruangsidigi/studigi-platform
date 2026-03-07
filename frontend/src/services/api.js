@@ -210,6 +210,7 @@ export const materialService = {
   attachPackage: (id, packageId) => api.post(`/materials/${id}/packages`, { packageId }),
   detachPackage: (id, packageId) => api.delete(`/materials/${id}/packages/${packageId}`),
   listByPackage: (packageId) => api.get(`/materials/package/${packageId}`),
+  listByPackagePreview: (packageId) => api.get(`/materials/package/${packageId}/preview`),
   listMyMaterials: () => api.get('/materials/my'),
   getAccessUrl: (id) => api.get(`/materials/${id}/access`),
   downloadFile: (id) => api.get(`/materials/${id}/file`, { responseType: 'blob' }),
