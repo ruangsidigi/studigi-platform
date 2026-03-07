@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
+import AuthBrandMark from '../components/AuthBrandMark';
 import '../styles/auth.css';
 
 const Register = () => {
@@ -31,7 +32,7 @@ const Register = () => {
 
   return (
     <div className="register-page">
-      <div className="register-page__dot" />
+      <AuthBrandMark className="auth-brand-mark--register" />
 
       <div className="register-page__container">
         <h2 className="register-page__title">Create an account</h2>

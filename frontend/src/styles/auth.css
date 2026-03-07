@@ -39,11 +39,47 @@
 }
 
 .login-page__avatar {
-  width: 52px;
-  height: 52px;
+  display: none;
+  margin-bottom: 18px;
+}
+
+.auth-brand-mark {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-brand-mark--login {
+  width: 56px;
+  height: 56px;
+}
+
+.auth-brand-mark--register {
+  width: 44px;
+  height: 44px;
+  margin: 0 0 10px;
+}
+
+.auth-brand-mark--medium {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+}
+
+.auth-brand-mark__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.auth-brand-mark__fallback {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   background: #bfbfbf;
-  margin-bottom: 18px;
 }
 
 .login-card {
@@ -181,10 +217,7 @@
 }
 
 .register-page__dot {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: #bfbfbf;
+  display: none;
   margin-bottom: 10px;
 }
 
@@ -304,10 +337,7 @@
 }
 
 .verify-page__dot {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #bfbfbf;
+  display: none;
   margin-bottom: 16px;
 }
 
@@ -355,10 +385,7 @@
 }
 
 .forgot-page__dot {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #bfbfbf;
+  display: none;
   margin-bottom: 16px;
 }
 
@@ -573,6 +600,14 @@
 
   .login-card__register-btn {
     font-size: 18px;
+  }
+
+  .auth-brand-mark {
+    margin-bottom: 14px;
+  }
+
+  .auth-brand-mark--register {
+    margin-bottom: 8px;
   }
 
   .register-page {

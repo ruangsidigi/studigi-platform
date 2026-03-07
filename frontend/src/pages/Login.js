@@ -2,6 +2,7 @@ import React, { useContext, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { authService, campaignService } from '../services/api';
+import AuthBrandMark from '../components/AuthBrandMark';
 import '../styles/auth.css';
 
 const Login = () => {
@@ -69,7 +70,7 @@ const Login = () => {
   return (
     <div className="login-page">
       <div className="login-page__container">
-        <div className="login-page__avatar" />
+        <AuthBrandMark className="auth-brand-mark--login" />
         <div className="login-card">
           <h2 className="login-card__title">Sign in</h2>
 

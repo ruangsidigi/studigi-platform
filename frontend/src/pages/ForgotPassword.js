@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
+import AuthBrandMark from '../components/AuthBrandMark';
 import '../styles/auth.css';
 
 const ForgotPassword = () => {
@@ -29,7 +30,7 @@ const ForgotPassword = () => {
 
   return (
     <div className="forgot-page">
-      <div className="forgot-page__dot" />
+      <AuthBrandMark className="auth-brand-mark--medium" />
 
       <div className="forgot-card">
         <h2 className="forgot-card__title">Forgot Password</h2>

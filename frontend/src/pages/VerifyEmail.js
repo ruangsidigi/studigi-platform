@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/api';
+import AuthBrandMark from '../components/AuthBrandMark';
 import '../styles/auth.css';
 
 const VerifyEmail = () => {
@@ -34,7 +35,7 @@ const VerifyEmail = () => {
 
   return (
     <div className="verify-page">
-      <div className="verify-page__dot" />
+      <AuthBrandMark className="auth-brand-mark--medium" />
 
       <div className="verify-card">
         <h2 className="verify-card__title">Verifikasi Email</h2>
