@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Clock3, FileText, ShoppingCart } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import { categoryService, packageService } from '../services/api';
@@ -30,6 +30,7 @@ const normalizePackageToCartItem = (pkg: any, categoryMap: Record<string, string
 
 export default function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useContext(AuthContext as any);
   const [packages, setPackages] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -88,11 +89,30 @@ export default function Home() {
   }, [cartItems]);
 
   const filteredPackages = useMemo(() => {
-    if (activeCategory === 'Lainnya') {
-      return packages.filter((pkg) => !['CPNS', 'PPPK', 'BUMN', 'TOEFL'].includes(getCategoryName(pkg, categoryMap)));
-    }
-    return packages.filter((pkg) => getCategoryName(pkg, categoryMap) === activeCategory);
-  }, [packages, activeCategory, categoryMap]);
+    const params = new URLSearchParams(location.search);
+    const searchTerm = String(params.get('q') || '').trim().toLowerCase();
+
+    const byCategory =
+      activeCategory === 'Lainnya'
+        ? packages.filter((pkg) => !['CPNS', 'PPPK', 'BUMN', 'TOEFL'].includes(getCategoryName(pkg, categoryMap)))
+        : packages.filter((pkg) => getCategoryName(pkg, categoryMap) === activeCategory);
+
+    if (!searchTerm) return byCategory;
+
+    const searchablePackages = packages;
+
+    return searchablePackages.filter((pkg) => {
+      const packageName = String(pkg?.name || '').toLowerCase();
+      const categoryName = getCategoryName(pkg, categoryMap).toLowerCase();
+      const packageType = String(pkg?.type || pkg?.package_type || pkg?.packageType || pkg?.bundle_type || '').toLowerCase();
+
+      return (
+        packageName.includes(searchTerm) ||
+        categoryName.includes(searchTerm) ||
+        packageType.includes(searchTerm)
+      );
+    });
+  }, [packages, activeCategory, categoryMap, location.search]);
 
   const handleAddToCart = (pkg: any) => {
     const mapped = normalizePackageToCartItem(pkg, categoryMap);

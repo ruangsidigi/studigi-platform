@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Bell, ShoppingCart, Search, LogOut } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 
@@ -11,7 +11,9 @@ interface NavbarProps {
 export default function Navbar({ title, onMenuClick }: NavbarProps) {
   const { user, logout } = useContext(AuthContext as any);
   const navigate = useNavigate();
+  const location = useLocation();
   const [cartCount, setCartCount] = useState(0);
+  const [searchInput, setSearchInput] = useState('');
 
   const getCartCount = () => {
     try {
@@ -38,6 +40,33 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setSearchInput(params.get('q') || '');
+  }, [location.pathname, location.search]);
+
+  const applySearchToHome = (keyword: string, forceToHome = false) => {
+    const params = new URLSearchParams(forceToHome ? '' : location.search);
+    const trimmedKeyword = keyword.trim();
+
+    if (trimmedKeyword) {
+      params.set('q', trimmedKeyword);
+    } else {
+      params.delete('q');
+    }
+
+    const nextSearch = params.toString();
+    const nextPath = '/home';
+    const target = nextSearch ? `${nextPath}?${nextSearch}` : nextPath;
+
+    if (forceToHome || location.pathname !== '/home') {
+      navigate(target);
+      return;
+    }
+
+    navigate(target, { replace: true });
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -63,6 +92,19 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
           <input
             type="text"
             placeholder="Cari tryout..."
+            value={searchInput}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSearchInput(value);
+              if (location.pathname === '/home') {
+                applySearchToHome(value);
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                applySearchToHome(searchInput, true);
+              }
+            }}
             className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-700 placeholder:text-slate-400 focus:border-[var(--header-color,#103c21)] focus:outline-none"
           />
         </div>
