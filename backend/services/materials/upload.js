@@ -289,6 +289,97 @@ function buildPublicStorageUrl(bucket, key) {
   return `${base}/${bucket}/${key}`;
 }
 
+function extractSupabasePublicObject(url) {
+  try {
+    const parsed = new URL(String(url || ''));
+    const match = parsed.pathname.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/i);
+    if (!match) return null;
+    return {
+      bucket: match[1],
+      key: match[2],
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function normalizeMaterialUrlCandidate(value, material) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  if (/^data:/i.test(raw)) return raw;
+
+  // Absolute URL case: rewrite bucket segment when it points to an old bucket.
+  if (/^https?:\/\//i.test(raw)) {
+    const parsed = extractSupabasePublicObject(raw);
+    if (parsed && config.storageBucket && parsed.bucket !== config.storageBucket) {
+      return buildPublicStorageUrl(config.storageBucket, parsed.key);
+    }
+    return raw;
+  }
+
+  const trimmed = raw.replace(/^\/+/, '');
+
+  // Relative `bucket/key` path case.
+  if (material?.storage_bucket && trimmed.startsWith(`${material.storage_bucket}/`)) {
+    const key = trimmed.slice(material.storage_bucket.length + 1);
+    return buildPublicStorageUrl(material.storage_bucket, key);
+  }
+
+  // Relative `key` path case.
+  if (trimmed.includes('/')) {
+    const bucket = material?.storage_bucket || config.storageBucket;
+    if (bucket) return buildPublicStorageUrl(bucket, trimmed);
+  }
+
+  return raw;
+}
+
+async function resolveMaterialAccessUrl(material) {
+  const candidates = [];
+  const pushCandidate = (value) => {
+    const normalized = normalizeMaterialUrlCandidate(value, material);
+    if (!normalized) return;
+    if (!candidates.includes(normalized)) candidates.push(normalized);
+  };
+
+  pushCandidate(material?.file_url);
+  pushCandidate(material?.storage_key);
+
+  // Secondary fallback: if storage_key is full URL, rebuild from key using current bucket.
+  const storageParts = extractSupabasePublicObject(material?.storage_key);
+  if (storageParts && config.storageBucket) {
+    pushCandidate(buildPublicStorageUrl(config.storageBucket, storageParts.key));
+  }
+
+  if (!candidates.length) return null;
+
+  // Prefer first reachable storage URL to avoid returning stale bucket links.
+  for (const candidate of candidates) {
+    if (!/^https?:\/\//i.test(candidate) || !candidate.includes('/storage/v1/object/public/')) {
+      return candidate;
+    }
+
+    try {
+      const probe = await axios.request({
+        url: candidate,
+        method: 'HEAD',
+        timeout: 5000,
+        validateStatus: () => true,
+      });
+
+      if (probe.status >= 200 && probe.status < 400) {
+        return candidate;
+      }
+    } catch (_) {
+      // Try next candidate.
+    }
+  }
+
+  // If all probes fail, still return the first candidate to preserve backward compatibility.
+  return candidates[0];
+}
+
 async function uploadToStorage({ buffer, mimeType, folder = 'materials' }) {
   const key = `${folder}/${Date.now()}-${uuidv4()}`;
   const command = new PutObjectCommand({
@@ -570,7 +661,7 @@ router.get('/materials/:id/access', requireAuth, async (req, res) => {
       if (!hasAccess) return res.status(403).json({ error: 'No access to this material' });
     }
 
-    const accessUrl = material.file_url || material.storage_key || null;
+    const accessUrl = await resolveMaterialAccessUrl(material);
     if (!accessUrl) return res.status(404).json({ error: 'Material URL not found' });
     return res.json({ access_url: accessUrl });
   } catch (error) {
