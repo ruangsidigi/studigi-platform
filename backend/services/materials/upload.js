@@ -188,6 +188,41 @@ const filterMaterialsByAccessiblePackages = (materials, packageMap, allowedPacka
   });
 };
 
+const getBundleRelatedPackageIds = async (db, packageId) => {
+  const ids = new Set([Number(packageId)]);
+
+  try {
+    const bundleLinks = await db.query(
+      'SELECT package_id FROM bundle_packages WHERE bundle_id = $1',
+      [packageId]
+    );
+    for (const row of bundleLinks.rows || []) {
+      const childId = Number(row.package_id);
+      if (Number.isInteger(childId) && childId > 0) ids.add(childId);
+    }
+  } catch (_) {
+    // Ignore when bundle_packages relation is unavailable.
+  }
+
+  try {
+    const packageResult = await db.query(
+      'SELECT included_package_ids FROM packages WHERE id = $1 LIMIT 1',
+      [packageId]
+    );
+    const included = Array.isArray(packageResult.rows?.[0]?.included_package_ids)
+      ? packageResult.rows[0].included_package_ids
+      : [];
+    for (const item of included) {
+      const includedId = Number(item);
+      if (Number.isInteger(includedId) && includedId > 0) ids.add(includedId);
+    }
+  } catch (_) {
+    // Ignore schema drift.
+  }
+
+  return [...ids];
+};
+
 console.log('materials/upload: initializing S3 client', { endpoint: config.storageEndpoint, bucket: config.storageBucket });
 let s3;
 try {
@@ -449,16 +484,22 @@ router.get('/materials/package/:packageId', requireAuth, async (req, res) => {
     const packageId = Number(req.params.packageId);
     if (!Number.isInteger(packageId)) return res.status(400).json({ error: 'Invalid package id' });
 
+    const targetPackageIds = await getBundleRelatedPackageIds(db, packageId);
+
     const packageMap = await loadPackageMap(db);
     const allMaterialsResult = await db.query('SELECT * FROM materials ORDER BY created_at DESC NULLS LAST, id DESC');
     const allNormalized = withMaterialPackages(allMaterialsResult.rows || [], packageMap);
 
     if (!isAdminUser(req.user)) {
       const ownedPackageIds = await getOwnedPackageIds(db, req.user.id);
-      if (!ownedPackageIds.includes(packageId)) return res.status(403).json({ error: 'No access to this package materials' });
+      const hasAccess = targetPackageIds.some((id) => ownedPackageIds.includes(id));
+      if (!hasAccess) return res.status(403).json({ error: 'No access to this package materials' });
     }
 
-    const filtered = allNormalized.filter((material) => (material.package_ids || []).some((id) => Number(id) === packageId));
+    const targetSet = new Set(targetPackageIds.map((id) => Number(id)));
+    const filtered = allNormalized.filter((material) =>
+      (material.package_ids || []).some((id) => targetSet.has(Number(id)))
+    );
     return res.json(filtered);
   } catch (error) {
     return res.status(500).json({ error: error.message });
