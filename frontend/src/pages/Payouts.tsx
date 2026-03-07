@@ -17,6 +17,7 @@ export default function Payouts() {
         const response = await purchaseService.getAll();
         const items = Array.isArray(response.data) ? response.data : [];
         setTransactions(items);
+        window.dispatchEvent(new CustomEvent('studigi:notifications-refresh'));
         setError('');
       } catch (loadErr) {
         setError('Gagal memuat riwayat transaksi.');

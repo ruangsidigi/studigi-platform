@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { reportService } from '../services/api';
 import QuestionDetailModal from '../components/QuestionDetailModal';
 import DashboardSubmenu from '../components/DashboardSubmenu';
@@ -7,6 +7,7 @@ import '../styles/reports.css';
 
 const Reports = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [overview, setOverview] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [history, setHistory] = useState([]);
@@ -17,6 +18,7 @@ const Reports = () => {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [loadingQuestion, setLoadingQuestion] = useState(false);
   const [error, setError] = useState('');
+  const [openedFromQuery, setOpenedFromQuery] = useState(null);
 
   useEffect(() => {
     initLoad();
@@ -87,6 +89,18 @@ const Reports = () => {
       setLoadingQuestion(false);
     }
   };
+
+  useEffect(() => {
+    if (loading) return;
+
+    const params = new URLSearchParams(location.search);
+    const requestedAttemptId = Number(params.get('attemptId') || 0);
+    if (!requestedAttemptId) return;
+    if (openedFromQuery === requestedAttemptId) return;
+
+    setOpenedFromQuery(requestedAttemptId);
+    openAttemptDetail(requestedAttemptId);
+  }, [location.search, loading, openedFromQuery]);
 
   const downloadPdf = () => {
     if (!selectedAttempt) return;

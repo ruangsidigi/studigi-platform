@@ -1,12 +1,25 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Bell, ShoppingCart, Search, LogOut } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
+import { purchaseService, reportService } from '../services/api';
 
 interface NavbarProps {
   title: string;
   onMenuClick: () => void;
 }
+
+type NotificationItem = {
+  id: string;
+  type: 'payment_success' | 'tryout_completed';
+  title: string;
+  message: string;
+  createdAt: number;
+  purchaseId?: number;
+  attemptId?: number;
+};
+
+const COMPLETED_PAYMENT_STATUSES = ['paid', 'completed', 'success', 'settlement'];
 
 export default function Navbar({ title, onMenuClick }: NavbarProps) {
   const { user, logout } = useContext(AuthContext as any);
@@ -14,6 +27,10 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
   const location = useLocation();
   const [cartCount, setCartCount] = useState(0);
   const [searchInput, setSearchInput] = useState('');
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const notifRef = useRef<HTMLDivElement | null>(null);
 
   const getCartCount = () => {
     try {
@@ -45,6 +62,92 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
     setSearchInput(params.get('q') || '');
   }, [location.pathname, location.search]);
 
+  const hasToken = Boolean(localStorage.getItem('token'));
+
+  const loadNotifications = useCallback(async () => {
+    if (!hasToken) {
+      setNotifications([]);
+      return;
+    }
+
+    try {
+      setNotifLoading(true);
+      const [purchasesRes, historyRes] = await Promise.all([
+        purchaseService.getAll().catch(() => ({ data: [] })),
+        reportService.getHistory(1, 8).catch(() => ({ data: { items: [] } })),
+      ]);
+
+      const purchases = Array.isArray((purchasesRes as any)?.data) ? (purchasesRes as any).data : [];
+      const historyItems = Array.isArray((historyRes as any)?.data?.items) ? (historyRes as any).data.items : [];
+
+      const paymentNotifications: NotificationItem[] = purchases
+        .filter((purchase: any) => {
+          const status = String(purchase?.payment_status || purchase?.status || '').toLowerCase();
+          return COMPLETED_PAYMENT_STATUSES.includes(status);
+        })
+        .map((purchase: any) => {
+          const packageName = purchase?.package_name || purchase?.packageName || `Paket #${purchase?.package_id || '-'}`;
+          const createdAt = new Date(purchase?.created_at || Date.now()).getTime();
+          return {
+            id: `payment-${purchase.id}`,
+            type: 'payment_success',
+            title: 'Pembayaran Berhasil',
+            message: `${packageName} sudah berhasil dibayar.`,
+            createdAt,
+            purchaseId: Number(purchase?.id || 0),
+          };
+        });
+
+      const tryoutNotifications: NotificationItem[] = historyItems.map((attempt: any) => {
+        const attemptId = Number(attempt?.attemptId || attempt?.id || 0);
+        const packageName = attempt?.packageName || attempt?.package_name || 'Paket Tryout';
+        const createdAt = new Date(attempt?.date || attempt?.finishedAt || Date.now()).getTime();
+        return {
+          id: `tryout-${attemptId}`,
+          type: 'tryout_completed',
+          title: 'Tryout Selesai',
+          message: `${packageName} telah selesai dikerjakan.`,
+          createdAt,
+          attemptId,
+        };
+      });
+
+      const merged = [...paymentNotifications, ...tryoutNotifications]
+        .filter((item) => Number.isFinite(item.createdAt))
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, 10);
+
+      setNotifications(merged);
+    } finally {
+      setNotifLoading(false);
+    }
+  }, [hasToken]);
+
+  useEffect(() => {
+    if (!hasToken) return;
+    loadNotifications();
+    const refresh = () => loadNotifications();
+    const interval = window.setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('studigi:notifications-refresh', refresh as EventListener);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('studigi:notifications-refresh', refresh as EventListener);
+    };
+  }, [hasToken, loadNotifications]);
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [notifOpen]);
+
   const applySearchToHome = (keyword: string, forceToHome = false) => {
     const params = new URLSearchParams(forceToHome ? '' : location.search);
     const trimmedKeyword = keyword.trim();
@@ -70,6 +173,18 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const onClickNotification = (item: NotificationItem) => {
+    setNotifOpen(false);
+    if (item.type === 'payment_success') {
+      navigate('/payouts');
+      return;
+    }
+
+    if (item.type === 'tryout_completed' && item.attemptId) {
+      navigate(`/dashboard/report?attemptId=${item.attemptId}`);
+    }
   };
 
   return (
@@ -111,14 +226,58 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
       </div>
 
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
-        <button
-          type="button"
-          className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100"
-          aria-label="Notifications"
-        >
-          <Bell size={18} />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
-        </button>
+        <div className="relative" ref={notifRef}>
+          <button
+            type="button"
+            className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+            aria-label="Notifications"
+            onClick={() => {
+              const nextOpen = !notifOpen;
+              setNotifOpen(nextOpen);
+              if (nextOpen) {
+                loadNotifications();
+              }
+            }}
+          >
+            <Bell size={18} />
+            {notifications.length > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />}
+          </button>
+
+          {notifOpen && (
+            <div className="absolute right-0 z-30 mt-2 w-[320px] max-w-[85vw] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+              <div className="border-b border-slate-100 px-4 py-3">
+                <p className="text-sm font-semibold text-slate-900">Notifikasi</p>
+                <p className="text-xs text-slate-500">Pembayaran dan hasil tryout terbaru</p>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto">
+                {notifLoading ? (
+                  <p className="px-4 py-3 text-sm text-slate-600">Memuat notifikasi...</p>
+                ) : notifications.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-slate-600">Belum ada notifikasi.</p>
+                ) : (
+                  notifications.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onClickNotification(item)}
+                      className="w-full border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50"
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--header-color,#103c21)]">
+                        {item.type === 'payment_success' ? 'Pembayaran' : 'Tryout'}
+                      </p>
+                      <p className="mt-0.5 text-sm font-semibold text-slate-900">{item.title}</p>
+                      <p className="mt-0.5 text-xs text-slate-600">{item.message}</p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {new Date(item.createdAt).toLocaleString('id-ID')}
+                      </p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         <button
           type="button"

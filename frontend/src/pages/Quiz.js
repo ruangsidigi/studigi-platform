@@ -92,6 +92,7 @@ const Quiz = () => {
       try {
         setIsFinishing(true);
         await tryoutService.finish(sessionId);
+        window.dispatchEvent(new CustomEvent('studigi:notifications-refresh'));
         navigate(`/review/${sessionId}`);
       } catch (err) {
         alert('Error finishing tryout: ' + (err.response?.data?.error || err.message));
