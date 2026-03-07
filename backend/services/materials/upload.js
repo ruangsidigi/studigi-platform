@@ -295,6 +295,7 @@ function extractSupabasePublicObject(url) {
     const match = parsed.pathname.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/i);
     if (!match) return null;
     return {
+      origin: parsed.origin,
       bucket: match[1],
       key: match[2],
     };
@@ -303,68 +304,106 @@ function extractSupabasePublicObject(url) {
   }
 }
 
-function normalizeMaterialUrlCandidate(value, material) {
-  const raw = String(value || '').trim();
-  if (!raw) return null;
-
-  if (/^data:/i.test(raw)) return raw;
-
-  // Absolute URL case: rewrite bucket segment when it points to an old bucket.
-  if (/^https?:\/\//i.test(raw)) {
-    const parsed = extractSupabasePublicObject(raw);
-    if (parsed && config.storageBucket && parsed.bucket !== config.storageBucket) {
-      return buildPublicStorageUrl(config.storageBucket, parsed.key);
-    }
-    return raw;
-  }
-
-  const trimmed = raw.replace(/^\/+/, '');
-
-  // Relative `bucket/key` path case.
-  if (material?.storage_bucket && trimmed.startsWith(`${material.storage_bucket}/`)) {
-    const key = trimmed.slice(material.storage_bucket.length + 1);
-    return buildPublicStorageUrl(material.storage_bucket, key);
-  }
-
-  // Relative `key` path case.
-  if (trimmed.includes('/')) {
-    const bucket = material?.storage_bucket || config.storageBucket;
-    if (bucket) return buildPublicStorageUrl(bucket, trimmed);
-  }
-
-  return raw;
-}
-
 async function resolveMaterialAccessUrl(material) {
   const candidates = [];
-  const pushCandidate = (value) => {
-    const normalized = normalizeMaterialUrlCandidate(value, material);
+  const bucketCandidates = [];
+  const keyCandidates = [];
+  const baseCandidates = [];
+
+  const pushUnique = (list, value) => {
+    const normalized = String(value || '').trim();
     if (!normalized) return;
-    if (!candidates.includes(normalized)) candidates.push(normalized);
+    if (!list.includes(normalized)) list.push(normalized);
   };
 
-  pushCandidate(material?.file_url);
-  pushCandidate(material?.storage_key);
+  const rawValues = [material?.file_url, material?.storage_key]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
 
-  // Secondary fallback: if storage_key is full URL, rebuild from key using current bucket.
-  const storageParts = extractSupabasePublicObject(material?.storage_key);
-  if (storageParts && config.storageBucket) {
-    pushCandidate(buildPublicStorageUrl(config.storageBucket, storageParts.key));
+  for (const raw of rawValues) {
+    if (/^data:/i.test(raw)) return raw;
+
+    if (/^https?:\/\//i.test(raw)) {
+      pushUnique(candidates, raw);
+      const parsed = extractSupabasePublicObject(raw);
+      if (parsed) {
+        pushUnique(bucketCandidates, parsed.bucket);
+        pushUnique(keyCandidates, parsed.key);
+        pushUnique(baseCandidates, parsed.origin);
+      }
+      continue;
+    }
+
+    const trimmed = raw.replace(/^\/+/, '');
+    if (!trimmed) continue;
+
+    // Could be `bucket/key` or just `key`.
+    const slashIndex = trimmed.indexOf('/');
+    if (slashIndex > 0) {
+      pushUnique(bucketCandidates, trimmed.slice(0, slashIndex));
+      pushUnique(keyCandidates, trimmed.slice(slashIndex + 1));
+    }
+    pushUnique(keyCandidates, trimmed);
+  }
+
+  pushUnique(bucketCandidates, material?.storage_bucket);
+  pushUnique(bucketCandidates, config.storageBucket);
+
+  // Common fallback names used in existing deployments.
+  pushUnique(bucketCandidates, 'materials');
+  pushUnique(bucketCandidates, 'materials-pdf');
+  pushUnique(bucketCandidates, 'public');
+
+  const defaultBase = (config.cdnUrl || config.storageEndpoint || process.env.SUPABASE_URL || '').replace(/\/$/, '');
+  pushUnique(baseCandidates, defaultBase);
+  pushUnique(baseCandidates, process.env.SUPABASE_URL);
+
+  const buildFromBaseBucketKey = (base, bucket, key) => {
+    const b = String(base || '').replace(/\/$/, '');
+    if (!b || !bucket || !key) return null;
+
+    if (/supabase\.co/i.test(b)) {
+      if (/\/storage\/v1\/object\/public/i.test(b)) {
+        return `${b}/${bucket}/${key}`;
+      }
+      return `${b}/storage/v1/object/public/${bucket}/${key}`;
+    }
+
+    return `${b}/${bucket}/${key}`;
+  };
+
+  for (const base of baseCandidates) {
+    for (const bucket of bucketCandidates) {
+      for (const key of keyCandidates) {
+        const built = buildFromBaseBucketKey(base, bucket, key);
+        if (built) pushUnique(candidates, built);
+      }
+    }
+  }
+
+  // As last fallback, if we only have key and configured bucket exists.
+  if (config.storageBucket) {
+    for (const key of keyCandidates) {
+      pushUnique(candidates, buildPublicStorageUrl(config.storageBucket, key));
+    }
   }
 
   if (!candidates.length) return null;
 
-  // Prefer first reachable storage URL to avoid returning stale bucket links.
   for (const candidate of candidates) {
-    if (!/^https?:\/\//i.test(candidate) || !candidate.includes('/storage/v1/object/public/')) {
+    if (!/^https?:\/\//i.test(candidate)) return candidate;
+
+    if (!candidate.includes('/storage/v1/object/public/')) {
       return candidate;
     }
 
     try {
       const probe = await axios.request({
         url: candidate,
-        method: 'HEAD',
-        timeout: 5000,
+        method: 'GET',
+        headers: { Range: 'bytes=0-0' },
+        responseType: 'arraybuffer',
+        timeout: 7000,
         validateStatus: () => true,
       });
 
@@ -376,7 +415,6 @@ async function resolveMaterialAccessUrl(material) {
     }
   }
 
-  // If all probes fail, still return the first candidate to preserve backward compatibility.
   return candidates[0];
 }
 
