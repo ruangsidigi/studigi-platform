@@ -34,6 +34,40 @@ const safeExec = async (db, sql, values = []) => {
   }
 };
 
+const normalizeIncludedPackageIds = (rawValue) => {
+  if (Array.isArray(rawValue)) {
+    return JSON.stringify(
+      rawValue
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item) && item > 0)
+    );
+  }
+
+  if (typeof rawValue === 'string') {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return JSON.stringify([]);
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return JSON.stringify(
+          parsed
+            .map((item) => Number(item))
+            .filter((item) => Number.isInteger(item) && item > 0)
+        );
+      }
+    } catch (_) {
+      const splitValues = trimmed
+        .split(',')
+        .map((item) => Number(String(item).trim()))
+        .filter((item) => Number.isInteger(item) && item > 0);
+      return JSON.stringify(splitValues);
+    }
+  }
+
+  return JSON.stringify([]);
+};
+
 router.get('/packages', async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -82,7 +116,7 @@ router.post('/packages', requireAdmin, async (req, res) => {
         Number(price || 0),
         Number(question_count || 0),
         category_id || null,
-        Array.isArray(included_package_ids) ? included_package_ids : [],
+        normalizeIncludedPackageIds(included_package_ids),
       ]
     );
 
@@ -126,7 +160,7 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
         price !== undefined ? Number(price) : null,
         question_count !== undefined ? Number(question_count) : null,
         category_id ?? null,
-        included_package_ids ?? null,
+        included_package_ids !== undefined ? normalizeIncludedPackageIds(included_package_ids) : null,
         id,
       ]
     );
