@@ -60,6 +60,31 @@ const parsePackageIds = (body) => {
 };
 
 const loadPackageMap = async (db) => {
+  const map = new Map();
+  const packageById = new Map();
+
+  const pushMapping = (materialId, packageId) => {
+    const normalizedMaterialId = Number(materialId);
+    const normalizedPackageId = Number(packageId);
+    if (!Number.isInteger(normalizedMaterialId) || normalizedMaterialId <= 0) return;
+    if (!Number.isInteger(normalizedPackageId) || normalizedPackageId <= 0) return;
+
+    if (!map.has(normalizedMaterialId)) map.set(normalizedMaterialId, []);
+    const existing = map.get(normalizedMaterialId);
+    if (existing.some((item) => Number(item.package_id) === normalizedPackageId)) return;
+
+    const pkg = packageById.get(normalizedPackageId) || { id: normalizedPackageId, name: null, type: null };
+    existing.push({
+      package_id: normalizedPackageId,
+      package: {
+        id: normalizedPackageId,
+        name: pkg.name || null,
+        type: pkg.type || null,
+      },
+    });
+  };
+
+  // Primary source: explicit many-to-many relation.
   try {
     const links = await db.query(
       `SELECT
@@ -71,42 +96,52 @@ const loadPackageMap = async (db) => {
        LEFT JOIN packages p ON p.id = pm.package_id`
     );
 
-    const map = new Map();
     for (const row of links.rows || []) {
-      if (!map.has(row.material_id)) map.set(row.material_id, []);
-      map.get(row.material_id).push({
-        package_id: row.package_id,
-        package: {
-          id: row.package_id,
+      const packageId = Number(row.package_id);
+      if (Number.isInteger(packageId) && packageId > 0) {
+        packageById.set(packageId, {
+          id: packageId,
           name: row.package_name || null,
           type: row.package_type || null,
-        },
-      });
+        });
+      }
+      pushMapping(row.material_id, row.package_id);
     }
-    return map;
   } catch (_) {
-    const fallback = await db.query('SELECT id, package_id FROM materials WHERE package_id IS NOT NULL');
-    if (!fallback.rows?.length) return new Map();
-
-    const packageIds = [...new Set(fallback.rows.map((row) => Number(row.package_id)).filter((id) => Number.isInteger(id)))];
-    const packages = packageIds.length
-      ? await db.query('SELECT id, name, type FROM packages WHERE id = ANY($1::int[])', [packageIds])
-      : { rows: [] };
-
-    const packageById = new Map((packages.rows || []).map((pkg) => [Number(pkg.id), pkg]));
-    const map = new Map();
-    for (const row of fallback.rows || []) {
-      const packageId = Number(row.package_id);
-      if (!Number.isInteger(packageId)) continue;
-      map.set(row.id, [
-        {
-          package_id: packageId,
-          package: packageById.get(packageId) || { id: packageId, name: null, type: null },
-        },
-      ]);
-    }
-    return map;
+    // Ignore and continue with legacy mapping fallback.
   }
+
+  // Legacy source: single package link on materials.package_id.
+  try {
+    const legacy = await db.query('SELECT id, package_id FROM materials WHERE package_id IS NOT NULL');
+    const legacyPackageIds = [...new Set(
+      (legacy.rows || [])
+        .map((row) => Number(row.package_id))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    )];
+
+    const missingIds = legacyPackageIds.filter((id) => !packageById.has(id));
+    if (missingIds.length) {
+      const packages = await db.query('SELECT id, name, type FROM packages WHERE id = ANY($1::int[])', [missingIds]);
+      for (const pkg of packages.rows || []) {
+        const id = Number(pkg.id);
+        if (!Number.isInteger(id) || id <= 0) continue;
+        packageById.set(id, {
+          id,
+          name: pkg.name || null,
+          type: pkg.type || null,
+        });
+      }
+    }
+
+    for (const row of legacy.rows || []) {
+      pushMapping(row.id, row.package_id);
+    }
+  } catch (_) {
+    // Ignore when legacy column does not exist.
+  }
+
+  return map;
 };
 
 const withMaterialPackages = (materials, packageMap) => {
@@ -429,7 +464,14 @@ router.post('/materials/:id/packages', requireAdmin, async (req, res) => {
         [materialId, packageId]
       );
     } catch (_) {
-      await db.query('UPDATE materials SET package_id = $1, updated_at = NOW() WHERE id = $2', [packageId, materialId]);
+      try {
+        await db.query(
+          'INSERT INTO package_materials (material_id, package_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [materialId, packageId]
+        );
+      } catch (_) {
+        await db.query('UPDATE materials SET package_id = $1, updated_at = NOW() WHERE id = $2', [packageId, materialId]);
+      }
     }
 
     return res.json({ message: 'Package attached to material' });
