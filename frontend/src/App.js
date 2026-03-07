@@ -30,6 +30,7 @@ import PayoutsPage from './pages/Payouts.tsx';
 import SettingsPage from './pages/Settings.tsx';
 import PaymentPage from './pages/Payment.tsx';
 import ContactUsPage from './pages/ContactUs.tsx';
+import MaterialViewerPage from './pages/MaterialViewerPage';
 import DashboardLayout from './layouts/DashboardLayout.tsx';
 
 // Styles
@@ -279,6 +280,16 @@ function App() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <UserMaterialsPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/materials/:materialId/view"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <MaterialViewerPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

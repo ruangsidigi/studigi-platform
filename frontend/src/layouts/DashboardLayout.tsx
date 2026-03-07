@@ -38,6 +38,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     : mobileItems;
 
   const pageTitle = useMemo(() => titles[location.pathname] || 'Dashboard', [location.pathname]);
+  const resolvedTitle = useMemo(() => {
+    if (/^\/materials\/\d+\/view$/i.test(location.pathname)) return 'PDF Viewer';
+    return pageTitle;
+  }, [location.pathname, pageTitle]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -83,7 +87,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <Navbar title={pageTitle} onMenuClick={() => setMobileOpen(true)} />
+          <Navbar title={resolvedTitle} onMenuClick={() => setMobileOpen(true)} />
           <main className="flex-1 px-4 py-5 sm:px-5 md:px-6 md:py-6 lg:px-8">{children}</main>
         </div>
       </div>

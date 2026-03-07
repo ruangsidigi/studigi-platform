@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BookOpen, FileText, FolderOpen, PlayCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { materialService } from '../services/api';
 import DashboardStatCard from '../components/dashboard/DashboardStatCard';
 
 const UserMaterialsPage = () => {
+  const navigate = useNavigate();
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,15 +28,7 @@ const UserMaterialsPage = () => {
   }, []);
 
   const handleOpenMaterial = async (materialId) => {
-    try {
-      const response = await materialService.downloadFile(materialId);
-      const blob = new Blob([response.data], { type: response.headers?.['content-type'] || 'application/pdf' });
-      const objectUrl = window.URL.createObjectURL(blob);
-      window.open(objectUrl, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 60 * 1000);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Tidak bisa membuka materi.');
-    }
+    navigate(`/materials/${materialId}/view`, { state: { backTo: '/my-materials' } });
   };
 
   const stats = useMemo(() => {

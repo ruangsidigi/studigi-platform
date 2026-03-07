@@ -175,15 +175,7 @@ const Quiz = () => {
     const packages = bundleDetail.packages || [];
 
     const openBundleMaterial = async (materialId) => {
-      try {
-        const response = await materialService.downloadFile(materialId);
-        const blob = new Blob([response.data], { type: response.headers?.['content-type'] || 'application/pdf' });
-        const objectUrl = window.URL.createObjectURL(blob);
-        window.open(objectUrl, '_blank', 'noopener,noreferrer');
-        window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 60 * 1000);
-      } catch (_) {
-        alert('Materi bundling tidak dapat dibuka saat ini.');
-      }
+      navigate(`/materials/${materialId}/view`, { state: { backTo: `/quiz/${packageId}` } });
     };
 
     return (
