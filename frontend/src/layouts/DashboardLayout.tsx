@@ -25,6 +25,7 @@ const titles: Record<string, string> = {
   '/payouts': 'Payouts',
   '/settings': 'Settings',
   '/payment': 'Payment',
+  '/contact-us': 'Contact Us',
 };
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {

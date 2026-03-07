@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import {
   Home,
   BookOpen,
@@ -7,9 +7,7 @@ import {
   CreditCard,
   Settings,
   GraduationCap,
-  LogIn,
-  UserPlus,
-  LogOut,
+  MessageCircle,
 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import { brandingService } from '../services/api';
@@ -53,8 +51,7 @@ const navItems = [
 ];
 
 export default function Sidebar() {
-  const { user, logout } = useContext(AuthContext as any);
-  const navigate = useNavigate();
+  const { user } = useContext(AuthContext as any);
   const [logoUrl, setLogoUrl] = useState<string>('');
   const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
   const sidebarItems = isAdmin
@@ -99,11 +96,6 @@ export default function Sidebar() {
     window.addEventListener('branding-updated', handleBrandingUpdated);
     return () => window.removeEventListener('branding-updated', handleBrandingUpdated);
   }, []);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   return (
     <aside className="hidden shrink-0 border-r border-slate-200 bg-white md:block md:w-20 lg:w-64">
@@ -152,33 +144,20 @@ export default function Sidebar() {
         </nav>
 
         <div className="mt-auto border-t border-slate-200 p-3">
-          {user ? (
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex w-full items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 lg:justify-start"
-            >
-              <LogOut size={17} />
-              <span className="hidden lg:inline">Logout</span>
-            </button>
-          ) : (
-            <>
-              <NavLink
-                to="/login"
-                className="mb-1 flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--secondary-color,#69655e)] transition-colors hover:bg-slate-100 hover:text-slate-900 lg:justify-start"
-              >
-                <LogIn size={17} />
-                <span className="hidden lg:inline">Login</span>
-              </NavLink>
-              <NavLink
-                to="/register"
-                className="flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--secondary-color,#69655e)] transition-colors hover:bg-slate-100 hover:text-slate-900 lg:justify-start"
-              >
-                <UserPlus size={17} />
-                <span className="hidden lg:inline">Sign Up</span>
-              </NavLink>
-            </>
-          )}
+          <NavLink
+            to="/contact-us"
+            className={({ isActive }) =>
+              [
+                'flex w-full items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors lg:justify-start',
+                isActive
+                  ? 'bg-[var(--header-color,#103c21)] text-white'
+                  : 'text-[var(--secondary-color,#69655e)] hover:bg-slate-100 hover:text-slate-900',
+              ].join(' ')
+            }
+          >
+            <MessageCircle size={17} />
+            <span className="hidden lg:inline">Contact Us</span>
+          </NavLink>
         </div>
       </div>
     </aside>

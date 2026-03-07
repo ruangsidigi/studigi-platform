@@ -29,6 +29,7 @@ import ActivityPage from './pages/Activity.tsx';
 import PayoutsPage from './pages/Payouts.tsx';
 import SettingsPage from './pages/Settings.tsx';
 import PaymentPage from './pages/Payment.tsx';
+import ContactUsPage from './pages/ContactUs.tsx';
 import DashboardLayout from './layouts/DashboardLayout.tsx';
 
 // Styles
@@ -167,6 +168,14 @@ function App() {
                     <PaymentPage />
                   </DashboardLayout>
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/contact-us"
+              element={
+                <DashboardLayout>
+                  <ContactUsPage />
+                </DashboardLayout>
               }
             />
             <Route
@@ -332,40 +341,6 @@ function App() {
           </Routes>
         </main>
 
-        <footer className="site-footer">
-          <div className="site-footer-content">
-            <p className="site-footer-title">Kontak Bisnis</p>
-            <div className="site-footer-links">
-              <a
-                className="site-footer-link"
-                href="https://api.whatsapp.com/send?phone=6282279910090"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                WhatsApp: +62 822-7991-0090
-              </a>
-              <a className="site-footer-link" href="mailto:ruangsidigi@gmail.com">
-                Email: ruangsidigi@gmail.com
-              </a>
-              <a
-                className="site-footer-link"
-                href="https://instagram.com/studigi.id"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Instagram: @studigi.id
-              </a>
-              <a
-                className="site-footer-link"
-                href="https://www.tiktok.com/@studigi.id"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                TikTok: @studigi.id
-              </a>
-            </div>
-          </div>
-        </footer>
       </div>
     </Router>
   );
