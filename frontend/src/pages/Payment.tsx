@@ -106,7 +106,7 @@ export default function Payment() {
               disabled={loading}
               className="mt-4 w-full rounded-xl bg-[var(--header-color,#103c21)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
             >
-              {loading ? 'Memproses pembayaran...' : 'Bayar dengan Midtrans'}
+              {loading ? 'Memproses pembayaran...' : 'Bayar sekarang'}
             </button>
           </>
         )}
