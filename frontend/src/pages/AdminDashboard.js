@@ -1,9 +1,31 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { adminService, packageService, questionService, materialService, brandingService, purchaseService } from '../services/api';
+import {
+  BarChart3,
+  Boxes,
+  FileEdit,
+  FileSpreadsheet,
+  Image,
+  Medal,
+  Palette,
+  Users,
+  Wallet,
+} from 'lucide-react';
 import '../styles/admin.css';
 
 const API_ROOT = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
 const BASE_CATEGORY_NAMES = ['CPNS', 'BUMN', 'TOEFL'];
+const ADMIN_TABS = [
+  { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+  { key: 'packages', label: 'Kelola Paket', icon: Boxes },
+  { key: 'upload', label: 'Upload Soal', icon: FileSpreadsheet },
+  { key: 'materials', label: 'Materi PDF', icon: Image },
+  { key: 'branding', label: 'Branding', icon: Palette },
+  { key: 'results', label: 'Hasil Tryout', icon: Wallet },
+  { key: 'ranking', label: 'Ranking Paket', icon: Medal },
+  { key: 'users', label: 'Daftar Pengguna', icon: Users },
+  { key: 'editQuestions', label: 'Edit Soal', icon: FileEdit },
+];
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -199,60 +221,19 @@ const AdminDashboard = () => {
       )}
 
       <div className="admin-tabs">
-        <button
-          className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
-        >
-          Dashboard
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'packages' ? 'active' : ''}`}
-          onClick={() => setActiveTab('packages')}
-        >
-          Kelola Paket
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'upload' ? 'active' : ''}`}
-          onClick={() => setActiveTab('upload')}
-        >
-          Upload Soal
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'materials' ? 'active' : ''}`}
-          onClick={() => setActiveTab('materials')}
-        >
-          Materi PDF
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'branding' ? 'active' : ''}`}
-          onClick={() => setActiveTab('branding')}
-        >
-          Branding
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'results' ? 'active' : ''}`}
-          onClick={() => setActiveTab('results')}
-        >
-          Hasil Tryout
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'ranking' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ranking')}
-        >
-          Ranking Paket
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveTab('users')}
-        >
-          Daftar Pengguna
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'editQuestions' ? 'active' : ''}`}
-          onClick={() => setActiveTab('editQuestions')}
-        >
-          Edit Soal
-        </button>
+        {ADMIN_TABS.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.key}
+              className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              <Icon size={15} className="tab-icon" />
+              <span className="tab-label">{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="admin-content">
