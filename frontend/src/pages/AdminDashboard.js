@@ -186,12 +186,13 @@ const AdminDashboard = () => {
     <div className="admin-container">
       <div className="admin-header">
         <h1>Admin Dashboard</h1>
+        <p>Pusat kontrol konten, paket tryout, dan operasional pengguna.</p>
       </div>
 
       {message && (
         <div className={`alert ${message.includes('successfully') ? 'alert-success' : 'alert-danger'}`}>
-          {message}
-          <button onClick={() => setMessage('')} style={{ marginLeft: '10px', cursor: 'pointer' }}>
+          <span>{message}</span>
+          <button className="alert-close" onClick={() => setMessage('')}>
             ✕
           </button>
         </div>
