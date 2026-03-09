@@ -308,7 +308,7 @@ const Quiz = () => {
   return (
     <div className="min-h-screen bg-[#f3f4f6]">
       <div className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex h-[68px] max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="mx-auto flex min-h-[68px] max-w-[1280px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap sm:gap-4 sm:px-6 sm:py-0">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--header-color,#0f5132)] text-white">
@@ -325,8 +325,8 @@ const Quiz = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-[var(--header-color,#0f5132)]">
+          <div className="ml-auto flex items-center gap-2 sm:ml-0">
+            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-[var(--header-color,#0f5132)] sm:px-3 sm:text-sm">
               <Clock3 size={16} />
               <span>{timerText}</span>
             </div>
@@ -334,7 +334,7 @@ const Quiz = () => {
               type="button"
               disabled={isFinishing}
               onClick={() => finishTryout()}
-              className="rounded-full bg-[var(--header-color,#0f5132)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+              className="rounded-full bg-[var(--header-color,#0f5132)] px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60 sm:px-4 sm:text-sm"
             >
               {isFinishing ? 'Memproses...' : 'Selesai'}
             </button>
@@ -342,7 +342,7 @@ const Quiz = () => {
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-[1280px] px-3 py-4 sm:px-6 sm:py-6">
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_292px]">
           <div className="space-y-5">
             <section className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -358,7 +358,7 @@ const Quiz = () => {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
               <div className="mb-4 flex items-center gap-3">
                 <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-[var(--header-color,#0f5132)]">
                   {(question.category || 'SOAL').toUpperCase()}
@@ -366,7 +366,7 @@ const Quiz = () => {
                 <span className="text-sm font-medium text-slate-600">Soal {question.number || currentQuestionNumber}</span>
               </div>
 
-              <p className="mb-5 text-base leading-relaxed text-slate-900">{question.question_text}</p>
+              <p className="mb-4 text-[15px] leading-relaxed text-slate-900 sm:mb-5 sm:text-base">{question.question_text}</p>
 
               {question.image_url && !imageErrors[question.id] && (
                 <div className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-white p-2">
@@ -393,7 +393,7 @@ const Quiz = () => {
                     key={option.label}
                     type="button"
                     className={[
-                      'flex w-full items-center gap-3 rounded-2xl border px-4 py-4 text-left transition-colors',
+                      'flex w-full items-center gap-3 rounded-2xl border px-3 py-3.5 text-left transition-colors sm:px-4 sm:py-4',
                       currentAnswer === option.label
                         ? 'border-[var(--header-color,#0f5132)] bg-emerald-50'
                         : 'border-slate-200 bg-slate-50 hover:bg-slate-100',
@@ -403,18 +403,18 @@ const Quiz = () => {
                     <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-lg font-semibold text-slate-600">
                       {option.label}
                     </span>
-                    <span className="text-base text-slate-800">{option.text}</span>
+                    <span className="text-sm text-slate-800 sm:text-base">{option.text}</span>
                   </button>
                 ))}
               </div>
             </section>
 
-            <section className="flex items-center justify-between gap-3 rounded-2xl bg-transparent py-1">
+            <section className="grid grid-cols-1 gap-2 rounded-2xl bg-transparent py-1 sm:grid-cols-3 sm:gap-3">
               <button
                 type="button"
                 disabled={currentQuestion === 0}
                 onClick={() => setCurrentQuestion((prev) => Math.max(prev - 1, 0))}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-3 text-base font-semibold text-slate-400 enabled:text-slate-700 enabled:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-400 enabled:text-slate-700 enabled:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:px-6 sm:py-3 sm:text-base"
               >
                 <ChevronLeft size={18} />
                 Sebelumnya
@@ -424,7 +424,7 @@ const Quiz = () => {
                 type="button"
                 onClick={toggleMarkQuestion}
                 className={[
-                  'inline-flex items-center gap-2 rounded-2xl border px-6 py-3 text-base font-semibold',
+                  'inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-semibold sm:px-6 sm:py-3 sm:text-base',
                   isCurrentMarked
                     ? 'border-amber-300 bg-amber-50 text-amber-700'
                     : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
@@ -438,7 +438,7 @@ const Quiz = () => {
                 type="button"
                 disabled={currentQuestion === questions.length - 1}
                 onClick={() => setCurrentQuestion((prev) => Math.min(prev + 1, questions.length - 1))}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[var(--header-color,#0f5132)] px-6 py-3 text-base font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--header-color,#0f5132)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:px-6 sm:py-3 sm:text-base"
               >
                 Berikutnya
                 <ChevronRight size={18} />
@@ -449,7 +449,7 @@ const Quiz = () => {
           <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
             <h3 className="mb-4 text-base font-semibold text-slate-900">Navigator Soal</h3>
 
-            <div className="mb-5 grid grid-cols-7 gap-2">
+            <div className="mb-5 grid grid-cols-5 gap-2 sm:grid-cols-6 lg:grid-cols-7">
               {questions.map((q, idx) => (
                 <button
                   key={q.id}

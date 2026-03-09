@@ -156,7 +156,7 @@
   grid-template-columns: 280px 1fr;
   gap: 20px;
   flex: 1;
-  padding: 20px;
+  padding: 16px 20px 24px;
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
@@ -339,7 +339,9 @@
 /* Responsive */
 @media (max-width: 1024px) {
   .review-content {
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 260px 1fr;
+    padding: 14px;
+    gap: 14px;
   }
 
   .review-header {
@@ -357,7 +359,7 @@
 @media (max-width: 768px) {
   .review-content {
     grid-template-columns: 1fr;
-    padding: 12px;
+    padding: 10px;
     gap: 12px;
   }
 
@@ -365,6 +367,7 @@
     position: static;
     max-height: none;
     order: 2;
+    overflow: visible;
   }
 
   .review-main {
@@ -421,6 +424,16 @@
   .explanation-section {
     padding: 16px;
   }
+
+  .question-navigation {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .nav-button {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 480px) {
@@ -456,8 +469,12 @@
   }
 
   .question-navigation {
-    flex-direction: column;
-    gap: 8px;
+    gap: 7px;
+  }
+
+  .nav-button {
+    padding: 11px 14px;
+    font-size: 13px;
   }
 
   .nav-button {

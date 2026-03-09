@@ -40,7 +40,7 @@ export default function Activity() {
   }, [overview]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-20 lg:pb-2">
+    <div className="mx-auto max-w-7xl space-y-4 pb-20 sm:space-y-5 lg:space-y-6 lg:pb-2">
       <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
         <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">Activity</h2>
         <p className="mt-1 text-sm text-[var(--secondary-color,#69655e)]">
@@ -50,14 +50,14 @@ export default function Activity() {
 
       {error && <section className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error}</section>}
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <section className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
         <article className="rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-base font-semibold text-slate-900">Adaptive Learning</h3>
             <button
               type="button"
               onClick={() => navigate('/dashboard/adaptive')}
-              className="rounded-xl bg-[var(--header-color,#103c21)] px-3 py-1.5 text-xs font-semibold text-white"
+              className="w-full rounded-xl bg-[var(--header-color,#103c21)] px-3 py-2 text-xs font-semibold text-white sm:w-auto"
             >
               Buka Adaptive
             </button>
@@ -80,12 +80,12 @@ export default function Activity() {
         </article>
 
         <article className="rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-base font-semibold text-slate-900">Report Belajar</h3>
             <button
               type="button"
               onClick={() => navigate('/dashboard/report')}
-              className="rounded-xl border border-[var(--secondary-color,#69655e)] px-3 py-1.5 text-xs font-semibold text-[var(--secondary-color,#69655e)]"
+              className="w-full rounded-xl border border-[var(--secondary-color,#69655e)] px-3 py-2 text-xs font-semibold text-[var(--secondary-color,#69655e)] sm:w-auto"
             >
               Buka Report
             </button>
@@ -114,7 +114,7 @@ export default function Activity() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-1.5">
           <h3 className="text-base font-semibold text-slate-900">Review Tryout Terakhir</h3>
           <span className="text-xs text-[var(--secondary-color,#69655e)]">Maksimal 6 data terbaru</span>
         </div>
@@ -136,7 +136,7 @@ export default function Activity() {
                 <button
                   type="button"
                   onClick={() => navigate(`/review/${item.id}`)}
-                  className="rounded-xl bg-[var(--header-color,#103c21)] px-3 py-2 text-xs font-semibold text-white"
+                  className="w-full rounded-xl bg-[var(--header-color,#103c21)] px-3 py-2 text-xs font-semibold text-white sm:w-auto"
                 >
                   Review Soal
                 </button>

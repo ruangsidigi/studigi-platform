@@ -9,7 +9,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { reviewService } from '../services/api';
 import QuestionSidebar from '../components/QuestionSidebar';
 import QuestionViewer from '../components/QuestionViewer';
@@ -17,6 +17,7 @@ import '../styles/review.css';
 
 const ReviewPage = () => {
   const { attemptId } = useParams();
+  const navigate = useNavigate();
 
   // State Management
   const [reviewData, setReviewData] = useState(null);
@@ -201,7 +202,7 @@ const ReviewPage = () => {
           <div className="review-title-row">
             <button 
               className="btn-icon-back"
-              onClick={() => window.location.assign('/activity')}
+              onClick={() => navigate('/activity')}
               title="Kembali ke halaman Activity"
             >
               ← Kembali

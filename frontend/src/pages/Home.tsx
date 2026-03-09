@@ -179,7 +179,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_330px]">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-5">
         <div className="space-y-4">
           {loading && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">Loading katalog...</div>
@@ -228,12 +228,12 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
                     <button
                       type="button"
                       onClick={() => handleAddToCart(pkg)}
                       disabled={inCart}
-                      className="inline-flex items-center gap-2 rounded-xl bg-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     >
                       <ShoppingCart size={15} />
                       {inCart ? 'Sudah di Cart' : 'Add to Cart'}
@@ -243,7 +243,7 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={() => navigate(`/bundles/${pkg.id}`)}
-                        className="rounded-xl border border-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-[var(--header-color,#103c21)] hover:bg-emerald-50"
+                        className="w-full rounded-xl border border-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-[var(--header-color,#103c21)] hover:bg-emerald-50 sm:w-auto"
                       >
                         Detail
                       </button>
@@ -253,7 +253,7 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={() => navigate(`/quiz/${pkg.id}`)}
-                        className="rounded-xl border border-[var(--secondary-color,#69655e)] px-4 py-2 text-sm font-semibold text-[var(--secondary-color,#69655e)] hover:bg-slate-50"
+                        className="w-full rounded-xl border border-[var(--secondary-color,#69655e)] px-4 py-2 text-sm font-semibold text-[var(--secondary-color,#69655e)] hover:bg-slate-50 sm:w-auto"
                       >
                         Start Tryout
                       </button>
