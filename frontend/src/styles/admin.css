@@ -230,6 +230,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   overflow: hidden;
+  table-layout: auto;
 }
 
 .admin-table thead {
@@ -237,28 +238,53 @@
 }
 
 .admin-table th {
-  padding: 12px;
+  padding: 10px 12px;
   text-align: left;
   font-weight: bold;
   border-bottom: 1px solid #dbe3ee;
   color: #334155;
-  font-size: 13px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: #f8fafc;
 }
 
 .admin-table td {
-  padding: 12px;
+  padding: 9px 12px;
   border-bottom: 1px solid #edf2f7;
   color: #0f172a;
+  font-size: 13px;
+  vertical-align: middle;
 }
 
 .admin-table tbody tr:hover {
   background-color: #f8fafc;
 }
 
+.admin-table tbody tr:nth-child(even) {
+  background-color: #fbfdff;
+}
+
 .admin-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+/* Compact helpers for dense admin data tables */
+.admin-table .btn.btn-sm {
+  padding: 4px 9px;
+  font-size: 11px;
+}
+
+.admin-table td .status-passed,
+.admin-table td .status-failed,
+.admin-table td .role-admin,
+.admin-table td .role-user {
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 999px;
 }
 
 .alert {
