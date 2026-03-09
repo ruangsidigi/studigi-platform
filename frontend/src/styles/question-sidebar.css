@@ -21,6 +21,7 @@
   border: 1px solid #e0e0e0;
   border-radius: 6px;
   padding: 8px 10px;
+  min-height: 40px;
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
@@ -378,8 +379,8 @@
   }
 
   .question-button {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     font-size: 11px;
   }
 }

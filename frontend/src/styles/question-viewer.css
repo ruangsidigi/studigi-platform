@@ -119,6 +119,7 @@
   color: #333;
   white-space: pre-wrap;
   word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .question-image-container {
@@ -233,6 +234,7 @@
   line-height: 1.6;
   color: #333;
   font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .option-user-badge,
