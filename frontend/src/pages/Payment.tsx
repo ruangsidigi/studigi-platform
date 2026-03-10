@@ -8,6 +8,7 @@ export default function Payment() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     try {
@@ -26,6 +27,11 @@ export default function Payment() {
       return;
     }
 
+    if (!termsAccepted) {
+      setError('Syarat & ketentuan harus disetujui sebelum checkout.');
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
@@ -34,6 +40,9 @@ export default function Payment() {
       const response = await paymentService.checkout(packageIds, 'midtrans', {
         reason: 'checkout',
         totalPrice,
+        termsAccepted: true,
+        termsAcceptedAt: new Date().toISOString(),
+        termsVersion: 'v1',
       });
 
       const payload = response.data || {};
@@ -99,6 +108,16 @@ export default function Payment() {
             </div>
 
             {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+
+            <label className="mt-3 flex items-start gap-2 text-sm text-[var(--secondary-color,#69655e)]">
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(event) => setTermsAccepted(event.target.checked)}
+                className="mt-1"
+              />
+              <span>Saya menyetujui syarat & ketentuan pembelian paket.</span>
+            </label>
 
             <button
               type="button"
