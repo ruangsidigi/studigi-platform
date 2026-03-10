@@ -119,50 +119,7 @@ export const paymentService = {
       payload.package_id = primaryId;
     }
 
-    const totalPrice = Number(extraPayload?.totalPrice || 0);
-
-    const legacyPayload = {
-      ...payload,
-      bundle_id: primaryId,
-      bundleId: primaryId,
-      package_id: primaryId,
-    };
-
-    const attempts = [
-      { path: '/payments/checkout', body: payload },
-      { path: '/payments/checkout', body: legacyPayload },
-      {
-        path: '/purchases',
-        body: {
-          packageIds: preferredPackageIds,
-          totalPrice,
-          paymentMethod,
-          payment_method: paymentMethod,
-        },
-      },
-      {
-        path: '/purchases',
-        body: {
-          bundle_id: primaryId,
-          bundleId: primaryId,
-          package_id: primaryId,
-          totalPrice,
-          paymentMethod,
-          payment_method: paymentMethod,
-        },
-      },
-    ];
-
-    let lastError;
-    for (const attempt of attempts) {
-      try {
-        return await api.post(attempt.path, attempt.body);
-      } catch (error) {
-        lastError = error;
-      }
-    }
-
-    throw lastError;
+    return api.post('/payments/checkout', payload);
   },
   getById: (id) => api.get(`/payments/${id}`),
   confirm: (id, status = 'paid') => api.post(`/payments/${id}/confirm`, { status }),
