@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://studigi.up.railway.app/api/:path*"
+      "destination": "https://backend-m96dghw84-ruangsidigis-projects.vercel.app/api/:path*"
     },
     {
       "source": "/(.*)",
