@@ -7,13 +7,23 @@ module.exports = async function authMiddleware(req, res, next) {
   const header = req.headers.authorization || '';
   if (!header.startsWith('Bearer ')) return next();
   const token = header.slice(7);
+
+  // Step 1: verify JWT signature/expiry. Reject immediately if invalid.
+  let payload;
   try {
     const jwtSecret = config.jwtSecret || config.jwtSecretFallback;
-    const payload = jwt.verify(token, jwtSecret);
-    // load user with roles from DB
+    payload = jwt.verify(token, jwtSecret);
+  } catch (err) {
+    console.warn('auth middleware: invalid token signature/expiry', err.message);
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  // Step 2: enrich with DB data. Fall back to JWT payload if DB is unavailable
+  // so infra issues do not block all authenticated requests with false 401s.
+  try {
     const db = req.app.locals.db;
     console.log('auth middleware: token verified, loading user', { sub: payload && payload.sub });
-    const userId = payload?.sub || payload?.id;
+    const userId = payload && (payload.sub || payload.id);
     const { rows } = await db.query('SELECT * FROM users WHERE id=$1 LIMIT 1', [userId]);
     if (!rows[0]) return res.status(401).json({ error: 'Invalid token' });
     const rowUser = rows[0];
@@ -21,28 +31,35 @@ module.exports = async function authMiddleware(req, res, next) {
       id: rowUser.id,
       email: rowUser.email,
       display_name: rowUser.display_name || rowUser.name || rowUser.email,
-      role: rowUser.role || payload?.role || 'user',
+      role: rowUser.role || (payload && payload.role) || 'user',
     };
     console.log('auth middleware: loading roles for user', { userId: user.id });
     try {
       const r = await db.query('SELECT roles.* FROM roles JOIN user_roles ur ON ur.role_id=roles.id WHERE ur.user_id=$1', [user.id]);
       user.roles = r.rows || [];
-      const adminRole = user.roles.find((role) => String(role?.name || '').toLowerCase() === 'admin');
+      const adminRole = user.roles.find(function(role) { return String(role && role.name || '').toLowerCase() === 'admin'; });
       if (adminRole) {
         user.role = 'admin';
-      } else if (!rowUser.role && payload?.role) {
+      } else if (!rowUser.role && payload && payload.role) {
         user.role = payload.role;
       }
     } catch (_) {
       user.roles = [];
-      if (!rowUser.role && payload?.role) {
+      if (!rowUser.role && payload && payload.role) {
         user.role = payload.role;
       }
     }
     req.user = user;
-    next();
-  } catch (err) {
-    console.warn('auth middleware token error', err.message);
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  } catch (dbErr) {
+    // DB unavailable -- use JWT payload so requests are not blocked by infra issues.
+    console.warn('auth middleware: DB unavailable, using JWT payload fallback', dbErr.message);
+    req.user = {
+      id: payload && (payload.sub || payload.id),
+      email: (payload && payload.email) || '',
+      display_name: (payload && (payload.display_name || payload.email)) || '',
+      role: (payload && payload.role) || 'user',
+      roles: [],
+    };
   }
+  next();
 };

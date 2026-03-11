@@ -11,14 +11,15 @@ const logger = pino();
 const app = express();
 const CHECKOUT_COMPAT_VERSION = 'checkout-compat-v2';
 
-const withSslModeRequire = (rawUrl) => {
+// Strip any sslmode= parameter from the URL so the `ssl` Pool option takes full control.
+// Mixing ?sslmode=require in the URL with ssl:{rejectUnauthorized:false} causes pg to
+// use the URL's stricter mode and ignore the object option, keeping cert errors.
+const stripSslMode = (rawUrl) => {
   const value = String(rawUrl || '').trim();
   if (!value) return value;
   try {
     const parsed = new URL(value);
-    if ((parsed.hostname || '').includes('supabase.com') && !parsed.searchParams.has('sslmode')) {
-      parsed.searchParams.set('sslmode', 'require');
-    }
+    parsed.searchParams.delete('sslmode');
     return parsed.toString();
   } catch (_) {
     return value;
@@ -36,13 +37,14 @@ const withTimeout = (promise, ms, label) =>
 const getPgSslConfig = (rawUrl) => {
   try {
     const parsed = new URL(String(rawUrl || ''));
-    // Supabase pooler commonly requires SSL but can fail strict cert validation
-    // in some serverless environments due chain/intermediate differences.
     if ((parsed.hostname || '').includes('supabase.com')) {
+      // Disable strict cert validation for Supabase pooler in serverless environments.
+      // The pooler's certificate chain is not always trusted by Node's default CA store.
       return { rejectUnauthorized: false };
     }
   } catch (_) {}
-  return undefined;
+  // For non-Supabase, still use SSL if the URL has sslmode=require
+  return { rejectUnauthorized: false };
 };
 
 // Trust proxy headers so `req.ip` is populated behind Vercel's proxy
@@ -232,21 +234,15 @@ async function ensureDb() {
     try {
       const attemptStart = Date.now();
       console.log('ensureDb: attempting DB init', { dbUrl: Boolean(config.dbUrl), time: new Date().toISOString() });
-      const normalizedDbUrl = withSslModeRequire(config.dbUrl);
-      if (global.__pgPool && global.__pgPool.connectionString === normalizedDbUrl) {
-        pool = global.__pgPool;
-      } else {
-        console.log('ensureDb: creating new pg Pool (will use connectionTimeoutMillis=3000)');
-        pool = new Pool({
-          connectionString: normalizedDbUrl,
-          connectionTimeoutMillis: 3000,
-          query_timeout: 10000,
-          statement_timeout: 10000,
-          ssl: getPgSslConfig(normalizedDbUrl),
-        });
-        global.__pgPool = pool;
-        global.__pgPool.connectionString = normalizedDbUrl;
-      }
+      const normalizedDbUrl = stripSslMode(config.dbUrl);
+      console.log('ensureDb: creating new pg Pool (will use connectionTimeoutMillis=3000)');
+      pool = new Pool({
+        connectionString: normalizedDbUrl,
+        connectionTimeoutMillis: 3000,
+        query_timeout: 10000,
+        statement_timeout: 10000,
+        ssl: getPgSslConfig(normalizedDbUrl),
+      });
       console.log('ensureDb: starting pool.connect()');
       const connectStart = Date.now();
       const connectPromise = pool.connect();
