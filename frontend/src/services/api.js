@@ -4,7 +4,10 @@ const isLocalHost =
   typeof window !== 'undefined' &&
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || (isLocalHost ? 'http://localhost:5000/api' : '/api');
+// In production, always use same-origin /api so rewrites control backend routing.
+const API_BASE_URL = isLocalHost
+  ? (process.env.REACT_APP_API_URL || 'http://localhost:5000/api')
+  : '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

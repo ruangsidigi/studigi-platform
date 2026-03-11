@@ -13,7 +13,12 @@ import {
 } from 'lucide-react';
 import '../styles/admin.css';
 
-const API_ROOT = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+const isLocalHost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const API_ROOT = isLocalHost
+  ? (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '')
+  : '';
 const BASE_CATEGORY_NAMES = ['CPNS', 'BUMN', 'TOEFL'];
 const ADMIN_TABS = [
   { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
