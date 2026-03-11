@@ -17,6 +17,9 @@ const schema = Joi.object({
   STORAGE_KEY: Joi.string().allow('').optional(),
   STORAGE_SECRET: Joi.string().allow('').optional(),
   PAYMENT_API_KEY: Joi.string().allow('').optional(),
+  MIDTRANS_SERVER_KEY: Joi.string().allow('').optional(),
+  MIDTRANS_CLIENT_KEY: Joi.string().allow('').optional(),
+  MIDTRANS_IS_PRODUCTION: Joi.boolean().truthy('true').falsy('false').default(false),
   JWT_SECRET: Joi.string().min(8).optional(),
   CDN_URL: Joi.string().uri().allow('').optional(),
   PORT: Joi.number().default(5000)
@@ -39,6 +42,9 @@ module.exports = {
   storageKey: env.STORAGE_KEY || '',
   storageSecret: env.STORAGE_SECRET || '',
   paymentApiKey: env.PAYMENT_API_KEY || '',
+  midtransServerKey: env.MIDTRANS_SERVER_KEY || '',
+  midtransClientKey: env.MIDTRANS_CLIENT_KEY || '',
+  midtransIsProduction: Boolean(env.MIDTRANS_IS_PRODUCTION),
   jwtSecret: env.JWT_SECRET,
   // Provide a harmless default for deployments that haven't had secrets
   // configured yet so the server can start; rotate/set a real secret in

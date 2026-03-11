@@ -96,7 +96,8 @@ Catatan: alamat ini biasanya hanya bisa kirim ke email akun Resend Anda sendiri.
 - `MIDTRANS_SERVER_KEY`
 - `MIDTRANS_CLIENT_KEY`
 - `MIDTRANS_IS_PRODUCTION` = `false` (sandbox) / `true` (live)
-- Di dashboard Midtrans, set Notification URL ke:
+- Sistem backend ini akan mengirim `X-Override-Notification` ke Midtrans secara otomatis saat checkout,
+   jadi jika menu Notification URL tidak muncul di dashboard Midtrans, transaksi tetap bisa mengarah ke:
    - `https://backend-xxx.up.railway.app/api/payments/webhook`
 
 5. Setelah semua variable diisi, klik **Deploy** ulang (redeploy) jika Railway tidak auto-redeploy.
@@ -331,7 +332,7 @@ function doPost(e) {
     - `MAIL_FORCE_APPS_SCRIPT=true`
 8. Redeploy backend Railway.
 
-Webhook Midtrans (Notification URL):
+Webhook Midtrans (otomatis dari backend per transaksi):
 `https://backend-xxx.up.railway.app/api/payments/webhook`
 
 ### Vercel Variables (template)

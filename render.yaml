@@ -1,0 +1,81 @@
+services:
+  - type: web
+    name: studigi-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    autoDeploy: true
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: PG_CONNECTION_STRING
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+      - key: MAIL_TRANSPORT
+        sync: false
+      - key: MAIL_FORCE_RESEND
+        sync: false
+      - key: APPS_SCRIPT_WEBHOOK_URL
+        sync: false
+      - key: APPS_SCRIPT_WEBHOOK_SECRET
+        sync: false
+      - key: MAIL_FORCE_APPS_SCRIPT
+        sync: false
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_BUCKET
+        sync: false
+      - key: STORAGE_KEY
+        sync: false
+      - key: STORAGE_SECRET
+        sync: false
+      - key: CDN_URL
+        sync: false
+      - key: MIDTRANS_SERVER_KEY
+        sync: false
+      - key: MIDTRANS_CLIENT_KEY
+        sync: false
+      - key: MIDTRANS_IS_PRODUCTION
+        sync: false
+      - key: PAYMENT_API_KEY
+        sync: false
+      - key: SYSTEM_PAYMENT_MODE
+        sync: false
+      - key: BULLMQ_ENABLED
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: BULLMQ_QUEUE_NAME
+        sync: false

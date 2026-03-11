@@ -52,8 +52,29 @@ CREATE TABLE IF NOT EXISTS purchases (
   package_id BIGINT NOT NULL REFERENCES packages(id),
   payment_method VARCHAR(50),
   payment_status VARCHAR(50) DEFAULT 'completed',
+  payment_transaction_id BIGINT,
+  payment_reference VARCHAR(120),
   total_price DECIMAL(10, 2) NOT NULL,
+  paid_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  payment_method VARCHAR(50) NOT NULL DEFAULT 'manual_transfer',
+  status VARCHAR(30) NOT NULL DEFAULT 'pending',
+  currency VARCHAR(10) NOT NULL DEFAULT 'IDR',
+  subtotal_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  provider VARCHAR(50),
+  provider_reference VARCHAR(120) UNIQUE,
+  expires_at TIMESTAMP,
+  paid_at TIMESTAMP,
+  metadata JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create tryout_sessions table
@@ -87,6 +108,10 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_questions_package ON questions(package_id);
 CREATE INDEX IF NOT EXISTS idx_purchases_user ON purchases(user_id);
 CREATE INDEX IF NOT EXISTS idx_purchases_package ON purchases(package_id);
+CREATE INDEX IF NOT EXISTS idx_purchases_payment_transaction_id ON purchases(payment_transaction_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_user_id ON payment_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_status ON payment_transactions(status);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_reference ON payment_transactions(provider_reference);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON tryout_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_package ON tryout_sessions(package_id);
 CREATE INDEX IF NOT EXISTS idx_answers_session ON tryout_answers(session_id);

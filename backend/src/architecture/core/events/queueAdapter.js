@@ -146,13 +146,25 @@ class BullQueueAdapter {
 
 const createQueueAdapter = () => {
   const isBullEnabled = String(process.env.BULLMQ_ENABLED || 'false').toLowerCase() === 'true';
+  const isServerless = String(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.RENDER || '').trim() !== '';
+
   if (!isBullEnabled) {
+    if (isServerless) {
+      console.warn(
+        '[WARN] Running on serverless platform (Vercel/Lambda/Render) with in-memory queue adapter. ' +
+        'Background jobs may not persist across function invocations. '
+        + 'Enable BullMQ by setting BULLMQ_ENABLED=true and REDIS_URL for production use.'
+      );
+    }
     return new InMemoryQueueAdapter();
   }
 
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
-    console.warn('BULLMQ_ENABLED=true but REDIS_URL is missing. Falling back to InMemoryQueueAdapter.');
+    console.warn(
+      'BULLMQ_ENABLED=true but REDIS_URL is missing. Falling back to InMemoryQueueAdapter. '
+      + 'On serverless, this means background jobs may be lost. Set REDIS_URL to a Redis instance.'
+    );
     return new InMemoryQueueAdapter();
   }
 
@@ -163,7 +175,10 @@ const createQueueAdapter = () => {
     console.log(`Queue adapter: BullMQ (${queueName})`);
     return new BullQueueAdapter({ queueName, redisUrl, Queue, Worker, IORedis });
   } catch (error) {
-    console.warn(`BullMQ dependencies unavailable (${error.message}). Falling back to InMemoryQueueAdapter.`);
+    console.warn(
+      `BullMQ dependencies unavailable (${error.message}). Falling back to InMemoryQueueAdapter. ` +
+      `${isServerless ? '[WARNING] Background jobs may be lost on serverless.' : ''}`
+    );
     return new InMemoryQueueAdapter();
   }
 };

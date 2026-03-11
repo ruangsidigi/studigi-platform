@@ -53,36 +53,10 @@ const uploadToSupabase = async (fileBuffer, filename, bucket, folder) => {
 };
 
 /**
- * Upload to local filesystem (backup/fallback)
- * @param {Buffer} fileBuffer - File buffer
- * @param {string} filename - Original filename
- * @param {string} folder - Folder path (e.g., 'materials', 'excel')
- * @returns {Promise<string>} - File path
+ * NOTE: Local filesystem fallback has been removed.
+ * All uploads MUST use cloud storage (Supabase).
+ * This is required for serverless deployment (Vercel) where /tmp is ephemeral.
  */
-const uploadToLocalStorage = async (fileBuffer, filename, folder) => {
-  try {
-    const storageDir = path.resolve(__dirname, '../../storage', folder);
-    
-    // Create directory if not exists
-    if (!fs.existsSync(storageDir)) {
-      fs.mkdirSync(storageDir, { recursive: true });
-    }
-
-    // Generate unique filename
-    const timestamp = Date.now();
-    const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const uniqueFilename = `${timestamp}_${sanitizedFilename}`;
-    const filePath = path.join(storageDir, uniqueFilename);
-
-    // Write file
-    fs.writeFileSync(filePath, fileBuffer);
-
-    // Return relative path for storage
-    return `/storage/${folder}/${uniqueFilename}`;
-  } catch (error) {
-    throw new Error(`Local storage error: ${error.message}`);
-  }
-};
 
 /**
  * Upload PDF file
@@ -106,21 +80,8 @@ const uploadPDF = async (file, filename, packageName) => {
       throw new Error(`File size exceeds 50MB limit. Got ${(fileBuffer.length / 1024 / 1024).toFixed(2)}MB`);
     }
 
-    // Try Supabase first
-    try {
-      return await uploadToSupabase(fileBuffer, filename, 'materials', 'pdf');
-    } catch (supabaseError) {
-      console.warn('Supabase upload failed, trying local storage:', supabaseError.message);
-      
-      // Fallback to local storage
-      const localPath = await uploadToLocalStorage(fileBuffer, filename, 'materials');
-      return {
-        path: localPath,
-        url: localPath,
-        publicUrl: `http://localhost:5000${localPath}`,
-        bucket: 'local',
-      };
-    }
+    // Use Supabase only (no local fallback for serverless safety)
+    return await uploadToSupabase(fileBuffer, filename, 'materials', 'pdf');
   } catch (error) {
     throw error;
   }
@@ -152,21 +113,8 @@ const uploadExcel = async (file, filename) => {
       throw new Error(`File size exceeds 10MB limit. Got ${(fileBuffer.length / 1024 / 1024).toFixed(2)}MB`);
     }
 
-    // Try Supabase first
-    try {
-      return await uploadToSupabase(fileBuffer, filename, 'excel-uploads', 'questions');
-    } catch (supabaseError) {
-      console.warn('Supabase upload failed, trying local storage:', supabaseError.message);
-      
-      // Fallback to local storage
-      const localPath = await uploadToLocalStorage(fileBuffer, filename, 'excel');
-      return {
-        path: localPath,
-        url: localPath,
-        publicUrl: `http://localhost:5000${localPath}`,
-        bucket: 'local',
-      };
-    }
+    // Use Supabase only (no local fallback for serverless safety)
+    return await uploadToSupabase(fileBuffer, filename, 'excel-uploads', 'questions');
   } catch (error) {
     throw error;
   }
@@ -174,7 +122,6 @@ const uploadExcel = async (file, filename) => {
 
 module.exports = {
   uploadToSupabase,
-  uploadToLocalStorage,
   uploadPDF,
   uploadExcel,
 };

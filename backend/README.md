@@ -86,8 +86,30 @@ CREATE TABLE purchases (
   package_id INTEGER REFERENCES packages(id),
   payment_method VARCHAR(50),
   payment_status VARCHAR(50) DEFAULT 'pending',
+  payment_transaction_id BIGINT,
+  payment_reference VARCHAR(120),
   total_price INTEGER,
+  paid_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Payment transactions table
+CREATE TABLE payment_transactions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  payment_method VARCHAR(50) DEFAULT 'manual_transfer',
+  status VARCHAR(30) DEFAULT 'pending',
+  currency VARCHAR(10) DEFAULT 'IDR',
+  subtotal_amount NUMERIC(12,2) DEFAULT 0,
+  discount_amount NUMERIC(12,2) DEFAULT 0,
+  total_amount NUMERIC(12,2) DEFAULT 0,
+  provider VARCHAR(50),
+  provider_reference VARCHAR(120) UNIQUE,
+  expires_at TIMESTAMP,
+  paid_at TIMESTAMP,
+  metadata JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tryout sessions table
@@ -139,6 +161,16 @@ npm run smtp:test
 npm run auth:flow:test
 ```
 
+### Smoke test Home/Dashboard/Login flow (frontend harus sudah running):
+```bash
+npm run smoke:home-flow
+```
+
+Jika frontend berjalan di URL selain default, kirim URL sebagai argumen:
+```bash
+node scripts/smoke_home_dashboard_flow.js http://127.0.0.1:3001
+```
+
 Untuk test ke backend deploy (Railway/Vercel), set base URL dulu:
 ```bash
 AUTH_TEST_BASE_URL=https://your-backend-domain/api npm run auth:flow:test
@@ -178,8 +210,14 @@ Server akan berjalan di `http://localhost:5000`
 
 ### Purchases
 - `GET /api/purchases` - Get user purchases
-- `POST /api/purchases` - Create purchase
+- `POST /api/purchases` - Deprecated (gunakan `/api/payments/checkout`)
 - `GET /api/purchases/admin/all` - Get all purchases (admin)
+
+### Payments
+- `POST /api/payments/checkout` - Create payment transaction + pending purchases
+- `GET /api/payments/:id` - Get payment detail and purchased packages
+- `POST /api/payments/:id/confirm` - Confirm/simulate payment status update
+- `POST /api/payments/webhook` - Provider callback to update payment status
 
 ### Users
 - `GET /api/users/profile` - Get user profile
@@ -199,5 +237,6 @@ Server akan berjalan di `http://localhost:5000`
 - ✅ Tryout sessions with timer support
 - ✅ Scoring system (TWK, TIU, TKP separate)
 - ✅ Purchase tracking
+- ✅ Payment transactions (pending → paid/failed)
 - ✅ Admin dashboard
 - ✅ Password reset functionality

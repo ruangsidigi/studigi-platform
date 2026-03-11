@@ -499,21 +499,40 @@ router.post('/payments/webhook', async (req, res) => {
 
     await db.query('BEGIN');
 
+    // Check if payment already processed (idempotency check)
+    const existingPaymentResult = await db.query(
+      `SELECT id, status FROM payment_transactions WHERE provider_reference = $1 FOR UPDATE`,
+      [reference]
+    );
+
+    const existingPayment = existingPaymentResult.rows[0];
+    if (!existingPayment) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    const currentStatus = normalizeStatus(existingPayment.status);
+    const newStatus = normalizeStatus(rawStatus);
+
+    // Idempotency: if already in final state (paid/failed/expired), return success without re-updating
+    if (['paid', 'success', 'completed', 'failed', 'expired', 'cancelled'].includes(currentStatus)) {
+      if (currentStatus === newStatus) {
+        await db.query('ROLLBACK');
+        return res.status(200).json({ message: 'Webhook already processed (idempotent)', payment_id: existingPayment.id });
+      }
+    }
+
     const paymentResult = await db.query(
       `UPDATE payment_transactions
        SET status = $1,
            paid_at = CASE WHEN $1 IN ('paid', 'success', 'completed') THEN NOW() ELSE paid_at END,
            updated_at = NOW()
-       WHERE provider_reference = $2
+       WHERE id = $2
        RETURNING *`,
-      [rawStatus, reference]
+      [rawStatus, existingPayment.id]
     );
 
     const payment = paymentResult.rows[0];
-    if (!payment) {
-      await db.query('ROLLBACK');
-      return res.status(404).json({ error: 'Payment not found' });
-    }
 
     await db.query(
       `UPDATE purchases
