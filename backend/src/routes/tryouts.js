@@ -14,6 +14,65 @@ const isAdminUser = (user) => {
   return role === 'admin' || email === adminEmail;
 };
 
+const getAccessiblePackageIds = async (userId) => {
+  const accessible = new Set();
+
+  const { data: purchases, error: purchasesError } = await supabase
+    .from('purchases')
+    .select('package_id')
+    .eq('user_id', userId);
+
+  if (purchasesError) {
+    throw new Error(purchasesError.message);
+  }
+
+  for (const row of purchases || []) {
+    const packageId = Number(row?.package_id);
+    if (Number.isInteger(packageId) && packageId > 0) {
+      accessible.add(packageId);
+    }
+  }
+
+  if (!accessible.size) return accessible;
+
+  const ownedPackageIds = [...accessible];
+
+  // Include children from bundle_packages mapping table.
+  const { data: bundleLinks, error: bundleLinkError } = await supabase
+    .from('bundle_packages')
+    .select('bundle_id, package_id')
+    .in('bundle_id', ownedPackageIds);
+
+  if (!bundleLinkError) {
+    for (const link of bundleLinks || []) {
+      const childId = Number(link?.package_id);
+      if (Number.isInteger(childId) && childId > 0) {
+        accessible.add(childId);
+      }
+    }
+  }
+
+  // Fallback for deployments that store bundle children in included_package_ids.
+  const { data: ownedPackages, error: ownedPackagesError } = await supabase
+    .from('packages')
+    .select('id, included_package_ids')
+    .in('id', ownedPackageIds);
+
+  if (!ownedPackagesError) {
+    for (const pkg of ownedPackages || []) {
+      const included = Array.isArray(pkg?.included_package_ids) ? pkg.included_package_ids : [];
+      for (const id of included) {
+        const childId = Number(id);
+        if (Number.isInteger(childId) && childId > 0) {
+          accessible.add(childId);
+        }
+      }
+    }
+  }
+
+  return accessible;
+};
+
 // Start a tryout session
 router.post('/start', authenticateToken, async (req, res) => {
   try {
@@ -25,14 +84,9 @@ router.post('/start', authenticateToken, async (req, res) => {
     }
 
     if (!isAdminUser(req.user)) {
-      const { data: purchase } = await supabase
-        .from('purchases')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('package_id', packageId)
-        .single();
-
-      if (!purchase) {
+      const accessiblePackageIds = await getAccessiblePackageIds(userId);
+      const normalizedPackageId = Number(packageId);
+      if (!Number.isInteger(normalizedPackageId) || !accessiblePackageIds.has(normalizedPackageId)) {
         return res.status(403).json({ error: 'User does not have access to this package' });
       }
     }
