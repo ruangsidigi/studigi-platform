@@ -1,13 +1,7 @@
 const express = require('express');
+const axios = require('axios');
 const crypto = require('crypto');
 const config = require('../../shared/config');
-
-let midtransClient = null;
-try {
-  midtransClient = require('midtrans-client');
-} catch (_) {
-  midtransClient = null;
-}
 
 const router = express.Router();
 
@@ -48,19 +42,50 @@ const mapPaymentStatusToPurchaseStatus = (status) => {
 
 const createPaymentReference = () => `PAY-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
-let snapClient;
-const getSnapClient = () => {
-  if (!midtransClient) return null;
-  if (!config.midtransServerKey) return null;
-  if (snapClient) return snapClient;
+const getSnapEndpoint = () =>
+  config.midtransIsProduction
+    ? 'https://app.midtrans.com/snap/v1/transactions'
+    : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
 
-  snapClient = new midtransClient.Snap({
-    isProduction: Boolean(config.midtransIsProduction),
-    serverKey: config.midtransServerKey,
-    clientKey: config.midtransClientKey || undefined,
-  });
+const getBasicAuthHeader = () =>
+  `Basic ${Buffer.from(`${config.midtransServerKey}:`).toString('base64')}`;
 
-  return snapClient;
+const getBackendBaseUrl = (req) => {
+  const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+  const protocol = forwardedProto || req.protocol || 'https';
+  const host = req.get('host');
+  if (!host) return '';
+  return `${protocol}://${host}`.replace(/\/$/, '');
+};
+
+const getNotificationUrl = (req) => {
+  const backendBaseUrl = getBackendBaseUrl(req);
+  if (!backendBaseUrl) return '';
+  return `${backendBaseUrl}/api/payments/webhook`;
+};
+
+const createSnapTransaction = async ({ payload, notificationUrl }) => {
+  const headers = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    Authorization: getBasicAuthHeader(),
+  };
+
+  if (notificationUrl) {
+    headers['X-Override-Notification'] = notificationUrl;
+  }
+
+  const response = await axios.post(getSnapEndpoint(), payload, { headers, timeout: 30000 });
+  return response.data;
+};
+
+const extractProviderError = (error) => {
+  const providerMessage =
+    error?.response?.data?.error_messages?.[0] ||
+    error?.response?.data?.status_message ||
+    error?.response?.data?.message ||
+    error?.message;
+  return String(providerMessage || 'Payment provider error');
 };
 
 const mapMidtransStatusToPaymentStatus = (transactionStatus, fraudStatus) => {
@@ -141,8 +166,7 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
   const db = req.app.locals.db;
 
   try {
-    const snap = getSnapClient();
-    const useMidtrans = Boolean(snap);
+    const useMidtrans = Boolean(config.midtransServerKey);
 
     await ensurePaymentSchema(db);
     const {
@@ -153,7 +177,16 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
       termsAcceptedAt = null,
       termsVersion = 'unknown',
     } = req.body || {};
-    const effectivePaymentMethod = useMidtrans ? paymentMethod : 'manual_transfer';
+
+    const requestedMethod = String(paymentMethod || 'midtrans').toLowerCase();
+    if (requestedMethod === 'midtrans' && !useMidtrans) {
+      return res.status(500).json({
+        error:
+          'Midtrans belum aktif di backend. Pastikan MIDTRANS_SERVER_KEY, MIDTRANS_CLIENT_KEY, dan MIDTRANS_IS_PRODUCTION sudah terisi di Railway lalu redeploy.',
+      });
+    }
+
+    const effectivePaymentMethod = paymentMethod;
     const normalizedPackageIds = normalizePackageIds(packageIds);
 
     if (termsAccepted !== true) {
@@ -191,6 +224,7 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
     const customerName = String(req.user.display_name || req.user.name || req.user.email || 'User').trim() || 'User';
     const grossAmount = Math.max(1, Math.round(totalAmount));
     const callbackUrls = getPaymentCallbackUrls();
+    const notificationUrl = getNotificationUrl(req);
 
     await db.query('BEGIN');
 
@@ -265,7 +299,10 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
         },
       };
 
-      snapResponse = await snap.createTransaction(transactionPayload);
+      snapResponse = await createSnapTransaction({
+        payload: transactionPayload,
+        notificationUrl,
+      });
 
       await db.query(
         `UPDATE payment_transactions
@@ -276,6 +313,7 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
           JSON.stringify({
             snap_token: snapResponse?.token || null,
             payment_url: snapResponse?.redirect_url || null,
+            notification_url: notificationUrl || null,
           }),
           transaction.id,
         ]
@@ -305,7 +343,7 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
     try {
       await db.query('ROLLBACK');
     } catch (_) {}
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: extractProviderError(error) });
   }
 });
 
