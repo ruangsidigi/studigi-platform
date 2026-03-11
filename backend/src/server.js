@@ -33,6 +33,18 @@ const withTimeout = (promise, ms, label) =>
     ),
   ]);
 
+const getPgSslConfig = (rawUrl) => {
+  try {
+    const parsed = new URL(String(rawUrl || ''));
+    // Supabase pooler commonly requires SSL but can fail strict cert validation
+    // in some serverless environments due chain/intermediate differences.
+    if ((parsed.hostname || '').includes('supabase.com')) {
+      return { rejectUnauthorized: false };
+    }
+  } catch (_) {}
+  return undefined;
+};
+
 // Trust proxy headers so `req.ip` is populated behind Vercel's proxy
 app.set('trust proxy', true);
 
@@ -230,6 +242,7 @@ async function ensureDb() {
           connectionTimeoutMillis: 3000,
           query_timeout: 10000,
           statement_timeout: 10000,
+          ssl: getPgSslConfig(normalizedDbUrl),
         });
         global.__pgPool = pool;
         global.__pgPool.connectionString = normalizedDbUrl;
