@@ -9,6 +9,8 @@ export default function Payment() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [modalTermsAccepted, setModalTermsAccepted] = useState(false);
 
   useEffect(() => {
     try {
@@ -21,7 +23,7 @@ export default function Payment() {
 
   const totalPrice = cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0);
 
-  const handlePayMidtrans = async () => {
+  const processPayment = async () => {
     if (cartItems.length === 0) {
       setError('Cart masih kosong.');
       return;
@@ -61,6 +63,29 @@ export default function Payment() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePayMidtrans = () => {
+    if (cartItems.length === 0) {
+      setError('Cart masih kosong.');
+      return;
+    }
+
+    if (!termsAccepted) {
+      setError('');
+      setModalTermsAccepted(false);
+      setShowTermsModal(true);
+      return;
+    }
+
+    processPayment();
+  };
+
+  const handleConfirmTerms = async () => {
+    if (!modalTermsAccepted) return;
+    setTermsAccepted(true);
+    setShowTermsModal(false);
+    await processPayment();
   };
 
   return (
@@ -109,15 +134,17 @@ export default function Payment() {
 
             {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
 
-            <label className="mt-3 flex items-start gap-2 text-sm text-[var(--secondary-color,#69655e)]">
-              <input
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(event) => setTermsAccepted(event.target.checked)}
-                className="mt-1"
-              />
-              <span>Saya menyetujui syarat & ketentuan pembelian paket.</span>
-            </label>
+            <button
+              type="button"
+              onClick={() => setShowTermsModal(true)}
+              className="mt-3 text-sm font-medium text-[var(--header-color,#103c21)] underline"
+            >
+              Lihat syarat & ketentuan pembelian paket
+            </button>
+
+            {termsAccepted && (
+              <p className="mt-2 text-sm text-emerald-700">Syarat & ketentuan sudah disetujui.</p>
+            )}
 
             <button
               type="button"
@@ -130,6 +157,77 @@ export default function Payment() {
           </>
         )}
       </section>
+
+      {showTermsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Syarat & Ketentuan Pembelian Paket</h3>
+                <p className="mt-1 text-sm text-[var(--secondary-color,#69655e)]">
+                  Baca dan setujui ketentuan berikut sebelum melanjutkan pembayaran.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100"
+                aria-label="Tutup"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-4 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3 text-sm text-slate-700">
+              <p>1. Paket yang sudah dibeli tidak dapat dibatalkan atau diuangkan kembali.</p>
+              <p>2. Akses paket aktif otomatis setelah pembayaran dikonfirmasi oleh sistem Midtrans.</p>
+              <p>3. Akun dan akses paket tidak boleh dipindahkan atau dibagikan ke pihak lain.</p>
+              <p>4. Jika terjadi kendala teknis pembayaran, pengguna wajib menyimpan bukti transaksi.</p>
+              <p>5. Dengan melanjutkan pembayaran, pengguna dianggap menyetujui seluruh ketentuan yang berlaku.</p>
+              <p>
+                Dokumen lengkap dapat dilihat di{' '}
+                <a
+                  href="/terms-and-conditions.pdf"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-[var(--header-color,#103c21)] underline"
+                >
+                  Terms & Conditions (PDF)
+                </a>
+                .
+              </p>
+            </div>
+
+            <label className="mt-4 flex items-start gap-2 text-sm text-[var(--secondary-color,#69655e)]">
+              <input
+                type="checkbox"
+                checked={modalTermsAccepted}
+                onChange={(event) => setModalTermsAccepted(event.target.checked)}
+                className="mt-1"
+              />
+              <span>Saya sudah membaca dan menyetujui syarat & ketentuan pembelian paket.</span>
+            </label>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmTerms}
+                disabled={!modalTermsAccepted || loading}
+                className="rounded-xl bg-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {loading ? 'Memproses...' : 'Setuju & Lanjutkan Pembayaran'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
