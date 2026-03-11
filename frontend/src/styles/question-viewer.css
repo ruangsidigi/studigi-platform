@@ -30,7 +30,7 @@
 
 .question-category-badge {
   display: inline-block;
-  background: #1d7a7a;
+  background: var(--header-color, #103c21);
   color: white;
   padding: 4px 12px;
   border-radius: 999px;
@@ -59,13 +59,13 @@
 }
 
 .bookmark-button:hover {
-  border-color: #2196f3;
-  background: #e3f2fd;
+  border-color: var(--header-color, #103c21);
+  background: #ecfdf3;
 }
 
 .bookmark-button.bookmarked {
-  background: #2196f3;
-  border-color: #2196f3;
+  background: var(--header-color, #103c21);
+  border-color: var(--header-color, #103c21);
 }
 
 /* Status Indicator */
@@ -188,14 +188,14 @@
   justify-content: center;
   min-width: 40px;
   height: 40px;
-  background: rgba(29, 122, 122, 0.1);
+  background: rgba(16, 60, 33, 0.1);
   border-radius: 6px;
 }
 
 .option-label {
   font-weight: 700;
   font-size: 16px;
-  color: #1d7a7a;
+  color: var(--header-color, #103c21);
 }
 
 .option-item.option-user-correct .option-label-box {
@@ -248,7 +248,7 @@
 }
 
 .option-user-badge {
-  background: #2196f3;
+  background: var(--header-color, #103c21);
   color: white;
 }
 
