@@ -11,6 +11,28 @@ const logger = pino();
 const app = express();
 const CHECKOUT_COMPAT_VERSION = 'checkout-compat-v2';
 
+const withSslModeRequire = (rawUrl) => {
+  const value = String(rawUrl || '').trim();
+  if (!value) return value;
+  try {
+    const parsed = new URL(value);
+    if ((parsed.hostname || '').includes('supabase.com') && !parsed.searchParams.has('sslmode')) {
+      parsed.searchParams.set('sslmode', 'require');
+    }
+    return parsed.toString();
+  } catch (_) {
+    return value;
+  }
+};
+
+const withTimeout = (promise, ms, label) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label || 'operation'} timeout after ${ms}ms`)), ms)
+    ),
+  ]);
+
 // Trust proxy headers so `req.ip` is populated behind Vercel's proxy
 app.set('trust proxy', true);
 
@@ -173,13 +195,19 @@ async function ensureDb() {
     try {
       const attemptStart = Date.now();
       console.log('ensureDb: attempting DB init', { dbUrl: Boolean(config.dbUrl), time: new Date().toISOString() });
-      if (global.__pgPool && global.__pgPool.connectionString === config.dbUrl) {
+      const normalizedDbUrl = withSslModeRequire(config.dbUrl);
+      if (global.__pgPool && global.__pgPool.connectionString === normalizedDbUrl) {
         pool = global.__pgPool;
       } else {
         console.log('ensureDb: creating new pg Pool (will use connectionTimeoutMillis=3000)');
-        pool = new Pool({ connectionString: config.dbUrl, connectionTimeoutMillis: 3000 });
+        pool = new Pool({
+          connectionString: normalizedDbUrl,
+          connectionTimeoutMillis: 3000,
+          query_timeout: 10000,
+          statement_timeout: 10000,
+        });
         global.__pgPool = pool;
-        global.__pgPool.connectionString = config.dbUrl;
+        global.__pgPool.connectionString = normalizedDbUrl;
       }
       console.log('ensureDb: starting pool.connect()');
       const connectStart = Date.now();
@@ -189,7 +217,9 @@ async function ensureDb() {
       const connectElapsed = Date.now() - connectStart;
       console.log('ensureDb: pool.connect() succeeded', { connectElapsed });
       client.release();
-      app.locals.db = { query: (...args) => pool.query(...args) };
+      app.locals.db = {
+        query: (...args) => withTimeout(pool.query(...args), 12000, 'db query'),
+      };
       const elapsed = Date.now() - attemptStart;
       console.info('Connected to database', { elapsed });
       app.locals._dbErrorMessage = null;
