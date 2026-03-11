@@ -97,6 +97,31 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Vercel may invoke serverless handlers with rewritten '/' URLs.
+// Recover the intended API path from forwarded headers before routing.
+app.use((req, _res, next) => {
+  try {
+    if (req.url === '/' || req.url === '') {
+      const candidates = [
+        req.headers['x-vercel-original-url'],
+        req.headers['x-now-route'],
+        req.headers['x-matched-path'],
+        req.headers['x-forwarded-uri'],
+        req.originalUrl,
+      ]
+        .map((value) => String(value || '').trim())
+        .filter(Boolean);
+
+      const chosen = candidates.find((value) => value.startsWith('/api/')) || candidates.find((value) => value.startsWith('/'));
+      if (chosen) {
+        req.url = chosen;
+        req.originalUrl = chosen;
+      }
+    }
+  } catch (_) {}
+  next();
+});
+
 // Compatibility shim for mixed frontend/backend versions in production.
 // Some legacy handlers require `bundle_id` while newer clients send `packageIds`.
 app.use((req, _res, next) => {
@@ -151,7 +176,7 @@ app.use((req, _res, next) => {
 app.use((req, res, next) => {
   try {
     const size = req.rawBody ? req.rawBody.length : (req.body ? JSON.stringify(req.body).length : 0);
-    logger.info({ method: req.method, url: req.url, bodySize: size }, 'incoming request');
+    logger.info({ method: req.method, url: req.url, originalUrl: req.originalUrl, bodySize: size }, 'incoming request');
   } catch (e) {
     logger.warn({ err: e }, 'failed to log request');
   }
