@@ -12,6 +12,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import '../styles/admin.css';
+import { formatRupiah, getOriginalPrice } from '../utils/pricing';
 
 const isLocalHost =
   typeof window !== 'undefined' &&
@@ -43,7 +44,7 @@ const AdminDashboard = () => {
   const [message, setMessage] = useState('');
 
   // Form states
-  const [newPackage, setNewPackage] = useState({ name: '', description: '', type: 'tryout', price: 0, question_count: 0, category_id: '', included_package_ids: [] });
+  const [newPackage, setNewPackage] = useState({ name: '', description: '', type: 'tryout', price: 0, original_price: '', question_count: 0, category_id: '', included_package_ids: [] });
   const [otherCategoryName, setOtherCategoryName] = useState('');
   const [selectedPackageForUpload, setSelectedPackageForUpload] = useState('');
   const [excelFile, setExcelFile] = useState(null);
@@ -134,7 +135,7 @@ const AdminDashboard = () => {
 
       await packageService.create(payload);
       setMessage('Package created successfully');
-      setNewPackage({ name: '', description: '', type: 'tryout', price: 0, question_count: 0, category_id: '', included_package_ids: [] });
+      setNewPackage({ name: '', description: '', type: 'tryout', price: 0, original_price: '', question_count: 0, category_id: '', included_package_ids: [] });
       setOtherCategoryName('');
       loadDashboardData();
     } catch (err) {
@@ -468,6 +469,16 @@ const AdminDashboard = () => {
                     />
                   </div>
                   <div className="form-group">
+                    <label>Harga Coret (Opsional)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newPackage.original_price}
+                      onChange={(e) => setNewPackage({ ...newPackage, original_price: e.target.value })}
+                      placeholder="Contoh: 50000"
+                    />
+                  </div>
+                  <div className="form-group">
                     <label>Jumlah Soal</label>
                     <input
                       type="number"
@@ -518,7 +529,18 @@ const AdminDashboard = () => {
                       <td>{pkg.name}</td>
                       <td>{categories.find((c)=>c.id===pkg.category_id)?.name || '-'}</td>
                       <td>{pkg.type}</td>
-                      <td>Rp {pkg.price?.toLocaleString('id-ID') || 0}</td>
+                      <td>
+                        {getOriginalPrice(pkg) ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ color: '#94a3b8', fontSize: 12, textDecoration: 'line-through' }}>
+                              {formatRupiah(getOriginalPrice(pkg))}
+                            </span>
+                            <span>{formatRupiah(pkg.price)}</span>
+                          </div>
+                        ) : (
+                          formatRupiah(pkg.price)
+                        )}
+                      </td>
                       <td>{pkg.question_count || 0}</td>
                       <td>
                         <button

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { bundleService, materialService, purchaseService } from '../services/api';
 import '../styles/dashboard.css';
+import { formatRupiah, getOriginalPrice } from '../utils/pricing';
 
 const BundleDetail = () => {
   const { bundleId } = useParams();
@@ -59,6 +60,7 @@ const BundleDetail = () => {
 
   const bundle = bundleDetail?.bundle;
   const packages = bundleDetail?.packages || [];
+  const bundleOriginalPrice = getOriginalPrice(bundle);
 
   return (
     <div className="container">
@@ -78,7 +80,12 @@ const BundleDetail = () => {
         </div>
         <div className="bundle-hero-price">
           <div className="bundle-hero-label">Harga</div>
-          <div className="bundle-hero-value">Rp {(bundle?.price || 0).toLocaleString('id-ID')}</div>
+          {bundleOriginalPrice ? (
+            <div className="text-muted" style={{ fontSize: 14, textDecoration: 'line-through' }}>
+              {formatRupiah(bundleOriginalPrice)}
+            </div>
+          ) : null}
+          <div className="bundle-hero-value">{formatRupiah(bundle?.price || 0)}</div>
           <div className="bundle-hero-meta">{packages.length} paket di dalamnya</div>
         </div>
       </div>
@@ -102,7 +109,14 @@ const BundleDetail = () => {
                   <p className="package-desc">{pkg.description || 'Paket latihan dan tryout terbaik.'}</p>
                   <div className="package-info">
                     <span>{pkg.question_count || 0} soal</span>
-                    <span className="package-price">Rp {(pkg.price || 0).toLocaleString('id-ID')}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                      {getOriginalPrice(pkg) ? (
+                        <span className="text-muted" style={{ fontSize: 12, textDecoration: 'line-through' }}>
+                          {formatRupiah(getOriginalPrice(pkg))}
+                        </span>
+                      ) : null}
+                      <span className="package-price">{formatRupiah(pkg.price)}</span>
+                    </div>
                   </div>
                   {owned ? (
                     <button

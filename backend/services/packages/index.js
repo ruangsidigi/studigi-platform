@@ -68,6 +68,21 @@ const normalizeIncludedPackageIds = (rawValue) => {
   return JSON.stringify([]);
 };
 
+const normalizeOriginalPrice = (originalPrice, price) => {
+  if (originalPrice === undefined || originalPrice === null || originalPrice === '') {
+    return null;
+  }
+
+  const normalizedOriginalPrice = Number(originalPrice);
+  const normalizedPrice = Number(price || 0);
+
+  if (!Number.isFinite(normalizedOriginalPrice) || normalizedOriginalPrice <= normalizedPrice) {
+    return null;
+  }
+
+  return normalizedOriginalPrice;
+};
+
 router.get('/packages', async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -98,6 +113,7 @@ router.post('/packages', requireAdmin, async (req, res) => {
       description = '',
       type = 'tryout',
       price = 0,
+      original_price = null,
       question_count = 0,
       category_id = null,
       included_package_ids = [],
@@ -105,15 +121,19 @@ router.post('/packages', requireAdmin, async (req, res) => {
 
     if (!name) return res.status(400).json({ error: 'name is required' });
 
+    const normalizedPrice = Number(price || 0);
+    const normalizedOriginalPrice = normalizeOriginalPrice(original_price, normalizedPrice);
+
     const result = await db.query(
-      `INSERT INTO packages (name, description, type, price, question_count, category_id, included_package_ids, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      `INSERT INTO packages (name, description, type, price, original_price, question_count, category_id, included_package_ids, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
        RETURNING *`,
       [
         name,
         description,
         type,
-        Number(price || 0),
+        normalizedPrice,
+        normalizedOriginalPrice,
         Number(question_count || 0),
         category_id || null,
         normalizeIncludedPackageIds(included_package_ids),
@@ -135,10 +155,18 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
       description,
       type,
       price,
+      original_price,
       question_count,
       category_id,
       included_package_ids,
     } = req.body || {};
+
+    const normalizedPrice = price !== undefined ? Number(price) : null;
+    const shouldUpdateOriginalPrice = original_price !== undefined;
+    const normalizedOriginalPrice =
+      shouldUpdateOriginalPrice
+        ? normalizeOriginalPrice(original_price, price !== undefined ? normalizedPrice : 0)
+        : undefined;
 
     const result = await db.query(
       `UPDATE packages
@@ -147,17 +175,20 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
          description = COALESCE($2, description),
          type = COALESCE($3, type),
          price = COALESCE($4, price),
-         question_count = COALESCE($5, question_count),
-         category_id = COALESCE($6, category_id),
-         included_package_ids = COALESCE($7, included_package_ids),
+         original_price = CASE WHEN $5::boolean THEN $6::numeric ELSE original_price END,
+         question_count = COALESCE($7, question_count),
+         category_id = COALESCE($8, category_id),
+         included_package_ids = COALESCE($9, included_package_ids),
          updated_at = NOW()
-       WHERE id = $8
+       WHERE id = $10
        RETURNING *`,
       [
         name ?? null,
         description ?? null,
         type ?? null,
-        price !== undefined ? Number(price) : null,
+        normalizedPrice,
+        shouldUpdateOriginalPrice,
+        normalizedOriginalPrice !== undefined ? normalizedOriginalPrice : null,
         question_count !== undefined ? Number(question_count) : null,
         category_id ?? null,
         included_package_ids !== undefined ? normalizeIncludedPackageIds(included_package_ids) : null,

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS packages (
   description TEXT,
   type VARCHAR(50) NOT NULL,
   price DECIMAL(10, 2) NOT NULL,
+  original_price DECIMAL(10, 2),
   question_count INT DEFAULT 100,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

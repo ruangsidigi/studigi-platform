@@ -17,7 +17,7 @@ router.get('/with-packages', async (req, res) => {
 
     const { data: packages, error: packageError } = await supabase
       .from('packages')
-      .select('id, name, type, price, question_count, category_id, included_package_ids')
+      .select('id, name, type, price, original_price, question_count, category_id, included_package_ids')
       .order('created_at', { ascending: false });
 
     if (packageError) return res.status(400).json({ error: packageError.message });
@@ -95,7 +95,7 @@ router.get('/:id/packages', async (req, res) => {
 
     const packageQuery = supabase
       .from('packages')
-      .select('id, name, description, type, price, question_count, category_id, included_package_ids, created_at')
+      .select('id, name, description, type, price, original_price, question_count, category_id, included_package_ids, created_at')
       .order('created_at', { ascending: false });
 
     const { data: packages, error: packageError } = id === 'uncategorized'

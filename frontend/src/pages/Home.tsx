@@ -4,6 +4,7 @@ import { Clock3, FileText, ShoppingCart } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import { categoryService, packageService, purchaseService } from '../services/api';
 import CartWidget, { CartItem } from '../components/CartWidget.tsx';
+import { formatRupiah, getOriginalPrice } from '../utils/pricing';
 
 const CATEGORY_TABS = ['CPNS', 'PPPK', 'BUMN', 'TOEFL', 'Lainnya'] as const;
 
@@ -209,9 +210,16 @@ export default function Home() {
                 <article key={pkg.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">{categoryLabel}</span>
-                    <span className="text-sm font-semibold text-[var(--header-color,#103c21)]">
-                      Rp {Number(pkg.price || 0).toLocaleString('id-ID')}
-                    </span>
+                    <div className="flex flex-col items-end gap-1 text-right">
+                      {getOriginalPrice(pkg) ? (
+                        <span className="text-xs text-slate-400 line-through">
+                          {formatRupiah(getOriginalPrice(pkg))}
+                        </span>
+                      ) : null}
+                      <span className="text-sm font-semibold text-[var(--header-color,#103c21)]">
+                        {formatRupiah(pkg.price)}
+                      </span>
+                    </div>
                   </div>
 
                   <h3 className="text-base font-semibold text-slate-900">{pkg.name}</h3>

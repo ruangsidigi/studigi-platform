@@ -62,7 +62,7 @@ const getBundlePackages = async (bundleId) => {
   const packageIds = mappings.map((m) => m.package_id);
   const { data: packages, error: packagesError } = await supabase
     .from('packages')
-    .select('id, name, description, type, price, question_count, category_id')
+    .select('id, name, description, type, price, original_price, question_count, category_id')
     .in('id', packageIds);
 
   if (packagesError) {
@@ -82,7 +82,7 @@ const getBundlePackages = async (bundleId) => {
 const getBundleDetail = async (bundleId) => {
   const { data: bundle, error: bundleError } = await supabase
     .from('packages')
-    .select('id, name, description, type, price, question_count, category_id, included_package_ids')
+    .select('id, name, description, type, price, original_price, question_count, category_id, included_package_ids')
     .eq('id', bundleId)
     .single();
 
@@ -101,7 +101,7 @@ const getBundleDetail = async (bundleId) => {
     const includedIds = bundle.included_package_ids;
     const { data: fallbackItems, error: fallbackError } = await supabase
       .from('packages')
-      .select('id, name, description, type, price, question_count, category_id')
+      .select('id, name, description, type, price, original_price, question_count, category_id')
       .in('id', includedIds);
 
     if (fallbackError) {

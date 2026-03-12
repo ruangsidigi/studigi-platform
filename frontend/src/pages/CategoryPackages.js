@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { categoryService, packageService, paymentService, purchaseService } from '../services/api';
 import '../styles/dashboard.css';
+import { formatRupiah, getOriginalPrice } from '../utils/pricing';
 
 const TERMS_TEXT_PATH = '/terms-and-conditions.txt';
 const CART_STORAGE_KEY = 'studigi:cart';
@@ -351,7 +352,14 @@ const CategoryPackages = () => {
 
                   <div className="package-info">
                     <span>{pkg.question_count || 0} soal</span>
-                    <span className="package-price">Rp {(pkg.price || 0).toLocaleString('id-ID')}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                      {getOriginalPrice(pkg) ? (
+                        <span className="text-muted" style={{ fontSize: 12, textDecoration: 'line-through' }}>
+                          {formatRupiah(getOriginalPrice(pkg))}
+                        </span>
+                      ) : null}
+                      <span className="package-price">{formatRupiah(pkg.price)}</span>
+                    </div>
                   </div>
 
                   {pkg.is_bundle && (

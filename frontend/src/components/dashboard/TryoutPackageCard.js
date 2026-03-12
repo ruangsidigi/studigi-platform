@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock3, FileText, Play } from 'lucide-react';
+import { formatRupiah, getOriginalPrice } from '../../utils/pricing';
 
 const packageTypeLabel = {
   tryout: 'Tryout',
@@ -7,9 +8,9 @@ const packageTypeLabel = {
   bundle: 'Bundle',
 };
 
-const formatRupiah = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
-
 const TryoutPackageCard = ({ item, status = 'owned', onStart }) => {
+  const originalPrice = getOriginalPrice(item);
+
   return (
     <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
       <div className="mb-2 flex items-center justify-between gap-3">
@@ -41,7 +42,12 @@ const TryoutPackageCard = ({ item, status = 'owned', onStart }) => {
       </div>
 
       <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3">
-        <p className="text-sm font-semibold text-[var(--header-color,#103c21)]">{formatRupiah(item.price)}</p>
+        <div className="flex flex-col items-start gap-1">
+          {originalPrice ? (
+            <p className="text-xs text-slate-400 line-through">{formatRupiah(originalPrice)}</p>
+          ) : null}
+          <p className="text-sm font-semibold text-[var(--header-color,#103c21)]">{formatRupiah(item.price)}</p>
+        </div>
         {status === 'owned' ? (
           <button
             type="button"
