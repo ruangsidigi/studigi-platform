@@ -183,7 +183,6 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
       shouldUpdateOriginalPrice
         ? normalizeOriginalPrice(original_price, price !== undefined ? normalizedPrice : 0)
         : undefined;
-    console.log('[PUT /packages/:id] debug', { id, original_price, price, normalizedPrice, shouldUpdateOriginalPrice, normalizedOriginalPrice });
 
     const result = await db.query(
       `UPDATE packages
@@ -214,7 +213,7 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
     );
 
     if (!result.rows[0]) return res.status(404).json({ error: 'Package not found' });
-    return res.json({ message: 'Package updated successfully', package: result.rows[0], _debug: { original_price_in: original_price, should_update: shouldUpdateOriginalPrice, normalized: normalizedOriginalPrice } });
+    return res.json({ message: 'Package updated successfully', package: result.rows[0] });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
