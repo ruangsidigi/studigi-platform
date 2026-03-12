@@ -183,6 +183,7 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
       shouldUpdateOriginalPrice
         ? normalizeOriginalPrice(original_price, price !== undefined ? normalizedPrice : 0)
         : undefined;
+    console.log('[PUT /packages/:id] debug', { id, original_price, price, normalizedPrice, shouldUpdateOriginalPrice, normalizedOriginalPrice });
 
     const result = await db.query(
       `UPDATE packages

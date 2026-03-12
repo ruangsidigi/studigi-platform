@@ -238,7 +238,9 @@ const AdminDashboard = () => {
       payload.price = normalizedPrice;
       payload.original_price = normalizedOriginalPrice;
 
+      console.log('[EditPkg] sending payload:', JSON.stringify({ price: payload.price, original_price: payload.original_price }));
       const updateRes = await packageService.update(editingPackageId, payload);
+      console.log('[EditPkg] response:', JSON.stringify(updateRes?.data?.package ? { price: updateRes.data.package.price, original_price: updateRes.data.package.original_price } : updateRes?.data));
       const updatedPackage = updateRes?.data?.package || null;
       if (updatedPackage) {
         setPackages((prev) =>
