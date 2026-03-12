@@ -212,7 +212,17 @@ const AdminDashboard = () => {
         payload.included_package_ids = [];
       }
 
-      await packageService.update(editingPackageId, payload);
+      const updateRes = await packageService.update(editingPackageId, payload);
+      const updatedPackage = updateRes?.data?.package || null;
+      if (updatedPackage) {
+        setPackages((prev) =>
+          (prev || []).map((pkg) =>
+            String(pkg.id) === String(updatedPackage.id)
+              ? { ...pkg, ...updatedPackage }
+              : pkg
+          )
+        );
+      }
       setMessage('Package updated successfully');
       handleCancelEdit();
       await loadDashboardData();

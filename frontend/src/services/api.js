@@ -40,7 +40,7 @@ export const authService = {
 
 // Package Service
 export const packageService = {
-  getAll: () => api.get('/packages'),
+  getAll: () => api.get('/packages', { params: { t: Date.now() } }),
   getById: (id) => api.get(`/packages/${id}`),
   getBundleDetails: (id) => api.get(`/bundles/${id}`),
   getLeaderboard: (id) => api.get(`/packages/${id}/leaderboard`),
