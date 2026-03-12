@@ -577,7 +577,8 @@ const AdminDashboard = () => {
                   <div className="form-group">
                     <label>Harga (Rp)</label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={newPackage.price}
                       onChange={(e) => {
                         const nextValue = Number(normalizeCurrencyDigits(e.target.value)) || 0;
@@ -588,8 +589,8 @@ const AdminDashboard = () => {
                   <div className="form-group">
                     <label>Harga Coret (Opsional)</label>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
+                      inputMode="numeric"
                       value={newPackage.original_price}
                       onChange={(e) => {
                         const nextDigits = normalizeCurrencyDigits(e.target.value);
@@ -816,7 +817,8 @@ const AdminDashboard = () => {
                     <div className="form-group">
                       <label>Harga (Rp)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         value={editPackage.price}
                         onChange={(e) => {
                           const nextValue = Number(normalizeCurrencyDigits(e.target.value)) || 0;
@@ -827,8 +829,8 @@ const AdminDashboard = () => {
                     <div className="form-group">
                       <label>Harga Coret (Opsional)</label>
                       <input
-                        type="number"
-                        min="0"
+                        type="text"
+                        inputMode="numeric"
                         value={editPackage.original_price}
                         onChange={(e) => {
                           const nextDigits = normalizeCurrencyDigits(e.target.value);
