@@ -68,13 +68,29 @@ const normalizeIncludedPackageIds = (rawValue) => {
   return JSON.stringify([]);
 };
 
+const normalizeCurrencyNumber = (rawValue) => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return null;
+  }
+
+  if (typeof rawValue === 'number') {
+    return Number.isFinite(rawValue) ? rawValue : null;
+  }
+
+  const digitsOnly = String(rawValue).replace(/[^\d]/g, '');
+  if (!digitsOnly) return null;
+
+  const parsed = Number(digitsOnly);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 const normalizeOriginalPrice = (originalPrice, price) => {
   if (originalPrice === undefined || originalPrice === null || originalPrice === '') {
     return null;
   }
 
-  const normalizedOriginalPrice = Number(originalPrice);
-  const normalizedPrice = Number(price || 0);
+  const normalizedOriginalPrice = normalizeCurrencyNumber(originalPrice);
+  const normalizedPrice = normalizeCurrencyNumber(price) || 0;
 
   if (!Number.isFinite(normalizedOriginalPrice) || normalizedOriginalPrice <= normalizedPrice) {
     return null;
@@ -121,7 +137,7 @@ router.post('/packages', requireAdmin, async (req, res) => {
 
     if (!name) return res.status(400).json({ error: 'name is required' });
 
-    const normalizedPrice = Number(price || 0);
+    const normalizedPrice = normalizeCurrencyNumber(price) || 0;
     const normalizedOriginalPrice = normalizeOriginalPrice(original_price, normalizedPrice);
 
     const result = await db.query(
@@ -161,7 +177,7 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
       included_package_ids,
     } = req.body || {};
 
-    const normalizedPrice = price !== undefined ? Number(price) : null;
+    const normalizedPrice = price !== undefined ? normalizeCurrencyNumber(price) : null;
     const shouldUpdateOriginalPrice = original_price !== undefined;
     const normalizedOriginalPrice =
       shouldUpdateOriginalPrice

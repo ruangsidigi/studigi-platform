@@ -5,6 +5,17 @@ const bundleService = require('../services/bundleService');
 
 const router = express.Router();
 
+const normalizeCurrencyNumber = (rawValue) => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return null;
+  if (typeof rawValue === 'number') return Number.isFinite(rawValue) ? rawValue : null;
+
+  const digitsOnly = String(rawValue).replace(/[^\d]/g, '');
+  if (!digitsOnly) return null;
+
+  const parsed = Number(digitsOnly);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 // Get leaderboard by package (participant-facing)
 router.get('/:id/leaderboard', authenticateToken, async (req, res) => {
   try {
@@ -165,10 +176,10 @@ router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) =
       return res.status(400).json({ error: 'Name, type, and price are required' });
     }
 
-    const normalizedPrice = Number(price || 0);
+    const normalizedPrice = normalizeCurrencyNumber(price) || 0;
     const normalizedOriginalPrice =
-      original_price !== undefined && original_price !== null && original_price !== '' && Number(original_price) > normalizedPrice
-        ? Number(original_price)
+      original_price !== undefined && original_price !== null && original_price !== '' && (normalizeCurrencyNumber(original_price) || 0) > normalizedPrice
+        ? normalizeCurrencyNumber(original_price)
         : null;
 
     const payload = {
@@ -208,10 +219,10 @@ router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res)
     const { id } = req.params;
     const { name, description, type, price, original_price, question_count, category_id, included_package_ids } = req.body;
 
-    const normalizedPrice = price !== undefined ? Number(price || 0) : undefined;
+    const normalizedPrice = price !== undefined ? (normalizeCurrencyNumber(price) || 0) : undefined;
     const normalizedOriginalPrice =
-      original_price !== undefined && original_price !== null && original_price !== '' && Number(original_price) > Number(normalizedPrice ?? 0)
-        ? Number(original_price)
+      original_price !== undefined && original_price !== null && original_price !== '' && (normalizeCurrencyNumber(original_price) || 0) > Number(normalizedPrice ?? 0)
+        ? normalizeCurrencyNumber(original_price)
         : null;
 
     const payload = {
