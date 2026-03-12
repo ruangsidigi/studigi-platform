@@ -44,6 +44,8 @@ const normalizeIncludedPackageIds = (rawValue) => {
   }
 };
 
+const normalizeCurrencyDigits = (rawValue) => String(rawValue ?? '').replace(/[^\d]/g, '');
+
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -147,6 +149,18 @@ const AdminDashboard = () => {
         payload.included_package_ids = [];
       }
 
+      const normalizedPrice = Number(normalizeCurrencyDigits(payload.price)) || 0;
+      const normalizedOriginalPriceDigits = normalizeCurrencyDigits(payload.original_price);
+      const normalizedOriginalPrice = normalizedOriginalPriceDigits ? Number(normalizedOriginalPriceDigits) : null;
+
+      if (normalizedOriginalPrice !== null && normalizedOriginalPrice <= normalizedPrice) {
+        setMessage('Harga coret harus lebih besar dari harga jual');
+        return;
+      }
+
+      payload.price = normalizedPrice;
+      payload.original_price = normalizedOriginalPrice;
+
       await packageService.create(payload);
       setMessage('Package created successfully');
       setNewPackage({ name: '', description: '', type: 'tryout', price: 0, original_price: '', question_count: 0, category_id: '', included_package_ids: [] });
@@ -211,6 +225,18 @@ const AdminDashboard = () => {
       if (payload.type !== 'bundle' && payload.type !== 'bundling') {
         payload.included_package_ids = [];
       }
+
+      const normalizedPrice = Number(normalizeCurrencyDigits(payload.price)) || 0;
+      const normalizedOriginalPriceDigits = normalizeCurrencyDigits(payload.original_price);
+      const normalizedOriginalPrice = normalizedOriginalPriceDigits ? Number(normalizedOriginalPriceDigits) : null;
+
+      if (normalizedOriginalPrice !== null && normalizedOriginalPrice <= normalizedPrice) {
+        setMessage('Harga coret harus lebih besar dari harga jual');
+        return;
+      }
+
+      payload.price = normalizedPrice;
+      payload.original_price = normalizedOriginalPrice;
 
       const updateRes = await packageService.update(editingPackageId, payload);
       const updatedPackage = updateRes?.data?.package || null;
@@ -553,7 +579,10 @@ const AdminDashboard = () => {
                     <input
                       type="number"
                       value={newPackage.price}
-                      onChange={(e) => setNewPackage({ ...newPackage, price: parseInt(e.target.value) })}
+                      onChange={(e) => {
+                        const nextValue = Number(normalizeCurrencyDigits(e.target.value)) || 0;
+                        setNewPackage({ ...newPackage, price: nextValue });
+                      }}
                     />
                   </div>
                   <div className="form-group">
@@ -562,7 +591,10 @@ const AdminDashboard = () => {
                       type="number"
                       min="0"
                       value={newPackage.original_price}
-                      onChange={(e) => setNewPackage({ ...newPackage, original_price: e.target.value })}
+                      onChange={(e) => {
+                        const nextDigits = normalizeCurrencyDigits(e.target.value);
+                        setNewPackage({ ...newPackage, original_price: nextDigits });
+                      }}
                       placeholder="Contoh: 50000"
                     />
                   </div>
@@ -786,7 +818,10 @@ const AdminDashboard = () => {
                       <input
                         type="number"
                         value={editPackage.price}
-                        onChange={(e) => setEditPackage({ ...editPackage, price: parseInt(e.target.value || '0', 10) })}
+                        onChange={(e) => {
+                          const nextValue = Number(normalizeCurrencyDigits(e.target.value)) || 0;
+                          setEditPackage({ ...editPackage, price: nextValue });
+                        }}
                       />
                     </div>
                     <div className="form-group">
@@ -795,7 +830,10 @@ const AdminDashboard = () => {
                         type="number"
                         min="0"
                         value={editPackage.original_price}
-                        onChange={(e) => setEditPackage({ ...editPackage, original_price: e.target.value })}
+                        onChange={(e) => {
+                          const nextDigits = normalizeCurrencyDigits(e.target.value);
+                          setEditPackage({ ...editPackage, original_price: nextDigits });
+                        }}
                       />
                     </div>
                     <div className="form-group">
