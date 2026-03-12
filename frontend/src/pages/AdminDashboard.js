@@ -403,179 +403,6 @@ const AdminDashboard = () => {
                 </table>
               )}
             </div>
-            {editPackage && (
-              <div className="card mt-20">
-                <div className="card-title">Edit Paket #{editingPackageId}</div>
-                <form onSubmit={handleSaveEditPackage}>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Nama Paket</label>
-                      <input
-                        type="text"
-                        value={editPackage.name}
-                        onChange={(e) => setEditPackage({ ...editPackage, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Tipe</label>
-                      <select
-                        value={editPackage.type}
-                        onChange={(e) => setEditPackage({ ...editPackage, type: e.target.value })}
-                      >
-                        <option value="tryout">Tryout</option>
-                        <option value="latihan">Latihan</option>
-                        <option value="bundling">Bundling</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Kategori</label>
-                      <select
-                        value={editPackage.category_id || 'select'}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (v === 'other') {
-                            setEditPackage({ ...editPackage, category_id: 'other' });
-                          } else if (v === 'select') {
-                            setEditPackage({ ...editPackage, category_id: '' });
-                          } else {
-                            setEditPackage({ ...editPackage, category_id: v });
-                          }
-                        }}
-                      >
-                        <option value="select">-- Pilih Kategori --</option>
-                        <option value="CPNS">CPNS</option>
-                        <option value="BUMN">BUMN</option>
-                        <option value="TOEFL">TOEFL</option>
-                        {(categories || []).map((category) => (
-                          <option key={`edit-cat-${category.id}`} value={String(category.id)}>
-                            {category.name}
-                          </option>
-                        ))}
-                        <option value="other">Lainnya</option>
-                      </select>
-                      {editPackage.category_id === 'other' && (
-                        <input
-                          type="text"
-                          placeholder="Nama kategori"
-                          value={editOtherCategoryName}
-                          onChange={(e) => setEditOtherCategoryName(e.target.value)}
-                          style={{ marginTop: 8 }}
-                        />
-                      )}
-                    </div>
-
-                    {(editPackage.type === 'bundle' || editPackage.type === 'bundling') && (
-                      <div className="form-group">
-                        <label>Bundling (pilih paket yang termasuk)</label>
-                        <div className="bundle-picker-header">
-                          <input
-                            type="text"
-                            placeholder="Cari paket..."
-                            value={editBundleSearch}
-                            onChange={(e) => setEditBundleSearch(e.target.value)}
-                            className="bundle-search"
-                          />
-                          <div className="bundle-picker-count">
-                            {editPackage.included_package_ids?.length || 0} paket dipilih
-                          </div>
-                        </div>
-                        <div className="bundle-picker-grid">
-                          {(packages || [])
-                            .filter((p) => String(p.id) !== String(editingPackageId))
-                            .filter((p) => p.type !== 'bundle' && p.type !== 'bundling')
-                            .filter((p) => {
-                              if (!editBundleSearch.trim()) return true;
-                              const term = editBundleSearch.toLowerCase();
-                              return (
-                                String(p.name || '').toLowerCase().includes(term) ||
-                                String(p.type || '').toLowerCase().includes(term) ||
-                                String(categories.find((c) => String(c.id) === String(p.category_id))?.name || '')
-                                  .toLowerCase()
-                                  .includes(term)
-                              );
-                            })
-                            .map((p) => {
-                              const selected = (editPackage.included_package_ids || [])
-                                .map(String)
-                                .includes(String(p.id));
-
-                              return (
-                                <label key={`edit-pkgchk-${p.id}`} className={`bundle-picker-item ${selected ? 'selected' : ''}`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={selected}
-                                    onChange={() => {
-                                      const currentIds = editPackage.included_package_ids || [];
-                                      const nextIds = currentIds.map(String).includes(String(p.id))
-                                        ? currentIds.filter((x) => String(x) !== String(p.id))
-                                        : [...currentIds, p.id];
-                                      setEditPackage({ ...editPackage, included_package_ids: nextIds });
-                                    }}
-                                  />
-                                  <div>
-                                    <div className="bundle-picker-title">{p.name}</div>
-                                    <div className="bundle-picker-meta">
-                                      <span>{p.type}</span>
-                                      <span>•</span>
-                                      <span>{categories.find((c) => String(c.id) === String(p.category_id))?.name || '-'}</span>
-                                    </div>
-                                  </div>
-                                </label>
-                              );
-                            })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Harga (Rp)</label>
-                      <input
-                        type="number"
-                        value={editPackage.price}
-                        onChange={(e) => setEditPackage({ ...editPackage, price: parseInt(e.target.value || '0', 10) })}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Harga Coret (Opsional)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={editPackage.original_price}
-                        onChange={(e) => setEditPackage({ ...editPackage, original_price: e.target.value })}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Jumlah Soal</label>
-                      <input
-                        type="number"
-                        value={editPackage.question_count}
-                        onChange={(e) => setEditPackage({ ...editPackage, question_count: parseInt(e.target.value || '0', 10) })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Deskripsi</label>
-                    <textarea
-                      value={editPackage.description}
-                      onChange={(e) => setEditPackage({ ...editPackage, description: e.target.value })}
-                      rows="3"
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="submit" className="btn btn-success">Simpan Perubahan</button>
-                    <button type="button" className="btn btn-secondary" onClick={handleCancelEdit}>Batal</button>
-                  </div>
-                </form>
-              </div>
-            )}
           </div>
         )}
 
@@ -813,6 +640,180 @@ const AdminDashboard = () => {
                 </tbody>
               </table>
             </div>
+
+            {editPackage && (
+              <div className="card mt-20">
+                <div className="card-title">Edit Paket #{editingPackageId}</div>
+                <form onSubmit={handleSaveEditPackage}>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Nama Paket</label>
+                      <input
+                        type="text"
+                        value={editPackage.name}
+                        onChange={(e) => setEditPackage({ ...editPackage, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Tipe</label>
+                      <select
+                        value={editPackage.type}
+                        onChange={(e) => setEditPackage({ ...editPackage, type: e.target.value })}
+                      >
+                        <option value="tryout">Tryout</option>
+                        <option value="latihan">Latihan</option>
+                        <option value="bundling">Bundling</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Kategori</label>
+                      <select
+                        value={editPackage.category_id || 'select'}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === 'other') {
+                            setEditPackage({ ...editPackage, category_id: 'other' });
+                          } else if (v === 'select') {
+                            setEditPackage({ ...editPackage, category_id: '' });
+                          } else {
+                            setEditPackage({ ...editPackage, category_id: v });
+                          }
+                        }}
+                      >
+                        <option value="select">-- Pilih Kategori --</option>
+                        <option value="CPNS">CPNS</option>
+                        <option value="BUMN">BUMN</option>
+                        <option value="TOEFL">TOEFL</option>
+                        {(categories || []).map((category) => (
+                          <option key={`edit-cat-${category.id}`} value={String(category.id)}>
+                            {category.name}
+                          </option>
+                        ))}
+                        <option value="other">Lainnya</option>
+                      </select>
+                      {editPackage.category_id === 'other' && (
+                        <input
+                          type="text"
+                          placeholder="Nama kategori"
+                          value={editOtherCategoryName}
+                          onChange={(e) => setEditOtherCategoryName(e.target.value)}
+                          style={{ marginTop: 8 }}
+                        />
+                      )}
+                    </div>
+
+                    {(editPackage.type === 'bundle' || editPackage.type === 'bundling') && (
+                      <div className="form-group">
+                        <label>Bundling (pilih paket yang termasuk)</label>
+                        <div className="bundle-picker-header">
+                          <input
+                            type="text"
+                            placeholder="Cari paket..."
+                            value={editBundleSearch}
+                            onChange={(e) => setEditBundleSearch(e.target.value)}
+                            className="bundle-search"
+                          />
+                          <div className="bundle-picker-count">
+                            {editPackage.included_package_ids?.length || 0} paket dipilih
+                          </div>
+                        </div>
+                        <div className="bundle-picker-grid">
+                          {(packages || [])
+                            .filter((p) => String(p.id) !== String(editingPackageId))
+                            .filter((p) => p.type !== 'bundle' && p.type !== 'bundling')
+                            .filter((p) => {
+                              if (!editBundleSearch.trim()) return true;
+                              const term = editBundleSearch.toLowerCase();
+                              return (
+                                String(p.name || '').toLowerCase().includes(term) ||
+                                String(p.type || '').toLowerCase().includes(term) ||
+                                String(categories.find((c) => String(c.id) === String(p.category_id))?.name || '')
+                                  .toLowerCase()
+                                  .includes(term)
+                              );
+                            })
+                            .map((p) => {
+                              const selected = (editPackage.included_package_ids || [])
+                                .map(String)
+                                .includes(String(p.id));
+
+                              return (
+                                <label key={`edit-pkgchk-${p.id}`} className={`bundle-picker-item ${selected ? 'selected' : ''}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    onChange={() => {
+                                      const currentIds = editPackage.included_package_ids || [];
+                                      const nextIds = currentIds.map(String).includes(String(p.id))
+                                        ? currentIds.filter((x) => String(x) !== String(p.id))
+                                        : [...currentIds, p.id];
+                                      setEditPackage({ ...editPackage, included_package_ids: nextIds });
+                                    }}
+                                  />
+                                  <div>
+                                    <div className="bundle-picker-title">{p.name}</div>
+                                    <div className="bundle-picker-meta">
+                                      <span>{p.type}</span>
+                                      <span>•</span>
+                                      <span>{categories.find((c) => String(c.id) === String(p.category_id))?.name || '-'}</span>
+                                    </div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Harga (Rp)</label>
+                      <input
+                        type="number"
+                        value={editPackage.price}
+                        onChange={(e) => setEditPackage({ ...editPackage, price: parseInt(e.target.value || '0', 10) })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Harga Coret (Opsional)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editPackage.original_price}
+                        onChange={(e) => setEditPackage({ ...editPackage, original_price: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Jumlah Soal</label>
+                      <input
+                        type="number"
+                        value={editPackage.question_count}
+                        onChange={(e) => setEditPackage({ ...editPackage, question_count: parseInt(e.target.value || '0', 10) })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Deskripsi</label>
+                    <textarea
+                      value={editPackage.description}
+                      onChange={(e) => setEditPackage({ ...editPackage, description: e.target.value })}
+                      rows="3"
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="submit" className="btn btn-success">Simpan Perubahan</button>
+                    <button type="button" className="btn btn-secondary" onClick={handleCancelEdit}>Batal</button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         )}
 
