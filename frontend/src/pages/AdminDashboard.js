@@ -301,7 +301,7 @@ const AdminDashboard = () => {
         setMessage('Package deleted successfully');
         loadDashboardData();
       } catch (err) {
-        setMessage('Error deleting package');
+        setMessage('Error deleting package: ' + extractErrorMessage(err, 'Gagal menghapus paket'));
       }
     }
   };

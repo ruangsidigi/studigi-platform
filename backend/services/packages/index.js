@@ -241,10 +241,33 @@ router.delete('/packages/:id', requireAdmin, async (req, res) => {
   try {
     const db = req.app.locals.db;
     const { id } = req.params;
+    await db.query('BEGIN');
+
+    await safeExec(
+      db,
+      `DELETE FROM tryout_answers
+       WHERE session_id IN (
+         SELECT id FROM tryout_sessions WHERE package_id = $1
+       )`,
+      [id]
+    );
+    await safeExec(db, 'DELETE FROM purchases WHERE package_id = $1', [id]);
+    await safeExec(db, 'DELETE FROM tryout_sessions WHERE package_id = $1', [id]);
+    await safeExec(db, 'DELETE FROM package_materials WHERE package_id = $1', [id]);
+    await safeExec(db, 'DELETE FROM bundle_packages WHERE package_id = $1 OR bundle_id = $1', [id]);
+    await safeExec(db, 'UPDATE materials SET package_id = NULL WHERE package_id = $1', [id]);
+
     const result = await db.query('DELETE FROM packages WHERE id = $1 RETURNING id', [id]);
+    await db.query('COMMIT');
+
     if (!result.rows[0]) return res.status(404).json({ error: 'Package not found' });
     return res.json({ message: 'Package deleted successfully' });
   } catch (error) {
+    try {
+      await req.app.locals.db.query('ROLLBACK');
+    } catch (rollbackError) {
+      // ignore rollback errors
+    }
     return res.status(500).json({ error: error.message });
   }
 });
