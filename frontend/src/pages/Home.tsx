@@ -29,6 +29,18 @@ const normalizePackageToCartItem = (pkg: any, categoryMap: Record<string, string
   price: Number(pkg.price || 0),
 });
 
+const isEbookPackage = (pkg: any, categoryMap: Record<string, string>) => {
+  const packageType = String(pkg?.type || '').trim().toLowerCase();
+  const contentType = String(pkg?.content_type || '').trim().toLowerCase();
+  const categoryName = getCategoryName(pkg, categoryMap);
+  return packageType === 'ebook' || contentType === 'material' || categoryName === 'EBOOK';
+};
+
+const getPackagePdfUrl = (pkg: any) => {
+  const raw = String(pkg?.pdf_file_path || '').trim();
+  return raw || null;
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -232,6 +244,8 @@ export default function Home() {
             filteredPackages.map((pkg) => {
               const inCart = cartItems.some((item) => item.id === Number(pkg.id));
               const categoryLabel = getCategoryName(pkg, categoryMap) || 'LAINNYA';
+              const isEbook = isEbookPackage(pkg, categoryMap);
+              const pdfUrl = getPackagePdfUrl(pkg);
               const isBundlePackage =
                 String(pkg?.type || '').toLowerCase() === 'bundling' ||
                 String(pkg?.type || '').toLowerCase() === 'bundle' ||
@@ -239,7 +253,12 @@ export default function Home() {
               return (
                 <article key={pkg.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">{categoryLabel}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">{categoryLabel}</span>
+                      {isEbook ? (
+                        <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">EBOOK</span>
+                      ) : null}
+                    </div>
                     <div className="flex flex-col items-end gap-1 text-right">
                       {getOriginalPrice(pkg) ? (
                         <span className="text-xs text-slate-400 line-through">
@@ -284,6 +303,16 @@ export default function Home() {
                         className="w-full rounded-xl border border-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-[var(--header-color,#103c21)] hover:bg-emerald-50 sm:w-auto"
                       >
                         Detail
+                      </button>
+                    )}
+
+                    {isEbook && pdfUrl && (
+                      <button
+                        type="button"
+                        onClick={() => window.open(pdfUrl, '_blank', 'noopener,noreferrer')}
+                        className="w-full rounded-xl border border-amber-400 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 sm:w-auto"
+                      >
+                        Baca PDF
                       </button>
                     )}
 
