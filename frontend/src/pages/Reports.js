@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { reportService } from '../services/api';
 import QuestionDetailModal from '../components/QuestionDetailModal';
@@ -171,6 +171,30 @@ const Reports = () => {
     popup.print();
   };
 
+  const progressPoints = useMemo(() => {
+    const raw = Array.isArray(overview?.progress) ? overview.progress : [];
+    const points = raw.map((point) => ({
+      ...point,
+      scoreValue: Number(point?.score) || 0,
+    }));
+
+    if (!points.length) return [];
+
+    const minScore = Math.min(...points.map((item) => item.scoreValue));
+    const maxScore = Math.max(...points.map((item) => item.scoreValue));
+    const spread = Math.max(maxScore - minScore, 1);
+
+    return points.map((point) => {
+      const normalized = (point.scoreValue - minScore) / spread;
+      // Keep bars readable even when values are close to each other.
+      const heightPercent = points.length === 1 ? 72 : Math.round(18 + normalized * 82);
+      return {
+        ...point,
+        heightPercent,
+      };
+    });
+  }, [overview]);
+
   if (loading) return <div className="container">Loading report...</div>;
 
   return (
@@ -202,12 +226,18 @@ const Reports = () => {
             <div className="card">
               <div className="card-title">Grafik Progres Skor</div>
               <div className="mini-chart">
-                {overview.progress.map((point) => (
-                  <div key={`p-${point.attemptId}`} className="mini-chart-item" title={`${point.packageName}: ${point.score}`}>
-                    <div className="mini-chart-bar" style={{ height: `${Math.min(100, Math.max(6, point.score / 4))}%` }} />
-                    <span>{point.score}</span>
-                  </div>
-                ))}
+                {progressPoints.length === 0 ? (
+                  <p className="text-muted" style={{ margin: 0 }}>Belum ada data progres.</p>
+                ) : (
+                  progressPoints.map((point) => (
+                    <div key={`p-${point.attemptId}`} className="mini-chart-item" title={`${point.packageName}: ${point.scoreValue}`}>
+                      <div className="mini-chart-bar-wrap">
+                        <div className="mini-chart-bar" style={{ height: `${point.heightPercent}%` }} />
+                      </div>
+                      <span>{point.scoreValue}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 

@@ -16,10 +16,11 @@
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  min-height: 180px;
+  min-height: 220px;
   border: 1px solid #eee;
   border-radius: 8px;
   padding: 12px;
+  overflow-x: auto;
 }
 
 .report-page .mini-chart-item {
@@ -28,7 +29,16 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  min-width: 20px;
+  min-width: 36px;
+  height: 180px;
+}
+
+.report-page .mini-chart-bar-wrap {
+  width: 100%;
+  height: 150px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 
 .report-page .mini-chart-bar {
