@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TryoutCard from '../components/TryoutCard.tsx';
 import { AuthContext } from '../context/AuthContext';
-import { packageService, purchaseService } from '../services/api';
+import { materialService, packageService, purchaseService } from '../services/api';
 
 export default function Library() {
   const { user } = useContext(AuthContext as any);
@@ -10,6 +10,55 @@ export default function Library() {
   const [ownedPackages, setOwnedPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const openEbook = async (pkg: any) => {
+    try {
+      const response = await materialService.listByPackagePreview(pkg.id);
+      const materials = Array.isArray(response?.data) ? response.data : [];
+      const firstMaterial = materials[0];
+
+      if (firstMaterial?.id) {
+        navigate(`/materials/${firstMaterial.id}/view`, { state: { backTo: '/library' } });
+        return;
+      }
+
+      const directUrl = String(pkg?.pdf_file_path || '').trim();
+      if (directUrl) {
+        window.open(directUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      window.alert('Materi PDF belum tersedia untuk paket ini.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Gagal membuka ebook';
+      window.alert(String(msg));
+    }
+  };
+
+  const handleCardAction = async (pkg: any) => {
+    const packageType = String(pkg?.type || '').toLowerCase();
+    const categoryName = String(pkg?.category_name || pkg?.category || '').toUpperCase();
+    const isBundle =
+      packageType === 'bundle' ||
+      packageType === 'bundling' ||
+      (Array.isArray(pkg?.included_package_ids) && pkg.included_package_ids.length > 0);
+    const isEbook =
+      packageType === 'ebook' ||
+      String(pkg?.content_type || '').toLowerCase() === 'material' ||
+      categoryName === 'EBOOK';
+
+    if (isEbook) {
+      await openEbook(pkg);
+      return;
+    }
+
+    if (isBundle) {
+      navigate(`/bundles/${pkg.id}`);
+      return;
+    }
+
+    navigate(`/quiz/${pkg.id}`);
+  };
 
   useEffect(() => {
     const loadOwnedPackages = async () => {
@@ -76,12 +125,26 @@ export default function Library() {
     () =>
       ownedPackages.map((pkg) => ({
         id: pkg.id,
+        raw: pkg,
         title: pkg.name,
         description: pkg.description || 'Paket milikmu, siap dikerjakan.',
         questions: Number(pkg.question_count || 0),
         duration: Number(pkg.duration || 100),
         category: (pkg.category_name || pkg.type || 'Tryout').toUpperCase(),
-        actionLabel: 'Mulai Tryout',
+        actionLabel: (() => {
+          const packageType = String(pkg?.type || '').toLowerCase();
+          const categoryName = String(pkg?.category_name || pkg?.category || '').toUpperCase();
+          const isBundle =
+            packageType === 'bundle' ||
+            packageType === 'bundling' ||
+            (Array.isArray(pkg?.included_package_ids) && pkg.included_package_ids.length > 0);
+          const isEbook =
+            packageType === 'ebook' ||
+            String(pkg?.content_type || '').toLowerCase() === 'material' ||
+            categoryName === 'EBOOK';
+
+          return isEbook || isBundle ? 'Buka' : 'Mulai';
+        })(),
       })),
     [ownedPackages]
   );
@@ -131,7 +194,7 @@ export default function Library() {
       {user && !loading && !error && cards.length > 0 && (
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {cards.map((item) => (
-            <TryoutCard key={item.id} {...item} onAction={() => navigate(`/quiz/${item.id}`)} />
+            <TryoutCard key={item.id} {...item} onAction={() => handleCardAction(item.raw)} />
           ))}
         </section>
       )}
