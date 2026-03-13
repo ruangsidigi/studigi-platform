@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Clock3, FileText, ShoppingCart } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
-import { categoryService, packageService, purchaseService } from '../services/api';
+import { categoryService, materialService, packageService, purchaseService } from '../services/api';
 import CartWidget, { CartItem } from '../components/CartWidget.tsx';
 import { formatRupiah, getOriginalPrice } from '../utils/pricing';
 
@@ -34,11 +34,6 @@ const isEbookPackage = (pkg: any, categoryMap: Record<string, string>) => {
   const contentType = String(pkg?.content_type || '').trim().toLowerCase();
   const categoryName = getCategoryName(pkg, categoryMap);
   return packageType === 'ebook' || contentType === 'material' || categoryName === 'EBOOK';
-};
-
-const getPackagePdfUrl = (pkg: any) => {
-  const raw = String(pkg?.pdf_file_path || '').trim();
-  return raw || null;
 };
 
 export default function Home() {
@@ -191,6 +186,48 @@ export default function Home() {
     });
   };
 
+  const handleReadEbook = async (pkg: any) => {
+    if (!user) {
+      navigate('/login', {
+        state: {
+          redirectTo: '/home',
+        },
+      });
+      return;
+    }
+
+    try {
+      const response = await materialService.listByPackagePreview(pkg.id);
+      const materials = Array.isArray(response?.data) ? response.data : [];
+      const firstMaterial = materials[0];
+      if (firstMaterial?.id) {
+        navigate(`/materials/${firstMaterial.id}/view`, { state: { backTo: '/home' } });
+        return;
+      }
+
+      const directUrl = String(pkg?.pdf_file_path || '').trim();
+      if (directUrl) {
+        window.open(directUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      window.alert('Materi PDF belum tersedia untuk paket ini.');
+    } catch (error: any) {
+      const status = Number(error?.response?.status || 0);
+      if (status === 401) {
+        navigate('/login', {
+          state: {
+            redirectTo: '/home',
+          },
+        });
+        return;
+      }
+
+      const errMsg = error?.response?.data?.error || error?.message || 'Gagal membuka PDF';
+      window.alert(String(errMsg));
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-20 md:pb-4 lg:pb-2">
       <section className="rounded-2xl bg-[var(--header-color,#103c21)] p-5 text-white sm:p-6">
@@ -245,7 +282,6 @@ export default function Home() {
               const inCart = cartItems.some((item) => item.id === Number(pkg.id));
               const categoryLabel = getCategoryName(pkg, categoryMap) || 'LAINNYA';
               const isEbook = isEbookPackage(pkg, categoryMap);
-              const pdfUrl = getPackagePdfUrl(pkg);
               const isBundlePackage =
                 String(pkg?.type || '').toLowerCase() === 'bundling' ||
                 String(pkg?.type || '').toLowerCase() === 'bundle' ||
@@ -306,10 +342,10 @@ export default function Home() {
                       </button>
                     )}
 
-                    {isEbook && pdfUrl && (
+                    {isEbook && (
                       <button
                         type="button"
-                        onClick={() => window.open(pdfUrl, '_blank', 'noopener,noreferrer')}
+                        onClick={() => handleReadEbook(pkg)}
                         className="w-full rounded-xl border border-amber-400 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 sm:w-auto"
                       >
                         Baca PDF
