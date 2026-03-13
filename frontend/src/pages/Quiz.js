@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { questionService, tryoutService, bundleService, packageService, materialService } from '../services/api';
 import { GraduationCap, Clock3, Flag, ChevronLeft, ChevronRight } from 'lucide-react';
+import MathText from '../components/MathText';
 
 const Quiz = () => {
   const { packageId } = useParams();
@@ -146,6 +147,10 @@ const Quiz = () => {
       });
     } catch (err) {
       console.error('Error submitting answer:', err);
+    }
+
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion((prev) => Math.min(prev + 1, questions.length - 1));
     }
   };
 
@@ -366,7 +371,11 @@ const Quiz = () => {
                 <span className="text-sm font-medium text-slate-600">Soal {question.number || currentQuestionNumber}</span>
               </div>
 
-              <p className="mb-4 text-[15px] leading-relaxed text-slate-900 sm:mb-5 sm:text-base">{question.question_text}</p>
+              <MathText
+                text={question.question_text}
+                display
+                className="mb-4 text-[15px] leading-relaxed text-slate-900 sm:mb-5 sm:text-base"
+              />
 
               {question.image_url && !imageErrors[question.id] && (
                 <div className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-white p-2">
@@ -403,7 +412,7 @@ const Quiz = () => {
                     <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-lg font-semibold text-slate-600">
                       {option.label}
                     </span>
-                    <span className="text-sm text-slate-800 sm:text-base">{option.text}</span>
+                    <MathText text={option.text} className="text-sm text-slate-800 sm:text-base" />
                   </button>
                 ))}
               </div>
