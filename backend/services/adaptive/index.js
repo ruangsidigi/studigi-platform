@@ -16,6 +16,97 @@ const safeQuery = async (db, queryText, params = []) => {
   }
 };
 
+const computeAdaptiveFromSessions = async (db, userId) => {
+  const sessionRows = await safeQuery(
+    db,
+    `SELECT id, twk_score, tiu_score, tkp_score, total_score
+     FROM tryout_sessions
+     WHERE user_id = $1 AND status = 'completed'
+     ORDER BY id ASC`,
+    [userId]
+  );
+
+  if (!sessionRows.length) {
+    return null;
+  }
+
+  const n = sessionRows.length;
+  const avgTwk = sessionRows.reduce((sum, s) => sum + Number(s.twk_score || 0), 0) / n;
+  const avgTiu = sessionRows.reduce((sum, s) => sum + Number(s.tiu_score || 0), 0) / n;
+  const avgTkp = sessionRows.reduce((sum, s) => sum + Number(s.tkp_score || 0), 0) / n;
+
+  const TWK_MAX = 150;
+  const TIU_MAX = 175;
+  const TKP_MAX = 225;
+
+  let categoryData = [
+    { topic: 'TWK', skillScore: Math.min(100, Math.round((avgTwk / TWK_MAX) * 100)) },
+    { topic: 'TIU', skillScore: Math.min(100, Math.round((avgTiu / TIU_MAX) * 100)) },
+    { topic: 'TKP', skillScore: Math.min(100, Math.round((avgTkp / TKP_MAX) * 100)) },
+  ].filter((item) => item.skillScore > 0);
+
+  // Non-CPNS type: compute accuracy per category from answers
+  if (!categoryData.length) {
+    const sessionIds = sessionRows.map((s) => Number(s.id));
+    const catAgg = await safeQuery(
+      db,
+      `SELECT q.category,
+              COUNT(*)::int AS total_answered,
+              SUM(CASE WHEN a.is_correct = true THEN 1 ELSE 0 END)::int AS correct_count
+       FROM tryout_answers a
+       JOIN questions q ON q.id = a.question_id
+       WHERE a.session_id = ANY($1::int[])
+       GROUP BY q.category`,
+      [sessionIds]
+    );
+    categoryData = catAgg
+      .filter((row) => Number(row.total_answered || 0) > 0)
+      .map((row) => ({
+        topic: String(row.category || '').toUpperCase(),
+        skillScore: Math.round((Number(row.correct_count || 0) / Number(row.total_answered)) * 100),
+      }));
+  }
+
+  if (!categoryData.length) return null;
+
+  const progressChart = categoryData.map((c) => ({ topic: c.topic, skillScore: c.skillScore }));
+
+  const weaknessInsights = progressChart
+    .filter((row) => row.skillScore < 70)
+    .map((row) => ({
+      topic: row.topic,
+      skill_score: row.skillScore,
+      weakness_level: row.skillScore < 50 ? 'high' : 'medium',
+    }));
+
+  const recommendedNextAction = weaknessInsights.map((row, idx) => ({
+    id: idx + 1,
+    topic: row.topic,
+    recommendation_type: 'review',
+    reason:
+      row.weakness_level === 'high'
+        ? `Tingkatkan latihan ${row.topic}. Capaian saat ini ${row.skill_score}% dari nilai optimal.`
+        : `Perbaiki strategi pengerjaan ${row.topic}. Capaian saat ini ${row.skill_score}%.`,
+    priority: row.weakness_level === 'high' ? 3 : 2,
+  }));
+
+  const studyPlan = [...progressChart]
+    .sort((a, b) => a.skillScore - b.skillScore)
+    .map((row, index) => ({
+      priority: index + 1,
+      topic: row.topic,
+      action:
+        row.skillScore < 50
+          ? 'Kerjakan 15 soal latihan dasar + review konsep inti'
+          : row.skillScore < 70
+            ? 'Kerjakan 10 soal campuran + evaluasi kesalahan'
+            : 'Naikkan difficulty dan lakukan challenge set 10 soal',
+      targetAccuracy: Math.min(95, row.skillScore + 15),
+    }));
+
+  return { progressChart, weaknessInsights, recommendedNextAction, studyPlan };
+};
+
 router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -42,6 +133,13 @@ router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
         );
 
     const sourceRows = performanceRows.length ? performanceRows : fallbackSkillRows;
+
+    // No pre-computed data: compute from actual tryout sessions
+    if (!sourceRows.length) {
+      const computed = await computeAdaptiveFromSessions(db, userId);
+      if (computed) return res.json(computed);
+      return res.json({ progressChart: [], weaknessInsights: [], recommendedNextAction: [], studyPlan: [] });
+    }
 
     const progressChart = sourceRows.map((row) => ({
       topic: row.topic,

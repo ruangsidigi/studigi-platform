@@ -130,12 +130,12 @@ export default function Activity() {
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{item.packageName || `Attempt #${item.id}`}</p>
                   <p className="text-xs text-[var(--secondary-color,#69655e)]">
-                    Skor {item.totalScore || 0} • {item.status || '-'}
+                    Skor {item.score || 0} • {item.status || '-'}
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => navigate(`/review/${item.id}`)}
+                  onClick={() => navigate(`/review/${item.attemptId}`)}
                   className="w-full rounded-xl bg-[var(--header-color,#103c21)] px-3 py-2 text-xs font-semibold text-white sm:w-auto"
                 >
                   Review Soal
