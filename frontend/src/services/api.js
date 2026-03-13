@@ -184,6 +184,7 @@ export const reportService = {
   getAnalytics: () => api.get('/reports/analytics'),
   getQuestionDetail: (attemptId, questionNumber) => 
     api.get(`/reports/attempt/${attemptId}/question/${questionNumber}`),
+  getMyRankings: () => api.get('/reports/my-rankings'),
 };
 
 // Review Service

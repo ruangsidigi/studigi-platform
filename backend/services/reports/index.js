@@ -63,7 +63,6 @@ router.get('/reports/overview', requireAuth, async (req, res) => {
       date: item.finished_at || item.created_at,
       score: asNumber(item.total_score),
       packageName: item.package_name || '-',
-      isPassed: !!item.is_passed,
     }));
 
     const categoriesResult = await db.query('SELECT id, name FROM categories');
@@ -429,6 +428,67 @@ router.get('/reports/attempt/:attemptId/question/:questionNumber', requireAuth, 
       is_correct: row.is_correct,
       explanation: row.explanation || 'Belum ada pembahasan.',
     });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/reports/my-rankings', requireAuth, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const userId = req.user.id;
+
+    // Build per-package rankings using window functions
+    const result = await db.query(
+      `WITH all_best AS (
+         SELECT ts.package_id, ts.user_id, MAX(ts.total_score) AS best_score
+         FROM tryout_sessions ts
+         WHERE ts.status = 'completed'
+         GROUP BY ts.package_id, ts.user_id
+       ),
+       ranked AS (
+         SELECT ab.*,
+                RANK() OVER (PARTITION BY ab.package_id ORDER BY ab.best_score DESC) AS user_rank,
+                COUNT(*) OVER (PARTITION BY ab.package_id) AS participant_count
+         FROM all_best ab
+       ),
+       top3 AS (
+         SELECT r.package_id,
+                JSON_AGG(
+                  JSON_BUILD_OBJECT(
+                    'rank', r.user_rank,
+                    'name', COALESCE(u.display_name, u.name, SPLIT_PART(u.email, '@', 1)),
+                    'score', r.best_score
+                  ) ORDER BY r.user_rank
+                ) FILTER (WHERE r.user_rank <= 3) AS top_participants
+         FROM ranked r
+         LEFT JOIN users u ON u.id = r.user_id
+         GROUP BY r.package_id
+       )
+       SELECT r.package_id,
+              p.name AS package_name,
+              r.user_rank,
+              r.best_score AS user_best_score,
+              r.participant_count,
+              t.top_participants
+       FROM ranked r
+       JOIN packages p ON p.id = r.package_id
+       LEFT JOIN top3 t ON t.package_id = r.package_id
+       WHERE r.user_id = $1
+       ORDER BY r.user_rank ASC, r.package_id ASC`,
+      [userId]
+    );
+
+    const rankings = (result.rows || []).map((row) => ({
+      packageId: row.package_id,
+      packageName: row.package_name || '-',
+      userRank: Number(row.user_rank),
+      userBestScore: Number(row.user_best_score || 0),
+      participantCount: Number(row.participant_count || 0),
+      topParticipants: Array.isArray(row.top_participants) ? row.top_participants : [],
+    }));
+
+    return res.json({ rankings });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
