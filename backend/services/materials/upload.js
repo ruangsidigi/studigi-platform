@@ -623,8 +623,10 @@ async function uploadToStorage({ buffer, mimeType, folder = 'materials' }) {
 async function handleMaterialUpload(req, res) {
   try {
     if (!req.file) return res.status(400).json({ error: 'File is required' });
-    const allowed = ['application/pdf'];
-    if (!allowed.includes(req.file.mimetype)) return res.status(400).json({ error: 'Invalid file type' });
+    const lowerName = String(req.file.originalname || '').toLowerCase();
+    const isPdfMime = String(req.file.mimetype || '').toLowerCase() === 'application/pdf';
+    const isPdfByName = lowerName.endsWith('.pdf');
+    if (!isPdfMime && !isPdfByName) return res.status(400).json({ error: 'Invalid file type' });
     const url = await uploadToStorage({ buffer: req.file.buffer, mimeType: req.file.mimetype, folder: 'materials' });
     const db = req.app.locals.db;
     const materialColumnsResult = await db.query(

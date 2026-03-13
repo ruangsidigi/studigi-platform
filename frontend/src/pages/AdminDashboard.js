@@ -45,6 +45,25 @@ const normalizeIncludedPackageIds = (rawValue) => {
 };
 
 const normalizeCurrencyDigits = (rawValue) => String(rawValue ?? '').replace(/[^\d]/g, '');
+const extractErrorMessage = (error, fallback = 'Terjadi kesalahan') => {
+  const direct = error?.response?.data?.error ?? error?.response?.data?.message ?? error?.message;
+  if (typeof direct === 'string' && direct.trim()) return direct;
+  if (direct && typeof direct === 'object') {
+    try {
+      const objectMessage = direct.message || direct.error || JSON.stringify(direct);
+      if (typeof objectMessage === 'string' && objectMessage.trim()) return objectMessage;
+    } catch (_) {}
+  }
+
+  const responseData = error?.response?.data;
+  if (responseData && typeof responseData === 'object') {
+    try {
+      return JSON.stringify(responseData);
+    } catch (_) {}
+  }
+
+  return fallback;
+};
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -2056,7 +2075,7 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
         await onReloadDashboard();
       }
     } catch (err) {
-      setMessage('Error membuat paket ebook: ' + (err.response?.data?.error || err.message));
+      setMessage('Error membuat paket ebook: ' + extractErrorMessage(err, 'Gagal membuat paket ebook'));
     }
   };
 
