@@ -87,6 +87,32 @@ export default function Home() {
     return map;
   }, [categories]);
 
+  const activePackages = useMemo(() => {
+    return packages.filter((pkg) => {
+      const visibility = String(pkg?.visibility || 'visible').trim().toLowerCase();
+      return visibility === 'visible' || visibility === 'active' || visibility === '';
+    });
+  }, [packages]);
+
+  const visibleCategoryTabs = useMemo(() => {
+    const baseCategories = ['CPNS', 'PPPK', 'BUMN', 'TOEFL'];
+
+    return CATEGORY_TABS.filter((tab) => {
+      if (tab === 'Lainnya') {
+        return activePackages.some((pkg) => !baseCategories.includes(getCategoryName(pkg, categoryMap)));
+      }
+
+      return activePackages.some((pkg) => getCategoryName(pkg, categoryMap) === tab);
+    });
+  }, [activePackages, categoryMap]);
+
+  useEffect(() => {
+    if (!visibleCategoryTabs.length) return;
+    if (!visibleCategoryTabs.includes(activeCategory)) {
+      setActiveCategory(visibleCategoryTabs[0]);
+    }
+  }, [visibleCategoryTabs, activeCategory]);
+
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('studigi:cart') || '[]');
@@ -107,12 +133,12 @@ export default function Home() {
 
     const byCategory =
       activeCategory === 'Lainnya'
-        ? packages.filter((pkg) => !['CPNS', 'PPPK', 'BUMN', 'TOEFL'].includes(getCategoryName(pkg, categoryMap)))
-        : packages.filter((pkg) => getCategoryName(pkg, categoryMap) === activeCategory);
+        ? activePackages.filter((pkg) => !['CPNS', 'PPPK', 'BUMN', 'TOEFL'].includes(getCategoryName(pkg, categoryMap)))
+        : activePackages.filter((pkg) => getCategoryName(pkg, categoryMap) === activeCategory);
 
     if (!searchTerm) return byCategory;
 
-    const searchablePackages = packages;
+    const searchablePackages = activePackages;
 
     return searchablePackages.filter((pkg) => {
       const packageName = String(pkg?.name || '').toLowerCase();
@@ -125,7 +151,7 @@ export default function Home() {
         packageType.includes(searchTerm)
       );
     });
-  }, [packages, activeCategory, categoryMap, location.search]);
+  }, [activePackages, activeCategory, categoryMap, location.search]);
 
   const handleAddToCart = (pkg: any) => {
     const mapped = normalizePackageToCartItem(pkg, categoryMap);
@@ -161,23 +187,27 @@ export default function Home() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-        <div className="flex flex-wrap gap-2">
-          {CATEGORY_TABS.map((category) => (
-            <button
-              key={category}
-              type="button"
-              onClick={() => setActiveCategory(category)}
-              className={[
-                'rounded-xl px-4 py-2 text-sm font-medium transition-colors',
-                activeCategory === category
-                  ? 'bg-[var(--header-color,#103c21)] text-white'
-                  : 'bg-slate-100 text-[var(--secondary-color,#69655e)] hover:bg-slate-200',
-              ].join(' ')}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
+        {visibleCategoryTabs.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {visibleCategoryTabs.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setActiveCategory(category)}
+                className={[
+                  'rounded-xl px-4 py-2 text-sm font-medium transition-colors',
+                  activeCategory === category
+                    ? 'bg-[var(--header-color,#103c21)] text-white'
+                    : 'bg-slate-100 text-[var(--secondary-color,#69655e)] hover:bg-slate-200',
+                ].join(' ')}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-600">Belum ada paket aktif yang tersedia.</p>
+        )}
       </section>
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-5">
