@@ -303,7 +303,7 @@ router.get('/reports/analytics', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/reports/:attemptId', requireAuth, async (req, res) => {
+router.get('/reports/:attemptId(\\d+)', requireAuth, async (req, res) => {
   try {
     const db = req.app.locals.db;
     const attemptId = Number(req.params.attemptId);
