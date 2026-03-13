@@ -133,6 +133,9 @@ router.post('/packages', requireAdmin, async (req, res) => {
       question_count = 0,
       category_id = null,
       included_package_ids = [],
+      content_type = 'question',
+      visibility = 'visible',
+      pdf_file_path = null,
     } = req.body || {};
 
     if (!name) return res.status(400).json({ error: 'name is required' });
@@ -141,8 +144,8 @@ router.post('/packages', requireAdmin, async (req, res) => {
     const normalizedOriginalPrice = normalizeOriginalPrice(original_price, normalizedPrice);
 
     const result = await db.query(
-      `INSERT INTO packages (name, description, type, price, original_price, question_count, category_id, included_package_ids, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+      `INSERT INTO packages (name, description, type, price, original_price, question_count, category_id, included_package_ids, content_type, visibility, pdf_file_path, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
        RETURNING *`,
       [
         name,
@@ -153,6 +156,9 @@ router.post('/packages', requireAdmin, async (req, res) => {
         Number(question_count || 0),
         category_id || null,
         normalizeIncludedPackageIds(included_package_ids),
+        content_type || 'question',
+        visibility || 'visible',
+        pdf_file_path || null,
       ]
     );
 
@@ -175,7 +181,12 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
       question_count,
       category_id,
       included_package_ids,
+      content_type,
+      visibility,
+      pdf_file_path,
     } = req.body || {};
+
+    const shouldUpdatePdfFilePath = Object.prototype.hasOwnProperty.call(req.body || {}, 'pdf_file_path');
 
     const normalizedPrice = price !== undefined ? normalizeCurrencyNumber(price) : null;
     const shouldUpdateOriginalPrice = original_price !== undefined;
@@ -195,8 +206,11 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
          question_count = COALESCE($7, question_count),
          category_id = COALESCE($8, category_id),
          included_package_ids = COALESCE($9, included_package_ids),
+         content_type = COALESCE($10, content_type),
+         visibility = COALESCE($11, visibility),
+         pdf_file_path = CASE WHEN $12::boolean THEN $13 ELSE pdf_file_path END,
          updated_at = NOW()
-       WHERE id = $10
+       WHERE id = $14
        RETURNING *`,
       [
         name ?? null,
@@ -208,6 +222,10 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
         question_count !== undefined ? Number(question_count) : null,
         category_id ?? null,
         included_package_ids !== undefined ? normalizeIncludedPackageIds(included_package_ids) : null,
+        content_type ?? null,
+        visibility ?? null,
+        shouldUpdatePdfFilePath,
+        shouldUpdatePdfFilePath ? (pdf_file_path ?? null) : null,
         id,
       ]
     );

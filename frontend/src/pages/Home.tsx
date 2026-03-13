@@ -6,7 +6,7 @@ import { categoryService, packageService, purchaseService } from '../services/ap
 import CartWidget, { CartItem } from '../components/CartWidget.tsx';
 import { formatRupiah, getOriginalPrice } from '../utils/pricing';
 
-const CATEGORY_TABS = ['CPNS', 'PPPK', 'BUMN', 'TOEFL', 'Lainnya'] as const;
+const CATEGORY_TABS = ['CPNS', 'PPPK', 'BUMN', 'TOEFL', 'EBOOK', 'Lainnya'] as const;
 
 const normalizeCategoryName = (value: any) => String(value || '').trim().toUpperCase();
 
@@ -95,7 +95,7 @@ export default function Home() {
   }, [packages]);
 
   const visibleCategoryTabs = useMemo(() => {
-    const baseCategories = ['CPNS', 'PPPK', 'BUMN', 'TOEFL'];
+    const baseCategories = ['CPNS', 'PPPK', 'BUMN', 'TOEFL', 'EBOOK'];
 
     return CATEGORY_TABS.filter((tab) => {
       if (tab === 'Lainnya') {
@@ -133,7 +133,7 @@ export default function Home() {
 
     const byCategory =
       activeCategory === 'Lainnya'
-        ? activePackages.filter((pkg) => !['CPNS', 'PPPK', 'BUMN', 'TOEFL'].includes(getCategoryName(pkg, categoryMap)))
+        ? activePackages.filter((pkg) => !['CPNS', 'PPPK', 'BUMN', 'TOEFL', 'EBOOK'].includes(getCategoryName(pkg, categoryMap)))
         : activePackages.filter((pkg) => getCategoryName(pkg, categoryMap) === activeCategory);
 
     if (!searchTerm) return byCategory;
@@ -183,7 +183,7 @@ export default function Home() {
     <div className="mx-auto max-w-7xl space-y-6 pb-20 md:pb-4 lg:pb-2">
       <section className="rounded-2xl bg-[var(--header-color,#103c21)] p-5 text-white sm:p-6">
         <h2 className="text-xl font-semibold sm:text-2xl">Tryout Marketplace</h2>
-        <p className="mt-1 text-sm text-emerald-100">Kategori: CPNS, PPPK, BUMN, TOEFL, dan lainnya.</p>
+        <p className="mt-1 text-sm text-emerald-100">Kategori: CPNS, PPPK, BUMN, TOEFL, Ebook, dan lainnya.</p>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">

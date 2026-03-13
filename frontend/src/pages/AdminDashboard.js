@@ -20,7 +20,7 @@ const isLocalHost =
 const API_ROOT = isLocalHost
   ? (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '')
   : '';
-const BASE_CATEGORY_NAMES = ['CPNS', 'BUMN', 'TOEFL'];
+const BASE_CATEGORY_NAMES = ['CPNS', 'PPPK', 'BUMN', 'TOEFL', 'EBOOK'];
 const ADMIN_TABS = [
   { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { key: 'packages', label: 'Kelola Paket', icon: Boxes },
@@ -467,6 +467,7 @@ const AdminDashboard = () => {
                       <option value="tryout">Tryout</option>
                       <option value="latihan">Latihan</option>
                       <option value="bundling">Bundling</option>
+                      <option value="ebook">Ebook</option>
                     </select>
                   </div>
                 </div>
@@ -488,8 +489,10 @@ const AdminDashboard = () => {
                     >
                       <option value="select">-- Pilih Kategori --</option>
                       <option value="CPNS">CPNS</option>
+                      <option value="PPPK">PPPK</option>
                       <option value="BUMN">BUMN</option>
                       <option value="TOEFL">TOEFL</option>
+                      <option value="EBOOK">Ebook</option>
                       <option value="other">Lainnya</option>
                     </select>
                     {newPackage.category_id === 'other' && (
@@ -707,6 +710,7 @@ const AdminDashboard = () => {
                         <option value="tryout">Tryout</option>
                         <option value="latihan">Latihan</option>
                         <option value="bundling">Bundling</option>
+                        <option value="ebook">Ebook</option>
                       </select>
                     </div>
                   </div>
@@ -729,8 +733,10 @@ const AdminDashboard = () => {
                       >
                         <option value="select">-- Pilih Kategori --</option>
                         <option value="CPNS">CPNS</option>
+                        <option value="PPPK">PPPK</option>
                         <option value="BUMN">BUMN</option>
                         <option value="TOEFL">TOEFL</option>
+                        <option value="EBOOK">Ebook</option>
                         {(categories || []).map((category) => (
                           <option key={`edit-cat-${category.id}`} value={String(category.id)}>
                             {category.name}
@@ -881,7 +887,7 @@ const AdminDashboard = () => {
         {activeTab === 'materials' && (
           <div className="card">
             <div className="card-title">Upload Materi (PDF)</div>
-            <MaterialUploader categories={categories} setCategories={setCategories} packages={packages} materials={materials} setMaterials={setMaterials} setMessage={setMessage} />
+            <MaterialUploader categories={categories} setCategories={setCategories} packages={packages} materials={materials} setMaterials={setMaterials} setMessage={setMessage} onReloadDashboard={loadDashboardData} />
           </div>
         )}
 
@@ -1827,7 +1833,7 @@ const CategoryManager = ({ categories, setCategories, setMessage }) => {
 };
 
 // Material uploader component
-const MaterialUploader = ({ categories, setCategories, packages, materials, setMaterials, setMessage }) => {
+const MaterialUploader = ({ categories, setCategories, packages, materials, setMaterials, setMessage, onReloadDashboard }) => {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -1835,6 +1841,11 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
   const [otherCategoryName, setOtherCategoryName] = useState('');
   const [packageId, setPackageId] = useState('');
   const [attachPackageByMaterial, setAttachPackageByMaterial] = useState({});
+  const [ebookName, setEbookName] = useState('');
+  const [ebookDescription, setEbookDescription] = useState('');
+  const [ebookPrice, setEbookPrice] = useState('0');
+  const [ebookOriginalPrice, setEbookOriginalPrice] = useState('');
+  const [ebookFile, setEbookFile] = useState(null);
 
   const ensureCategoryIdByName = async (rawName) => {
     const normalizedName = String(rawName || '').trim();
@@ -1969,8 +1980,129 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
     }
   };
 
+  const handleCreateEbookPackage = async (e) => {
+    e.preventDefault();
+
+    if (!ebookName.trim()) {
+      setMessage('Nama paket ebook wajib diisi');
+      return;
+    }
+
+    if (!ebookFile) {
+      setMessage('Pilih file PDF ebook');
+      return;
+    }
+
+    const lowerName = String(ebookFile.name || '').toLowerCase();
+    if (!(ebookFile.type === 'application/pdf' || lowerName.endsWith('.pdf'))) {
+      setMessage('File ebook harus berformat PDF');
+      return;
+    }
+
+    try {
+      const ebookCategoryId = await ensureCategoryIdByName('EBOOK');
+      const normalizedPrice = Number(normalizeCurrencyDigits(ebookPrice)) || 0;
+      const normalizedOriginalPriceDigits = normalizeCurrencyDigits(ebookOriginalPrice);
+      const normalizedOriginalPrice = normalizedOriginalPriceDigits ? Number(normalizedOriginalPriceDigits) : null;
+
+      if (normalizedOriginalPrice !== null && normalizedOriginalPrice <= normalizedPrice) {
+        setMessage('Harga coret ebook harus lebih besar dari harga jual');
+        return;
+      }
+
+      const createRes = await packageService.create({
+        name: ebookName.trim(),
+        description: ebookDescription.trim(),
+        type: 'ebook',
+        price: normalizedPrice,
+        original_price: normalizedOriginalPrice,
+        question_count: 0,
+        category_id: ebookCategoryId,
+        included_package_ids: [],
+        content_type: 'material',
+        visibility: 'visible',
+      });
+
+      const createdPackage = createRes?.data?.package || createRes?.data || {};
+      const createdPackageId = Number(createdPackage?.id || 0);
+      if (!Number.isInteger(createdPackageId) || createdPackageId <= 0) {
+        throw new Error('Gagal membuat paket ebook');
+      }
+
+      const uploadRes = await materialService.upload(ebookFile, {
+        categoryId: ebookCategoryId,
+        packageId: createdPackageId,
+        title: ebookName.trim(),
+        description: ebookDescription.trim(),
+      });
+
+      const pdfUrl = uploadRes?.data?.url || null;
+      if (pdfUrl) {
+        await packageService.update(createdPackageId, {
+          content_type: 'material',
+          visibility: 'visible',
+          pdf_file_path: pdfUrl,
+        });
+      }
+
+      setMessage('Paket ebook berhasil dibuat dan PDF berhasil diupload');
+      setEbookName('');
+      setEbookDescription('');
+      setEbookPrice('0');
+      setEbookOriginalPrice('');
+      setEbookFile(null);
+      await reloadMaterials();
+      if (typeof onReloadDashboard === 'function') {
+        await onReloadDashboard();
+      }
+    } catch (err) {
+      setMessage('Error membuat paket ebook: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   return (
     <div>
+      <form onSubmit={handleCreateEbookPackage} style={{ marginBottom: 20 }}>
+        <div className="card-title">Fitur Khusus Ebook (Buat Paket + Upload PDF)</div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Nama Paket Ebook</label>
+            <input value={ebookName} onChange={(e) => setEbookName(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label>Harga (Rp)</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={ebookPrice}
+              onChange={(e) => setEbookPrice(normalizeCurrencyDigits(e.target.value))}
+            />
+          </div>
+          <div className="form-group">
+            <label>Harga Coret (Opsional)</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={ebookOriginalPrice}
+              onChange={(e) => setEbookOriginalPrice(normalizeCurrencyDigits(e.target.value))}
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Deskripsi</label>
+            <textarea value={ebookDescription} onChange={(e) => setEbookDescription(e.target.value)} rows={2} />
+          </div>
+          <div className="form-group">
+            <label>File Ebook (PDF)</label>
+            <input type="file" accept="application/pdf" onChange={(e) => setEbookFile(e.target.files[0])} required />
+          </div>
+        </div>
+
+        <button className="btn btn-success">Buat Paket Ebook</button>
+      </form>
+
       <form onSubmit={handleUpload}>
         <div className="form-row">
           <div className="form-group">
@@ -1982,8 +2114,10 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
             <select value={selectedCategory} onChange={(e)=>setSelectedCategory(e.target.value)}>
               <option value="">-- none --</option>
               <option value="CPNS">CPNS</option>
+              <option value="PPPK">PPPK</option>
               <option value="BUMN">BUMN</option>
               <option value="TOEFL">TOEFL</option>
+              <option value="EBOOK">Ebook</option>
               <option value="other">Lainnya</option>
             </select>
             {selectedCategory === 'other' && (
