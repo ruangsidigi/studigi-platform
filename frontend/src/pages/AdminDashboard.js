@@ -2002,6 +2002,8 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
   const handleCreateEbookPackage = async (e) => {
     e.preventDefault();
 
+    let createdPackageId = 0;
+
     if (!ebookName.trim()) {
       setMessage('Nama paket ebook wajib diisi');
       return;
@@ -2043,7 +2045,7 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
       });
 
       const createdPackage = createRes?.data?.package || createRes?.data || {};
-      const createdPackageId = Number(createdPackage?.id || 0);
+      createdPackageId = Number(createdPackage?.id || 0);
       if (!Number.isInteger(createdPackageId) || createdPackageId <= 0) {
         throw new Error('Gagal membuat paket ebook');
       }
@@ -2075,6 +2077,11 @@ const MaterialUploader = ({ categories, setCategories, packages, materials, setM
         await onReloadDashboard();
       }
     } catch (err) {
+      if (Number.isInteger(createdPackageId) && createdPackageId > 0) {
+        try {
+          await packageService.delete(createdPackageId);
+        } catch (_) {}
+      }
       setMessage('Error membuat paket ebook: ' + extractErrorMessage(err, 'Gagal membuat paket ebook'));
     }
   };

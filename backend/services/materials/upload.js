@@ -606,18 +606,41 @@ async function fetchMaterialStream(material) {
   return null;
 }
 
-async function uploadToStorage({ buffer, mimeType, folder = 'materials' }) {
+async function uploadToStorage({ buffer, mimeType, folder = 'materials', originalName = 'material.pdf' }) {
   const key = `${folder}/${Date.now()}-${uuidv4()}`;
-  const command = new PutObjectCommand({
-    Bucket: config.storageBucket,
-    Key: key,
-    Body: buffer,
-    ContentType: mimeType
-  });
-  console.log('materials/upload: sending PutObjectCommand', { key, mimeType, size: buffer && buffer.length });
-  if (!s3) throw new Error('S3 client not initialized');
-  await s3.send(command);
-  return buildPublicStorageUrl(config.storageBucket, key);
+
+  const canUseS3 = Boolean(s3 && config.storageBucket);
+  if (canUseS3) {
+    try {
+      const command = new PutObjectCommand({
+        Bucket: config.storageBucket,
+        Key: key,
+        Body: buffer,
+        ContentType: mimeType
+      });
+      console.log('materials/upload: sending PutObjectCommand', { key, mimeType, size: buffer && buffer.length });
+      await s3.send(command);
+      return buildPublicStorageUrl(config.storageBucket, key);
+    } catch (s3Error) {
+      console.warn('materials/upload: S3 upload failed, trying Supabase fallback', s3Error && s3Error.message ? s3Error.message : s3Error);
+    }
+  }
+
+  try {
+    const safeName = String(originalName || 'material.pdf').toLowerCase().endsWith('.pdf')
+      ? String(originalName)
+      : `${Date.now()}-material.pdf`;
+    let fileStorageService;
+    try {
+      fileStorageService = require('../../src/services/fileStorageService');
+    } catch (bootstrapError) {
+      throw new Error(`Supabase fallback is not available: ${bootstrapError && bootstrapError.message ? bootstrapError.message : String(bootstrapError)}`);
+    }
+    const fallback = await fileStorageService.uploadPDF(buffer, safeName, 'materials');
+    return fallback.publicUrl || fallback.url || fallback.path;
+  } catch (fallbackError) {
+    throw new Error(`Upload failed: ${fallbackError && fallbackError.message ? fallbackError.message : String(fallbackError)}`);
+  }
 }
 
 async function handleMaterialUpload(req, res) {
@@ -627,7 +650,12 @@ async function handleMaterialUpload(req, res) {
     const isPdfMime = String(req.file.mimetype || '').toLowerCase() === 'application/pdf';
     const isPdfByName = lowerName.endsWith('.pdf');
     if (!isPdfMime && !isPdfByName) return res.status(400).json({ error: 'Invalid file type' });
-    const url = await uploadToStorage({ buffer: req.file.buffer, mimeType: req.file.mimetype, folder: 'materials' });
+    const url = await uploadToStorage({
+      buffer: req.file.buffer,
+      mimeType: req.file.mimetype,
+      folder: 'materials',
+      originalName: req.file.originalname,
+    });
     const db = req.app.locals.db;
     const materialColumnsResult = await db.query(
       `SELECT column_name
