@@ -63,6 +63,7 @@ router.get('/reports/overview', requireAuth, async (req, res) => {
       date: item.finished_at || item.created_at,
       score: asNumber(item.total_score),
       packageName: item.package_name || '-',
+      isPassed: !!item.is_passed,
     }));
 
     const categoriesResult = await db.query('SELECT id, name FROM categories');
