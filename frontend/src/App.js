@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect } from 'react';
+import React, { Suspense, lazy, useCallback, useContext, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext';
 import { brandingService } from './services/api';
@@ -13,14 +13,7 @@ import Dashboard from './pages/Dashboard';
 import CategoryPackages from './pages/CategoryPackages';
 import BundleDetail from './pages/BundleDetail';
 import Reports from './pages/Reports';
-import ReviewPage from './pages/ReviewPage';
-import Quiz from './pages/Quiz';
 import Results from './pages/Results';
-import AdminDashboard from './pages/AdminDashboard';
-import CMSContentLibraryPage from './pages/CMSContentLibraryPage';
-import CMSUploadCenterPage from './pages/CMSUploadCenterPage';
-import CMSWorkflowApprovalPage from './pages/CMSWorkflowApprovalPage';
-import CMSBundleBuilderPage from './pages/CMSBundleBuilderPage';
 import AdaptiveDashboard from './pages/AdaptiveDashboard';
 import UserMaterialsPage from './pages/UserMaterialsPage';
 import HomePage from './pages/Home.tsx';
@@ -30,11 +23,23 @@ import PayoutsPage from './pages/Payouts.tsx';
 import SettingsPage from './pages/Settings.tsx';
 import PaymentPage from './pages/Payment.tsx';
 import ContactUsPage from './pages/ContactUs.tsx';
-import MaterialViewerPage from './pages/MaterialViewerPage';
 import DashboardLayout from './layouts/DashboardLayout.tsx';
 
 // Styles
 import './styles/global.css';
+
+const ReviewPage = lazy(() => import('./pages/ReviewPage'));
+const Quiz = lazy(() => import('./pages/Quiz'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const CMSContentLibraryPage = lazy(() => import('./pages/CMSContentLibraryPage'));
+const CMSUploadCenterPage = lazy(() => import('./pages/CMSUploadCenterPage'));
+const CMSWorkflowApprovalPage = lazy(() => import('./pages/CMSWorkflowApprovalPage'));
+const CMSBundleBuilderPage = lazy(() => import('./pages/CMSBundleBuilderPage'));
+const MaterialViewerPage = lazy(() => import('./pages/MaterialViewerPage'));
+
+const RouteLoading = () => (
+  <div className="mx-auto max-w-7xl p-6 text-sm text-slate-600">Memuat halaman...</div>
+);
 
 const FAVICON_CACHE_KEY = 'appFaviconUrl';
 
@@ -119,6 +124,7 @@ function App() {
     <Router>
       <div className="app-shell">
         <main className="app-content">
+          <Suspense fallback={<RouteLoading />}>
           <Routes>
             {/* Public Routes */}
             <Route
@@ -350,6 +356,7 @@ function App() {
             {/* Default Route */}
             <Route path="/" element={<Navigate to="/home" />} />
           </Routes>
+          </Suspense>
         </main>
 
       </div>
