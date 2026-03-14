@@ -107,14 +107,20 @@ export const paymentService = {
     const preferredPackageIds = normalizedPackageIds.length > 0 ? normalizedPackageIds : rawPackageIds;
     const primaryId = rawPackageIds[0] || normalizedPackageIds[0] || null;
 
+    const { voucherCode, ...rest } = extraPayload;
+
     const payload = {
       packageIds: preferredPackageIds,
       package_ids: preferredPackageIds,
       rawPackageIds,
       paymentMethod,
       payment_method: paymentMethod,
-      ...extraPayload,
+      ...rest,
     };
+
+    if (voucherCode && String(voucherCode).trim()) {
+      payload.voucherCode = String(voucherCode).trim().toUpperCase();
+    }
 
     if (primaryId && rawPackageIds.length === 1) {
       payload.bundle_id = primaryId;
@@ -132,6 +138,16 @@ export const paymentService = {
 export const userService = {
   getProfile: () => api.get('/users/profile'),
   updateProfile: (data) => api.put('/users/profile', data),
+};
+
+// Voucher Service
+export const voucherService = {
+  validate: (code, subtotal) => api.post('/vouchers/validate', { code, subtotal }),
+  getAll: () => api.get('/vouchers'),
+  create: (data) => api.post('/vouchers', data),
+  update: (id, data) => api.put(`/vouchers/${id}`, data),
+  remove: (id) => api.delete(`/vouchers/${id}`),
+  getUsages: (id) => api.get(`/vouchers/${id}/usages`),
 };
 
 // Admin Service

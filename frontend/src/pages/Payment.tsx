@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { paymentService } from '../services/api';
+import { paymentService, voucherService } from '../services/api';
 import { CartItem } from '../components/CartWidget.tsx';
 
 export default function Payment() {
@@ -12,6 +12,17 @@ export default function Payment() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [modalTermsAccepted, setModalTermsAccepted] = useState(false);
 
+  // Voucher state
+  const [voucherInput, setVoucherInput] = useState('');
+  const [voucherLoading, setVoucherLoading] = useState(false);
+  const [voucherError, setVoucherError] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState<{
+    code: string;
+    description: string;
+    discountAmount: number;
+    finalAmount: number;
+  } | null>(null);
+
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('studigi:cart') || '[]');
@@ -22,6 +33,39 @@ export default function Payment() {
   }, []);
 
   const totalPrice = cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0);
+  const finalPrice = appliedVoucher ? appliedVoucher.finalAmount : totalPrice;
+
+  const applyVoucher = async () => {
+    const code = voucherInput.trim().toUpperCase();
+    if (!code) {
+      setVoucherError('Masukkan kode voucher terlebih dahulu.');
+      return;
+    }
+    setVoucherLoading(true);
+    setVoucherError('');
+    try {
+      const res = await voucherService.validate(code, totalPrice);
+      const data = res.data || {};
+      setAppliedVoucher({
+        code: data.code,
+        description: data.description || '',
+        discountAmount: data.discountAmount,
+        finalAmount: data.finalAmount,
+      });
+      setVoucherInput('');
+    } catch (vErr: any) {
+      setVoucherError(vErr?.response?.data?.error || 'Kode voucher tidak valid.');
+      setAppliedVoucher(null);
+    } finally {
+      setVoucherLoading(false);
+    }
+  };
+
+  const removeVoucher = () => {
+    setAppliedVoucher(null);
+    setVoucherError('');
+    setVoucherInput('');
+  };
 
   const processPayment = async () => {
     if (cartItems.length === 0) {
@@ -41,10 +85,11 @@ export default function Payment() {
       const packageIds = cartItems.map((item) => item.id);
       const response = await paymentService.checkout(packageIds, 'midtrans', {
         reason: 'checkout',
-        totalPrice,
+        totalPrice: finalPrice,
         termsAccepted: true,
         termsAcceptedAt: new Date().toISOString(),
         termsVersion: 'v1',
+        ...(appliedVoucher ? { voucherCode: appliedVoucher.code } : {}),
       });
 
       const payload = response.data || {};
@@ -125,11 +170,68 @@ export default function Payment() {
               ))}
             </div>
 
-            <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
-              <span className="text-sm text-[var(--secondary-color,#69655e)]">Total Harga</span>
-              <span className="text-lg font-semibold text-[var(--header-color,#103c21)]">
-                Rp {totalPrice.toLocaleString('id-ID')}
-              </span>
+            {/* Voucher input */}
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              <p className="mb-2 text-sm font-medium text-slate-700">Kode Voucher</p>
+              {appliedVoucher ? (
+                <div className="flex items-center justify-between rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-800">{appliedVoucher.code}</p>
+                    {appliedVoucher.description && (
+                      <p className="text-xs text-emerald-700">{appliedVoucher.description}</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeVoucher}
+                    className="text-xs font-medium text-red-600 hover:underline"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={voucherInput}
+                    onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => e.key === 'Enter' && applyVoucher()}
+                    placeholder="Masukkan kode voucher"
+                    className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-[var(--header-color,#103c21)] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={applyVoucher}
+                    disabled={voucherLoading}
+                    className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+                  >
+                    {voucherLoading ? '...' : 'Terapkan'}
+                  </button>
+                </div>
+              )}
+              {voucherError && <p className="mt-1 text-xs text-red-600">{voucherError}</p>}
+            </div>
+
+            {/* Price summary */}
+            <div className="mt-4 space-y-1 border-t border-slate-200 pt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[var(--secondary-color,#69655e)]">Subtotal</span>
+                <span className="text-sm text-slate-700">Rp {totalPrice.toLocaleString('id-ID')}</span>
+              </div>
+              {appliedVoucher && (
+                <div className="flex items-center justify-between text-emerald-700">
+                  <span className="text-sm">Diskon Voucher ({appliedVoucher.code})</span>
+                  <span className="text-sm font-semibold">
+                    − Rp {appliedVoucher.discountAmount.toLocaleString('id-ID')}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between border-t border-slate-100 pt-1">
+                <span className="text-sm font-semibold text-slate-800">Total Bayar</span>
+                <span className="text-lg font-semibold text-[var(--header-color,#103c21)]">
+                  Rp {finalPrice.toLocaleString('id-ID')}
+                </span>
+              </div>
             </div>
 
             {error && <p className="mt-3 text-sm text-red-700">{error}</p>}

@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
 const config = require('../../shared/config');
+const voucherHelpers = require('../vouchers');
 
 const router = express.Router();
 
@@ -159,6 +160,13 @@ const ensurePaymentSchema = async (db) => {
   await db.query('CREATE INDEX IF NOT EXISTS idx_payment_transactions_reference ON payment_transactions(provider_reference)');
   await db.query('CREATE INDEX IF NOT EXISTS idx_purchases_payment_transaction_id ON purchases(payment_transaction_id)');
 
+  // Add voucher link columns (safe – silently ignored if vouchers table not yet created)
+  try {
+    await db.query(`ALTER TABLE payment_transactions
+      ADD COLUMN IF NOT EXISTS voucher_id   BIGINT,
+      ADD COLUMN IF NOT EXISTS voucher_code VARCHAR(50)`);
+  } catch (_) {}
+
   paymentSchemaReady = true;
 };
 
@@ -176,6 +184,7 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
       termsAccepted = false,
       termsAcceptedAt = null,
       termsVersion = 'unknown',
+      voucherCode = null,
     } = req.body || {};
 
     const requestedMethod = String(paymentMethod || 'midtrans').toLowerCase();
@@ -216,7 +225,26 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
     }
 
     const subtotalAmount = roundMoney(packageRows.reduce((sum, item) => sum + Number(item.price || 0), 0));
-    const discountAmount = normalizedPackageIds.length > 2 ? roundMoney(subtotalAmount * 0.1) : 0;
+
+    // Validate voucher if provided
+    let appliedVoucherId = null;
+    let appliedVoucherCode = null;
+    let voucherDiscountAmount = 0;
+    if (voucherCode && String(voucherCode).trim()) {
+      await voucherHelpers.ensureVoucherSchema(db);
+      const vResult = await voucherHelpers.validateVoucherCode(db, String(voucherCode).trim(), subtotalAmount);
+      if (!vResult.valid) {
+        return res.status(400).json({ error: vResult.error });
+      }
+      appliedVoucherId = vResult.voucher.id;
+      appliedVoucherCode = vResult.voucher.code;
+      voucherDiscountAmount = vResult.discountAmount;
+    }
+
+    // Use voucher discount if provided, otherwise fall back to bulk purchase discount (>2 items)
+    const discountAmount = appliedVoucherCode
+      ? roundMoney(voucherDiscountAmount)
+      : (normalizedPackageIds.length > 2 ? roundMoney(subtotalAmount * 0.1) : 0);
     const totalAmount = roundMoney(subtotalAmount - discountAmount);
     const perPackageAmount = normalizedPackageIds.length > 0 ? roundMoney(totalAmount / normalizedPackageIds.length) : 0;
     const paymentReference = createPaymentReference();
@@ -269,6 +297,32 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
         [req.user.id, packageId, effectivePaymentMethod, 'pending', perPackageAmount, transaction.id, paymentReference]
       );
       if (purchaseResult.rows[0]) insertedPurchases.push(purchaseResult.rows[0]);
+    }
+
+    // Apply voucher inside the transaction (lock row to prevent concurrent over-use)
+    if (appliedVoucherId) {
+      const lockedVoucher = await db.query(
+        `SELECT id, max_uses, used_count FROM vouchers WHERE id = $1 FOR UPDATE`,
+        [appliedVoucherId]
+      );
+      const lv = lockedVoucher.rows[0];
+      if (!lv || (lv.max_uses !== null && Number(lv.used_count) >= Number(lv.max_uses))) {
+        await db.query('ROLLBACK');
+        return res.status(400).json({ error: 'Kuota kode voucher sudah habis' });
+      }
+      await db.query(
+        `INSERT INTO voucher_usages (voucher_id, user_id, payment_transaction_id, discount_applied, used_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [appliedVoucherId, req.user.id, transaction.id, voucherDiscountAmount]
+      );
+      await db.query(
+        `UPDATE vouchers SET used_count = used_count + 1, updated_at = NOW() WHERE id = $1`,
+        [appliedVoucherId]
+      );
+      await db.query(
+        `UPDATE payment_transactions SET voucher_id = $1, voucher_code = $2 WHERE id = $3`,
+        [appliedVoucherId, appliedVoucherCode, transaction.id]
+      );
     }
 
     const itemDetails = [
@@ -336,6 +390,7 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
         expires_at: transaction.expires_at,
         snap_token: snapResponse?.token || null,
         payment_url: snapResponse?.redirect_url || null,
+        voucher_code: appliedVoucherCode || null,
       },
       purchases: insertedPurchases,
     });

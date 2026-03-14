@@ -31,6 +31,7 @@ import './styles/global.css';
 const ReviewPage = lazy(() => import('./pages/ReviewPage'));
 const Quiz = lazy(() => import('./pages/Quiz'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminVouchers = lazy(() => import('./pages/AdminVouchers'));
 const CMSContentLibraryPage = lazy(() => import('./pages/CMSContentLibraryPage'));
 const CMSUploadCenterPage = lazy(() => import('./pages/CMSUploadCenterPage'));
 const CMSWorkflowApprovalPage = lazy(() => import('./pages/CMSWorkflowApprovalPage'));
@@ -308,6 +309,16 @@ function App() {
                 <ProtectedRoute requiredRole="admin">
                   <DashboardLayout>
                     <AdminDashboard />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/vouchers"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <DashboardLayout>
+                    <AdminVouchers />
                   </DashboardLayout>
                 </ProtectedRoute>
               }
