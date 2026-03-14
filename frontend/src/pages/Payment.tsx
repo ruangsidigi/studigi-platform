@@ -67,13 +67,13 @@ export default function Payment() {
     setVoucherInput('');
   };
 
-  const processPayment = async () => {
+  const processPayment = async (options?: { forceTermsAccepted?: boolean }) => {
     if (cartItems.length === 0) {
       setError('Cart masih kosong.');
       return;
     }
 
-    if (!termsAccepted) {
+    if (!(options?.forceTermsAccepted || termsAccepted)) {
       setError('Syarat & ketentuan harus disetujui sebelum checkout.');
       return;
     }
@@ -129,8 +129,10 @@ export default function Payment() {
   const handleConfirmTerms = async () => {
     if (!modalTermsAccepted) return;
     setTermsAccepted(true);
+    setError('');
     setShowTermsModal(false);
-    await processPayment();
+    setModalTermsAccepted(false);
+    await processPayment({ forceTermsAccepted: true });
   };
 
   return (
