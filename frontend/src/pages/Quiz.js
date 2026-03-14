@@ -24,6 +24,7 @@ const Quiz = () => {
   const [timeLeft, setTimeLeft] = useState(100 * 60);
   const [questionStartAt, setQuestionStartAt] = useState(Date.now());
   const [isFinishing, setIsFinishing] = useState(false);
+  const [questionsReady, setQuestionsReady] = useState(false);
   const [participantName, setParticipantName] = useState('');
   const [participantProvince, setParticipantProvince] = useState('');
   const [isStartingSession, setIsStartingSession] = useState(false);
@@ -127,6 +128,7 @@ const Quiz = () => {
 
       setError('');
       setIsStartingSession(true);
+      setQuestionsReady(false);
       const parsedPackageId = parseInt(packageId, 10);
       const sessionRes = await tryoutService.start(parsedPackageId, {
         participantName: trimmedName,
@@ -137,6 +139,7 @@ const Quiz = () => {
       const questionsRes = await questionService.getByPackage(parsedPackageId);
       const loadedQuestions = Array.isArray(questionsRes.data) ? questionsRes.data : [];
       setQuestions(loadedQuestions);
+      setQuestionsReady(true);
       setSessionId(startedSessionId);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to start tryout');
@@ -364,7 +367,11 @@ const Quiz = () => {
     );
   }
 
-  if (questions.length === 0) {
+  if (sessionId && !questionsReady) {
+    return <div className="mx-auto max-w-7xl p-6 text-sm text-slate-600">Memuat soal...</div>;
+  }
+
+  if (questionsReady && questions.length === 0) {
     return <div className="mx-auto max-w-7xl p-6 text-sm text-slate-600">No questions found</div>;
   }
 
