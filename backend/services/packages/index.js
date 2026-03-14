@@ -308,32 +308,54 @@ router.get('/packages/:id/leaderboard', async (req, res) => {
   try {
     const db = req.app.locals.db;
     const { id } = req.params;
+    const scope = String(req.query?.scope || 'national').toLowerCase() === 'province' ? 'province' : 'national';
+    const province = String(req.query?.province || '').trim();
+
+    if (scope === 'province' && !province) {
+      return res.status(400).json({ error: 'province is required for province leaderboard' });
+    }
+
     const result = await db.query(
-      `SELECT
-         ts.user_id,
-         COALESCE(u.display_name, u.name, u.email) AS user_name,
-         MAX(ts.total_score) AS best_score,
-         MIN(CASE WHEN ts.started_at IS NOT NULL AND ts.finished_at IS NOT NULL
-           THEN EXTRACT(EPOCH FROM (ts.finished_at - ts.started_at))
-           ELSE NULL END) AS best_duration_seconds
-       FROM tryout_sessions ts
-       LEFT JOIN users u ON u.id = ts.user_id
-       WHERE ts.package_id = $1
-         AND ts.status = 'completed'
-       GROUP BY ts.user_id, COALESCE(u.display_name, u.name, u.email)
-       ORDER BY best_score DESC NULLS LAST, best_duration_seconds ASC NULLS LAST`,
-      [id]
+      `WITH best_sessions AS (
+         SELECT DISTINCT ON (ts.user_id)
+           ts.user_id,
+           ts.id,
+           ts.total_score,
+           ts.participant_name,
+           ts.participant_province,
+           CASE WHEN ts.started_at IS NOT NULL AND ts.finished_at IS NOT NULL
+             THEN EXTRACT(EPOCH FROM (ts.finished_at - ts.started_at))
+             ELSE NULL END AS duration_seconds,
+           COALESCE(NULLIF(ts.participant_name, ''), u.display_name, u.name, u.email) AS fallback_name
+         FROM tryout_sessions ts
+         LEFT JOIN users u ON u.id = ts.user_id
+         WHERE ts.package_id = $1
+           AND ts.status = 'completed'
+           AND ts.total_score IS NOT NULL
+         ORDER BY ts.user_id, ts.total_score DESC NULLS LAST, ts.finished_at DESC NULLS LAST, ts.id DESC
+       )
+       SELECT
+         bs.user_id,
+         bs.fallback_name AS user_name,
+         bs.participant_province AS user_province,
+         bs.total_score AS best_score,
+         bs.duration_seconds AS best_duration_seconds
+       FROM best_sessions bs
+       WHERE ($2 = 'national') OR (bs.participant_province = $3)
+       ORDER BY bs.total_score DESC NULLS LAST, bs.duration_seconds ASC NULLS LAST, bs.id ASC`,
+      [id, scope, province]
     );
 
     const ranking = (result.rows || []).map((row, index) => ({
       rank: index + 1,
       user_id: row.user_id,
       user_name: row.user_name || '-',
+      user_province: row.user_province || null,
       best_score: Number(row.best_score || 0),
       best_duration_seconds: row.best_duration_seconds !== null ? Number(row.best_duration_seconds) : null,
     }));
 
-    return res.json({ package_id: Number(id), ranking });
+    return res.json({ package_id: Number(id), scope, province: scope === 'province' ? province : null, ranking });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

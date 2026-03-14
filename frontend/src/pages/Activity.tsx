@@ -11,8 +11,9 @@ export default function Activity() {
   const [adaptiveDashboard, setAdaptiveDashboard] = useState<any>(null);
   const [myRankings, setMyRankings] = useState<any[]>([]);
   const [expandedPackageId, setExpandedPackageId] = useState<number | null>(null);
-  const [leaderboardData, setLeaderboardData] = useState<Record<number, any[]>>({});
-  const [loadingLeaderboard, setLoadingLeaderboard] = useState<number | null>(null);
+  const [leaderboardScopeByPackage, setLeaderboardScopeByPackage] = useState<Record<number, 'national' | 'province'>>({});
+  const [leaderboardData, setLeaderboardData] = useState<Record<string, any[]>>({});
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -54,22 +55,36 @@ export default function Activity() {
     loadData();
   }, []);
 
-  const toggleLeaderboard = async (packageId: number) => {
+  const buildBoardKey = (packageId: number, scope: 'national' | 'province') => `${packageId}_${scope}`;
+
+  const fetchLeaderboard = async (packageId: number, scope: 'national' | 'province', province?: string | null) => {
+    const boardKey = buildBoardKey(packageId, scope);
+    if (leaderboardData[boardKey]) return;
+    try {
+      setLoadingLeaderboard(boardKey);
+      const params: any = scope === 'province' ? { scope, province } : { scope };
+      const res = await packageService.getLeaderboard(packageId, params);
+      setLeaderboardData((prev) => ({ ...prev, [boardKey]: res.data?.ranking || [] }));
+    } catch (_) {
+      setLeaderboardData((prev) => ({ ...prev, [boardKey]: [] }));
+    } finally {
+      setLoadingLeaderboard(null);
+    }
+  };
+
+  const toggleLeaderboard = async (packageId: number, province?: string | null) => {
     if (expandedPackageId === packageId) {
       setExpandedPackageId(null);
       return;
     }
     setExpandedPackageId(packageId);
-    if (leaderboardData[packageId]) return;
-    try {
-      setLoadingLeaderboard(packageId);
-      const res = await packageService.getLeaderboard(packageId);
-      setLeaderboardData((prev) => ({ ...prev, [packageId]: res.data?.ranking || [] }));
-    } catch (_) {
-      setLeaderboardData((prev) => ({ ...prev, [packageId]: [] }));
-    } finally {
-      setLoadingLeaderboard(null);
-    }
+    const currentScope = leaderboardScopeByPackage[packageId] || 'national';
+    await fetchLeaderboard(packageId, currentScope, province || null);
+  };
+
+  const switchLeaderboardScope = async (packageId: number, scope: 'national' | 'province', province?: string | null) => {
+    setLeaderboardScopeByPackage((prev) => ({ ...prev, [packageId]: scope }));
+    await fetchLeaderboard(packageId, scope, province || null);
   };
 
   const progressBars = useMemo(() => {
@@ -199,39 +214,50 @@ export default function Activity() {
         ) : (
           <div className="space-y-3">
             {myRankings.map((pkg: any) => {
-              const rank = pkg.userRank;
-              const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
+              const nationalRank = pkg.userRankNational;
+              const provinceRank = pkg.userRankProvince;
+              const rankForBadge = nationalRank;
+              const medal = rankForBadge === 1 ? '🥇' : rankForBadge === 2 ? '🥈' : rankForBadge === 3 ? '🥉' : null;
               const isExpanded = expandedPackageId === pkg.packageId;
-              const board: any[] = leaderboardData[pkg.packageId] || [];
+              const activeScope: 'national' | 'province' = leaderboardScopeByPackage[pkg.packageId] || 'national';
+              const boardKey = buildBoardKey(pkg.packageId, activeScope);
+              const board: any[] = leaderboardData[boardKey] || [];
 
               return (
                 <div key={pkg.packageId} className="rounded-xl border border-slate-200 overflow-hidden">
                   <div className="flex flex-wrap items-center gap-3 p-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg font-bold text-slate-700">
-                      {medal || `#${rank}`}
+                      {medal || `#${rankForBadge}`}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-slate-900">{pkg.packageName}</p>
-                      <p className="text-xs text-[var(--secondary-color,#69655e)]">
-                        Peringkat <strong className="text-slate-900">#{rank}</strong> dari{' '}
-                        <strong className="text-slate-900">{pkg.participantCount}</strong> peserta
-                        {' '}• Skor terbaik: <strong className="text-slate-900">{pkg.userBestScore}</strong>
-                      </p>
+                      <div className="space-y-0.5 text-xs text-[var(--secondary-color,#69655e)]">
+                        <p>
+                          Nasional: <strong className="text-slate-900">#{nationalRank}</strong> dari{' '}
+                          <strong className="text-slate-900">{pkg.participantCountNational}</strong> peserta
+                        </p>
+                        <p>
+                          Provinsi ({pkg.participantProvince || '-'}):{' '}
+                          <strong className="text-slate-900">{provinceRank ? `#${provinceRank}` : '-'}</strong> dari{' '}
+                          <strong className="text-slate-900">{pkg.participantCountProvince || 0}</strong> peserta
+                          {' '}• Skor terbaik: <strong className="text-slate-900">{pkg.userBestScore}</strong>
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => toggleLeaderboard(pkg.packageId)}
+                      onClick={() => toggleLeaderboard(pkg.packageId, pkg.participantProvince)}
                       className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                     >
                       {isExpanded ? 'Tutup' : 'Lihat Semua'}
                     </button>
                   </div>
 
-                  {!isExpanded && (pkg.topParticipants || []).length > 0 && (
+                  {!isExpanded && (pkg.topParticipantsNational || []).length > 0 && (
                     <div className="border-t border-slate-100 bg-slate-50 px-3 py-2">
-                      <p className="mb-1.5 text-xs font-medium text-slate-500">Top 3</p>
+                      <p className="mb-1.5 text-xs font-medium text-slate-500">Top 3 Nasional</p>
                       <div className="flex flex-wrap gap-3">
-                        {(pkg.topParticipants || []).slice(0, 3).map((p: any) => (
+                        {(pkg.topParticipantsNational || []).slice(0, 3).map((p: any) => (
                           <div key={p.rank} className="flex items-center gap-1.5 text-xs text-slate-700">
                             <span>{p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : '🥉'}</span>
                             <span className="font-medium">{p.name}</span>
@@ -244,7 +270,25 @@ export default function Activity() {
 
                   {isExpanded && (
                     <div className="border-t border-slate-100">
-                      {loadingLeaderboard === pkg.packageId ? (
+                      <div className="flex gap-2 border-b border-slate-100 px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => switchLeaderboardScope(pkg.packageId, 'national', pkg.participantProvince)}
+                          className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${activeScope === 'national' ? 'bg-[var(--header-color,#103c21)] text-white' : 'bg-slate-100 text-slate-700'}`}
+                        >
+                          Nasional
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!pkg.participantProvince}
+                          onClick={() => switchLeaderboardScope(pkg.packageId, 'province', pkg.participantProvince)}
+                          className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${activeScope === 'province' ? 'bg-[var(--header-color,#103c21)] text-white' : 'bg-slate-100 text-slate-700'} disabled:opacity-50`}
+                        >
+                          Provinsi
+                        </button>
+                      </div>
+
+                      {loadingLeaderboard === boardKey ? (
                         <p className="p-3 text-sm text-slate-500">Memuat leaderboard...</p>
                       ) : board.length === 0 ? (
                         <p className="p-3 text-sm text-slate-500">Belum ada data leaderboard.</p>
@@ -255,12 +299,14 @@ export default function Activity() {
                               <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-500">
                                 <th className="px-3 py-2 w-12">No</th>
                                 <th className="px-3 py-2">Peserta</th>
+                                <th className="px-3 py-2">Provinsi</th>
                                 <th className="px-3 py-2 text-right">Skor Terbaik</th>
                               </tr>
                             </thead>
                             <tbody>
                               {board.slice(0, 20).map((row: any) => {
-                                const isMe = row.rank === rank && row.best_score === pkg.userBestScore;
+                                const myRank = activeScope === 'province' ? pkg.userRankProvince : pkg.userRankNational;
+                                const isMe = row.rank === myRank && row.best_score === pkg.userBestScore;
                                 return (
                                   <tr
                                     key={row.rank}
@@ -274,6 +320,7 @@ export default function Activity() {
                                     <td className="px-3 py-2 text-slate-900">
                                       {row.user_name}{isMe && <span className="ml-1.5 rounded bg-[var(--header-color,#103c21)] px-1.5 py-0.5 text-[10px] text-white">Kamu</span>}
                                     </td>
+                                    <td className="px-3 py-2 text-slate-600">{row.user_province || '-'}</td>
                                     <td className="px-3 py-2 text-right font-mono text-slate-700">{row.best_score}</td>
                                   </tr>
                                 );

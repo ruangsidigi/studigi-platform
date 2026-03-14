@@ -43,7 +43,7 @@ export const packageService = {
   getAll: () => api.get('/packages', { params: { t: Date.now() } }),
   getById: (id) => api.get(`/packages/${id}`),
   getBundleDetails: (id) => api.get(`/bundles/${id}`),
-  getLeaderboard: (id) => api.get(`/packages/${id}/leaderboard`),
+  getLeaderboard: (id, params = {}) => api.get(`/packages/${id}/leaderboard`, { params }),
   create: (data) => api.post('/packages', data),
   update: (id, data) => api.put(`/packages/${id}`, data),
   delete: (id) => api.delete(`/packages/${id}`),
@@ -77,7 +77,7 @@ export const questionService = {
 
 // Tryout Service
 export const tryoutService = {
-  start: (packageId) => api.post('/tryouts/start', { packageId }),
+  start: (packageId, participant = {}) => api.post('/tryouts/start', { packageId, ...participant }),
   submitAnswer: (sessionId, questionId, selectedAnswer, extra = {}) =>
     api.post('/tryouts/submit-answer', { sessionId, questionId, selectedAnswer, ...extra }),
   finish: (sessionId) => api.post('/tryouts/finish', { sessionId }),

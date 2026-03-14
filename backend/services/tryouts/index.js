@@ -1,4 +1,5 @@
 const express = require('express');
+const { INDONESIA_PROVINCES } = require('../../shared/config/indonesiaProvinces');
 
 const router = express.Router();
 
@@ -28,9 +29,23 @@ router.post('/tryouts/start', requireAuth, async (req, res) => {
     const db = req.app.locals.db;
     const userId = req.user.id;
     const packageId = Number(req.body?.packageId);
+    const participantName = String(req.body?.participantName || '').trim();
+    const participantProvince = String(req.body?.participantProvince || '').trim();
 
     if (!Number.isInteger(packageId)) {
       return res.status(400).json({ error: 'Package ID is required' });
+    }
+
+    if (participantName.length < 2) {
+      return res.status(400).json({ error: 'Nama peserta wajib diisi minimal 2 karakter' });
+    }
+
+    if (!participantProvince) {
+      return res.status(400).json({ error: 'Provinsi peserta wajib dipilih' });
+    }
+
+    if (!INDONESIA_PROVINCES.includes(participantProvince)) {
+      return res.status(400).json({ error: 'Provinsi tidak valid' });
     }
 
     if (!isAdminUser(req.user)) {
@@ -43,11 +58,30 @@ router.post('/tryouts/start', requireAuth, async (req, res) => {
       }
     }
 
+    const schemaResult = await db.query(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_name = 'tryout_sessions' AND column_name = 'participant_name'
+         ) AS has_participant_name,
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_name = 'tryout_sessions' AND column_name = 'participant_province'
+         ) AS has_participant_province`
+    );
+
+    const schema = schemaResult.rows[0] || {};
+    if (!schema.has_participant_name || !schema.has_participant_province) {
+      return res.status(500).json({
+        error: 'Database belum mendukung data ranking peserta. Jalankan migrasi terbaru terlebih dahulu.',
+      });
+    }
+
     const sessionResult = await db.query(
-      `INSERT INTO tryout_sessions (user_id, package_id, started_at, status)
-       VALUES ($1, $2, NOW(), 'in_progress')
+      `INSERT INTO tryout_sessions (user_id, package_id, participant_name, participant_province, started_at, status)
+       VALUES ($1, $2, $3, $4, NOW(), 'in_progress')
        RETURNING *`,
-      [userId, packageId]
+      [userId, packageId, participantName, participantProvince]
     );
 
     return res.json({

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { questionService, tryoutService, bundleService, packageService, materialService } from '../services/api';
 import { GraduationCap, Clock3, Flag, ChevronLeft, ChevronRight } from 'lucide-react';
 import MathText from '../components/MathText';
+import { INDONESIA_PROVINCES } from '../constants/indonesiaProvinces';
 
 const Quiz = () => {
   const { packageId } = useParams();
@@ -23,6 +24,9 @@ const Quiz = () => {
   const [timeLeft, setTimeLeft] = useState(100 * 60);
   const [questionStartAt, setQuestionStartAt] = useState(Date.now());
   const [isFinishing, setIsFinishing] = useState(false);
+  const [participantName, setParticipantName] = useState('');
+  const [participantProvince, setParticipantProvince] = useState('');
+  const [isStartingSession, setIsStartingSession] = useState(false);
 
   const convertGoogleDriveUrl = (url) => {
     if (!url) return null;
@@ -75,14 +79,9 @@ const Quiz = () => {
 
       setIsBundling(false);
       setBundleMaterials([]);
-      const sessionRes = await tryoutService.start(parseInt(packageId, 10));
-      setSessionId(sessionRes.data.session.id);
-
-      const questionsRes = await questionService.getByPackage(parseInt(packageId, 10));
-      setQuestions(Array.isArray(questionsRes.data) ? questionsRes.data : []);
       setLoading(false);
     } catch (err) {
-      setError('Failed to start tryout');
+      setError(err.response?.data?.error || 'Failed to load tryout package');
       setLoading(false);
     }
   }, [packageId]);
@@ -113,6 +112,36 @@ const Quiz = () => {
     },
     [sessionId, isFinishing, navigate]
   );
+
+  const startTryoutSession = useCallback(async () => {
+    try {
+      const trimmedName = String(participantName || '').trim();
+      if (trimmedName.length < 2) {
+        setError('Nama peserta minimal 2 karakter.');
+        return;
+      }
+      if (!participantProvince) {
+        setError('Pilih provinsi terlebih dahulu.');
+        return;
+      }
+
+      setError('');
+      setIsStartingSession(true);
+      const parsedPackageId = parseInt(packageId, 10);
+      const sessionRes = await tryoutService.start(parsedPackageId, {
+        participantName: trimmedName,
+        participantProvince,
+      });
+      setSessionId(sessionRes.data.session.id);
+
+      const questionsRes = await questionService.getByPackage(parsedPackageId);
+      setQuestions(Array.isArray(questionsRes.data) ? questionsRes.data : []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to start tryout');
+    } finally {
+      setIsStartingSession(false);
+    }
+  }, [participantName, participantProvince, packageId]);
 
   useEffect(() => {
     if (!sessionId || loading || isBundling || questions.length === 0) return undefined;
@@ -173,7 +202,6 @@ const Quiz = () => {
   };
 
   if (loading) return <div className="mx-auto max-w-7xl p-6 text-sm text-slate-600">Loading...</div>;
-  if (error) return <div className="mx-auto max-w-7xl p-6 text-sm text-red-600">{error}</div>;
 
   if (isBundling && bundleDetail) {
     const bundle = bundleDetail.bundle;
@@ -275,6 +303,65 @@ const Quiz = () => {
     );
   }
 
+  if (!sessionId) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+          <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Data Peserta Sebelum Tryout</h1>
+          <p className="mt-1 text-sm text-slate-600">Data ini digunakan untuk melihat peringkat anda.</p>
+
+          {error ? (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          ) : null}
+
+          <div className="mt-4 space-y-4">
+            <div>
+              <label htmlFor="participant-name" className="mb-1.5 block text-sm font-medium text-slate-700">
+                Nama Peserta
+              </label>
+              <input
+                id="participant-name"
+                type="text"
+                value={participantName}
+                onChange={(e) => setParticipantName(e.target.value)}
+                placeholder="Contoh: Budi Santoso"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-[var(--header-color,#0f5132)] focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="participant-province" className="mb-1.5 block text-sm font-medium text-slate-700">
+                Provinsi
+              </label>
+              <select
+                id="participant-province"
+                value={participantProvince}
+                onChange={(e) => setParticipantProvince(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-[var(--header-color,#0f5132)] focus:outline-none"
+              >
+                <option value="">Pilih provinsi</option>
+                {INDONESIA_PROVINCES.map((province) => (
+                  <option key={province} value={province}>
+                    {province}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={startTryoutSession}
+              disabled={isStartingSession}
+              className="w-full rounded-xl bg-[var(--header-color,#0f5132)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            >
+              {isStartingSession ? 'Memulai Tryout...' : 'Mulai Tryout'}
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   if (questions.length === 0) {
     return <div className="mx-auto max-w-7xl p-6 text-sm text-slate-600">No questions found</div>;
   }
@@ -312,6 +399,11 @@ const Quiz = () => {
 
   return (
     <div className="min-h-screen bg-[#f3f4f6]">
+      {error ? (
+        <div className="mx-auto mt-4 max-w-[1280px] rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex min-h-[68px] max-w-[1280px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap sm:gap-4 sm:px-6 sm:py-0">
           <div className="min-w-0">

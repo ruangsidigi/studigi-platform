@@ -438,54 +438,93 @@ router.get('/reports/my-rankings', requireAuth, async (req, res) => {
     const db = req.app.locals.db;
     const userId = req.user.id;
 
-    // Build per-package rankings using window functions
     const result = await db.query(
-      `WITH all_best AS (
-         SELECT ts.package_id, ts.user_id, MAX(ts.total_score) AS best_score
+      `WITH best_sessions AS (
+         SELECT DISTINCT ON (ts.package_id, ts.user_id)
+           ts.package_id,
+           ts.user_id,
+           ts.total_score,
+           NULLIF(ts.participant_province, '') AS participant_province,
+           COALESCE(NULLIF(ts.participant_name, ''), u.display_name, u.name, SPLIT_PART(u.email, '@', 1)) AS participant_name
          FROM tryout_sessions ts
+         LEFT JOIN users u ON u.id = ts.user_id
          WHERE ts.status = 'completed'
-         GROUP BY ts.package_id, ts.user_id
+           AND ts.total_score IS NOT NULL
+         ORDER BY ts.package_id, ts.user_id, ts.total_score DESC NULLS LAST, ts.finished_at DESC NULLS LAST, ts.id DESC
        ),
        ranked AS (
-         SELECT ab.*,
-                RANK() OVER (PARTITION BY ab.package_id ORDER BY ab.best_score DESC) AS user_rank,
-                COUNT(*) OVER (PARTITION BY ab.package_id) AS participant_count
-         FROM all_best ab
+         SELECT bs.*,
+                RANK() OVER (PARTITION BY bs.package_id ORDER BY bs.total_score DESC) AS national_rank,
+                COUNT(*) OVER (PARTITION BY bs.package_id) AS national_participant_count,
+                CASE
+                  WHEN bs.participant_province IS NULL THEN NULL
+                  ELSE RANK() OVER (PARTITION BY bs.package_id, bs.participant_province ORDER BY bs.total_score DESC)
+                END AS province_rank,
+                CASE
+                  WHEN bs.participant_province IS NULL THEN 0
+                  ELSE COUNT(*) OVER (PARTITION BY bs.package_id, bs.participant_province)
+                END AS province_participant_count
+         FROM best_sessions bs
        ),
-       top3 AS (
+       top3_national AS (
          SELECT r.package_id,
                 JSON_AGG(
                   JSON_BUILD_OBJECT(
-                    'rank', r.user_rank,
-                    'name', COALESCE(u.display_name, u.name, SPLIT_PART(u.email, '@', 1)),
-                    'score', r.best_score
-                  ) ORDER BY r.user_rank
-                ) FILTER (WHERE r.user_rank <= 3) AS top_participants
+                    'rank', r.national_rank,
+                    'name', r.participant_name,
+                    'score', r.total_score,
+                    'province', r.participant_province
+                  ) ORDER BY r.national_rank
+                ) FILTER (WHERE r.national_rank <= 3) AS top_participants
          FROM ranked r
-         LEFT JOIN users u ON u.id = r.user_id
          GROUP BY r.package_id
+       ),
+       top3_province AS (
+         SELECT r.package_id,
+                r.participant_province,
+                JSON_AGG(
+                  JSON_BUILD_OBJECT(
+                    'rank', r.province_rank,
+                    'name', r.participant_name,
+                    'score', r.total_score
+                  ) ORDER BY r.province_rank
+                ) FILTER (WHERE r.province_rank <= 3) AS top_participants
+         FROM ranked r
+         WHERE r.participant_province IS NOT NULL
+         GROUP BY r.package_id, r.participant_province
        )
        SELECT r.package_id,
               p.name AS package_name,
-              r.user_rank,
-              r.best_score AS user_best_score,
-              r.participant_count,
-              t.top_participants
+              r.participant_name,
+              r.participant_province,
+              r.national_rank,
+              r.national_participant_count,
+              r.province_rank,
+              r.province_participant_count,
+              r.total_score AS user_best_score,
+              tn.top_participants AS top_participants_national,
+              tp.top_participants AS top_participants_province
        FROM ranked r
        JOIN packages p ON p.id = r.package_id
-       LEFT JOIN top3 t ON t.package_id = r.package_id
+       LEFT JOIN top3_national tn ON tn.package_id = r.package_id
+       LEFT JOIN top3_province tp ON tp.package_id = r.package_id AND tp.participant_province = r.participant_province
        WHERE r.user_id = $1
-       ORDER BY r.user_rank ASC, r.package_id ASC`,
+       ORDER BY r.national_rank ASC, r.package_id ASC`,
       [userId]
     );
 
     const rankings = (result.rows || []).map((row) => ({
       packageId: row.package_id,
       packageName: row.package_name || '-',
-      userRank: Number(row.user_rank),
+      participantName: row.participant_name || '-',
+      participantProvince: row.participant_province || null,
+      userRankNational: Number(row.national_rank || 0),
+      participantCountNational: Number(row.national_participant_count || 0),
+      userRankProvince: row.province_rank !== null ? Number(row.province_rank) : null,
+      participantCountProvince: Number(row.province_participant_count || 0),
       userBestScore: Number(row.user_best_score || 0),
-      participantCount: Number(row.participant_count || 0),
-      topParticipants: Array.isArray(row.top_participants) ? row.top_participants : [],
+      topParticipantsNational: Array.isArray(row.top_participants_national) ? row.top_participants_national : [],
+      topParticipantsProvince: Array.isArray(row.top_participants_province) ? row.top_participants_province : [],
     }));
 
     return res.json({ rankings });
