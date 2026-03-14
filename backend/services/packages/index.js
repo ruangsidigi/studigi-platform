@@ -349,13 +349,12 @@ router.get('/packages/:id/leaderboard', async (req, res) => {
     }
 
     const result = await db.query(
-      `WITH best_sessions AS (
-         SELECT DISTINCT ON (ts.user_id)
+      `WITH scored_sessions AS (
+         SELECT
            ts.user_id,
            ts.id,
            ts.total_score,
-           ts.participant_name,
-           ts.participant_province,
+           NULLIF(ts.participant_province, '') AS participant_province,
            CASE WHEN ts.started_at IS NOT NULL AND ts.finished_at IS NOT NULL
              THEN EXTRACT(EPOCH FROM (ts.finished_at - ts.started_at))
              ELSE NULL END AS duration_seconds,
@@ -365,17 +364,16 @@ router.get('/packages/:id/leaderboard', async (req, res) => {
          WHERE ts.package_id = $1
            AND ts.status = 'completed'
            AND ts.total_score IS NOT NULL
-         ORDER BY ts.user_id, ts.total_score DESC NULLS LAST, ts.finished_at DESC NULLS LAST, ts.id DESC
        )
        SELECT
-         bs.user_id,
-         bs.fallback_name AS user_name,
-         bs.participant_province AS user_province,
-         bs.total_score AS best_score,
-         bs.duration_seconds AS best_duration_seconds
-       FROM best_sessions bs
-       WHERE ($2 = 'national') OR (bs.participant_province = $3)
-       ORDER BY bs.total_score DESC NULLS LAST, bs.duration_seconds ASC NULLS LAST, bs.id ASC`,
+         ss.user_id,
+         ss.fallback_name AS user_name,
+         ss.participant_province AS user_province,
+         ss.total_score AS best_score,
+         ss.duration_seconds AS best_duration_seconds
+       FROM scored_sessions ss
+       WHERE ($2 = 'national') OR (ss.participant_province = $3)
+       ORDER BY ss.total_score DESC NULLS LAST, ss.duration_seconds ASC NULLS LAST, ss.id ASC`,
       [id, scope, province]
     );
 

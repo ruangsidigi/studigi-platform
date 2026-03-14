@@ -24,7 +24,7 @@ router.get('/:id/leaderboard', authenticateToken, async (req, res) => {
 
     const { data: sessions, error } = await supabase
       .from('tryout_sessions')
-      .select('id, user_id, package_id, started_at, finished_at, total_score, is_passed, users(name), packages(name)')
+      .select('id, user_id, package_id, started_at, finished_at, total_score, is_passed, participant_name, participant_province, users(name), users(display_name), users(email), packages(name)')
       .eq('package_id', id)
       .eq('status', 'completed');
 
@@ -32,26 +32,7 @@ router.get('/:id/leaderboard', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
-    const bestByUser = new Map();
-
-    (sessions || []).forEach((session) => {
-      const current = bestByUser.get(session.user_id);
-      const score = Number(session.total_score || 0);
-      const currentScore = Number(current?.total_score || 0);
-
-      const duration = session.started_at && session.finished_at
-        ? Math.max(0, new Date(session.finished_at).getTime() - new Date(session.started_at).getTime())
-        : Number.MAX_SAFE_INTEGER;
-      const currentDuration = current?.started_at && current?.finished_at
-        ? Math.max(0, new Date(current.finished_at).getTime() - new Date(current.started_at).getTime())
-        : Number.MAX_SAFE_INTEGER;
-
-      if (!current || score > currentScore || (score === currentScore && duration < currentDuration)) {
-        bestByUser.set(session.user_id, session);
-      }
-    });
-
-    const ranking = Array.from(bestByUser.values())
+    const ranking = Array.from(sessions || [])
       .sort((a, b) => {
         const scoreDiff = Number(b.total_score || 0) - Number(a.total_score || 0);
         if (scoreDiff !== 0) return scoreDiff;
@@ -73,8 +54,9 @@ router.get('/:id/leaderboard', authenticateToken, async (req, res) => {
         return {
           rank: index + 1,
           user_id: session.user_id,
-          user_name: session.users?.name || 'Peserta',
-          total_score: session.total_score || 0,
+          user_name: session.participant_name || session.users?.display_name || session.users?.name || (session.users?.email ? String(session.users.email).split('@')[0] : 'Peserta'),
+          user_province: session.participant_province || null,
+          best_score: session.total_score || 0,
           is_passed: session.is_passed,
           duration_ms: durationMs,
           is_me: String(session.user_id) === String(userId),
