@@ -80,6 +80,7 @@ const aliasMap = {
   point_c: ['point_c', 'poin_c', 'nilai_c'],
   point_d: ['point_d', 'poin_d', 'nilai_d'],
   point_e: ['point_e', 'poin_e', 'nilai_e'],
+  poin_benar: ['poin_benar', 'point_correct', 'nilai_benar', 'correct_point', 'poin_jawaban_benar'],
   image_url: ['image_url', 'gambar', 'url_gambar', 'image'],
 };
 
@@ -99,7 +100,23 @@ const defaultColumnIndexMap = {
   point_c: 12,
   point_d: 13,
   point_e: 14,
-  image_url: 15,
+  poin_benar: 15,
+  image_url: 16,
+};
+
+// For TWK/TIU: if poin_benar is set, auto-fill point columns
+// (correct option = poin_benar, wrong options = 0), unless already explicitly set
+const applyPoinBenar = (points, poinBenar, correctAnswer) => {
+  if (poinBenar === null || !correctAnswer) return points;
+  const ca = String(correctAnswer).trim().toUpperCase();
+  const result = { ...points };
+  ['a', 'b', 'c', 'd', 'e'].forEach((opt) => {
+    const key = `point_${opt}`;
+    if (result[key] === null) {
+      result[key] = ca === opt.toUpperCase() ? poinBenar : 0;
+    }
+  });
+  return result;
 };
 
 const detectHeaderIndexMap = (grid) => {
@@ -270,6 +287,20 @@ router.post('/questions/upload', requireAdmin, upload.single('file'), async (req
       const explanation = pickValue(row, ['explanation', 'pembahasan', 'penjelasan']);
       const category = pickValue(row, ['category', 'kategori']);
       const imageUrl = pickValue(row, ['image_url', 'gambar', 'url_gambar', 'image']);
+      const poinBenar = toNumberOrNull(pickValue(row, ['poin_benar', 'point_correct', 'nilai_benar', 'correct_point', 'poin_jawaban_benar']));
+
+      const caStr = correctAnswer ? String(correctAnswer).trim().toUpperCase() : null;
+      const points = applyPoinBenar(
+        {
+          point_a: toNumberOrNull(pickValue(row, ['point_a', 'poin_a', 'nilai_a'])),
+          point_b: toNumberOrNull(pickValue(row, ['point_b', 'poin_b', 'nilai_b'])),
+          point_c: toNumberOrNull(pickValue(row, ['point_c', 'poin_c', 'nilai_c'])),
+          point_d: toNumberOrNull(pickValue(row, ['point_d', 'poin_d', 'nilai_d'])),
+          point_e: toNumberOrNull(pickValue(row, ['point_e', 'poin_e', 'nilai_e'])),
+        },
+        poinBenar,
+        caStr
+      );
 
       await db.query(
         `INSERT INTO questions (
@@ -294,14 +325,14 @@ router.post('/questions/upload', requireAdmin, upload.single('file'), async (req
           optionC ? String(optionC) : null,
           optionD ? String(optionD) : null,
           optionE ? String(optionE) : null,
-          correctAnswer ? String(correctAnswer).trim().toUpperCase() : null,
+          caStr,
           explanation ? String(explanation) : null,
           category ? String(category).trim().toUpperCase() : null,
-          toNumberOrNull(pickValue(row, ['point_a', 'poin_a', 'nilai_a'])),
-          toNumberOrNull(pickValue(row, ['point_b', 'poin_b', 'nilai_b'])),
-          toNumberOrNull(pickValue(row, ['point_c', 'poin_c', 'nilai_c'])),
-          toNumberOrNull(pickValue(row, ['point_d', 'poin_d', 'nilai_d'])),
-          toNumberOrNull(pickValue(row, ['point_e', 'poin_e', 'nilai_e'])),
+          points.point_a,
+          points.point_b,
+          points.point_c,
+          points.point_d,
+          points.point_e,
           imageUrl ? String(imageUrl) : null,
         ]
       );
@@ -330,6 +361,20 @@ router.post('/questions/upload', requireAdmin, upload.single('file'), async (req
         const explanation = pickValue(row, aliasMap.explanation);
         const category = pickValue(row, aliasMap.category);
         const imageUrl = pickValue(row, aliasMap.image_url);
+        const poinBenar = toNumberOrNull(pickValue(row, aliasMap.poin_benar));
+
+        const caStr = correctAnswer ? String(correctAnswer).trim().toUpperCase() : null;
+        const points = applyPoinBenar(
+          {
+            point_a: toNumberOrNull(pickValue(row, aliasMap.point_a)),
+            point_b: toNumberOrNull(pickValue(row, aliasMap.point_b)),
+            point_c: toNumberOrNull(pickValue(row, aliasMap.point_c)),
+            point_d: toNumberOrNull(pickValue(row, aliasMap.point_d)),
+            point_e: toNumberOrNull(pickValue(row, aliasMap.point_e)),
+          },
+          poinBenar,
+          caStr
+        );
 
         await db.query(
           `INSERT INTO questions (
@@ -354,14 +399,14 @@ router.post('/questions/upload', requireAdmin, upload.single('file'), async (req
             optionC ? String(optionC) : null,
             optionD ? String(optionD) : null,
             optionE ? String(optionE) : null,
-            correctAnswer ? String(correctAnswer).trim().toUpperCase() : null,
+            caStr,
             explanation ? String(explanation) : null,
             category ? String(category).trim().toUpperCase() : null,
-            toNumberOrNull(pickValue(row, aliasMap.point_a)),
-            toNumberOrNull(pickValue(row, aliasMap.point_b)),
-            toNumberOrNull(pickValue(row, aliasMap.point_c)),
-            toNumberOrNull(pickValue(row, aliasMap.point_d)),
-            toNumberOrNull(pickValue(row, aliasMap.point_e)),
+            points.point_a,
+            points.point_b,
+            points.point_c,
+            points.point_d,
+            points.point_e,
             imageUrl ? String(imageUrl) : null,
           ]
         );
