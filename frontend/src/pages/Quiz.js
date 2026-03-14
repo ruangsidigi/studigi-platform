@@ -132,10 +132,12 @@ const Quiz = () => {
         participantName: trimmedName,
         participantProvince,
       });
-      setSessionId(sessionRes.data.session.id);
+      const startedSessionId = sessionRes.data?.session?.id;
 
       const questionsRes = await questionService.getByPackage(parsedPackageId);
-      setQuestions(Array.isArray(questionsRes.data) ? questionsRes.data : []);
+      const loadedQuestions = Array.isArray(questionsRes.data) ? questionsRes.data : [];
+      setQuestions(loadedQuestions);
+      setSessionId(startedSessionId);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to start tryout');
     } finally {
