@@ -93,18 +93,18 @@ export default function Activity() {
   }, [overview]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 pb-20 sm:space-y-5 lg:space-y-6 lg:pb-2">
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+    <div className="mx-auto max-w-7xl space-y-4 px-3 pb-20 sm:space-y-5 sm:px-4 md:px-5 lg:space-y-6 lg:px-0 lg:pb-2">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 md:p-6">
         <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">Activity</h2>
         <p className="mt-1 text-sm text-[var(--secondary-color,#69655e)]">
           Adaptive learning, grafik peningkatan nilai, dan review tryout.
         </p>
       </section>
 
-      {error && <section className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error}</section>}
+      {error && <section className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:p-5">{error}</section>}
 
       <section className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
-        <article className="rounded-2xl border border-slate-200 bg-white p-5">
+        <article className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-base font-semibold text-slate-900">Adaptive Learning</h3>
             <button
@@ -132,7 +132,7 @@ export default function Activity() {
           )}
         </article>
 
-        <article className="rounded-2xl border border-slate-200 bg-white p-5">
+        <article className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-base font-semibold text-slate-900">Report Belajar</h3>
             <button
@@ -166,7 +166,7 @@ export default function Activity() {
         </article>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 md:p-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-1.5">
           <h3 className="text-base font-semibold text-slate-900">Review Tryout Terakhir</h3>
           <span className="text-xs text-[var(--secondary-color,#69655e)]">Maksimal 6 data terbaru</span>
@@ -179,8 +179,8 @@ export default function Activity() {
         ) : (
           <div className="space-y-2">
             {history.map((item: any) => (
-              <div key={item.attemptId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
-                <div>
+              <div key={item.attemptId} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-slate-200 p-3 sm:items-center">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-slate-900">{item.packageName || `Attempt #${item.attemptId}`}</p>
                   <p className="text-xs text-[var(--secondary-color,#69655e)]">
                     Skor {item.score || 0} • {item.status || '-'}
@@ -199,7 +199,7 @@ export default function Activity() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 md:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-1.5">
           <div>
             <h3 className="text-base font-semibold text-slate-900">Ranking Paket Tryout</h3>
@@ -224,8 +224,8 @@ export default function Activity() {
               const board: any[] = leaderboardData[boardKey] || [];
 
               return (
-                <div key={pkg.packageId} className="rounded-xl border border-slate-200 overflow-hidden">
-                  <div className="flex flex-wrap items-center gap-3 p-3">
+                <div key={pkg.packageId} className="overflow-hidden rounded-xl border border-slate-200">
+                  <div className="flex flex-wrap items-start gap-3 p-3 sm:items-center sm:p-3.5">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg font-bold text-slate-700">
                       {medal || `#${rankForBadge}`}
                     </div>
@@ -248,7 +248,7 @@ export default function Activity() {
                     <button
                       type="button"
                       onClick={() => toggleLeaderboard(pkg.packageId, pkg.participantProvince)}
-                      className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      className="w-full shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto sm:py-1.5"
                     >
                       {isExpanded ? 'Tutup' : 'Lihat Semua'}
                     </button>
@@ -257,7 +257,7 @@ export default function Activity() {
                   {!isExpanded && (pkg.topParticipantsNational || []).length > 0 && (
                     <div className="border-t border-slate-100 bg-slate-50 px-3 py-2">
                       <p className="mb-1.5 text-xs font-medium text-slate-500">Top 3 Nasional</p>
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-x-3 gap-y-1.5">
                         {(pkg.topParticipantsNational || []).slice(0, 3).map((p: any) => (
                           <div key={p.rank} className="flex items-center gap-1.5 text-xs text-slate-700">
                             <span>{p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : '🥉'}</span>
@@ -271,7 +271,7 @@ export default function Activity() {
 
                   {isExpanded && (
                     <div className="border-t border-slate-100">
-                      <div className="flex gap-2 border-b border-slate-100 px-3 py-2">
+                      <div className="flex gap-2 overflow-x-auto border-b border-slate-100 px-3 py-2">
                         <button
                           type="button"
                           onClick={() => switchLeaderboardScope(pkg.packageId, 'national', pkg.participantProvince)}
@@ -294,8 +294,36 @@ export default function Activity() {
                       ) : board.length === 0 ? (
                         <p className="p-3 text-sm text-slate-500">Belum ada data leaderboard.</p>
                       ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
+                        <div>
+                          <div className="space-y-2 p-3 sm:hidden">
+                            {board.slice(0, 20).map((row: any) => {
+                              const myRank = activeScope === 'province' ? pkg.userRankProvince : pkg.userRankNational;
+                              const isMe = row.is_me || (row.rank === myRank && row.best_score === pkg.userBestScore);
+                              return (
+                                <div
+                                  key={`mobile-${row.rank}-${row.user_name}`}
+                                  className={`rounded-lg border border-slate-200 p-2.5 ${isMe ? 'bg-[var(--header-color,#103c21)]/5' : 'bg-white'}`}
+                                >
+                                  <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-500">
+                                    <span className="font-semibold text-slate-700">
+                                      {row.rank <= 3
+                                        ? row.rank === 1 ? '🥇 #1' : row.rank === 2 ? '🥈 #2' : '🥉 #3'
+                                        : `#${row.rank}`}
+                                    </span>
+                                    <span className="font-mono text-sm text-slate-800">{row.best_score}</span>
+                                  </div>
+                                  <p className="text-sm font-semibold text-slate-900">
+                                    {row.user_name}
+                                    {isMe && <span className="ml-1.5 rounded bg-[var(--header-color,#103c21)] px-1.5 py-0.5 text-[10px] text-white">Kamu</span>}
+                                  </p>
+                                  <p className="text-xs text-slate-500">{row.user_province || '-'}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="hidden overflow-x-auto sm:block">
+                            <table className="w-full text-sm">
                             <thead>
                               <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-500">
                                 <th className="px-3 py-2 w-12">No</th>
@@ -307,10 +335,10 @@ export default function Activity() {
                             <tbody>
                               {board.slice(0, 20).map((row: any) => {
                                 const myRank = activeScope === 'province' ? pkg.userRankProvince : pkg.userRankNational;
-                                const isMe = row.rank === myRank && row.best_score === pkg.userBestScore;
+                                const isMe = row.is_me || (row.rank === myRank && row.best_score === pkg.userBestScore);
                                 return (
                                   <tr
-                                    key={row.rank}
+                                    key={`${row.rank}-${row.user_name}`}
                                     className={`border-t border-slate-100 ${isMe ? 'bg-[var(--header-color,#103c21)]/5 font-semibold' : ''}`}
                                   >
                                     <td className="px-3 py-2 text-slate-500">
@@ -327,7 +355,8 @@ export default function Activity() {
                                 );
                               })}
                             </tbody>
-                          </table>
+                            </table>
+                          </div>
                           {board.length > 20 && (
                             <p className="px-3 py-2 text-center text-xs text-slate-400">Menampilkan 20 teratas dari {board.length} peserta</p>
                           )}
