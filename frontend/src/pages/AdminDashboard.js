@@ -27,6 +27,7 @@ const ADMIN_TABS = [
   { key: 'upload', label: 'Upload Soal', icon: FileSpreadsheet },
   { key: 'materials', label: 'Materi PDF', icon: Image },
   { key: 'branding', label: 'Branding', icon: Palette },
+  { key: 'vouchers', label: 'Voucher', icon: Wallet },
   { key: 'results', label: 'Hasil Tryout', icon: Wallet },
   { key: 'ranking', label: 'Ranking Paket', icon: Medal },
   { key: 'users', label: 'Daftar Pengguna', icon: Users },
@@ -362,11 +363,18 @@ const AdminDashboard = () => {
       <div className="admin-tabs">
         {ADMIN_TABS.map((tab) => {
           const Icon = tab.icon;
+          const handleTabClick = () => {
+            if (tab.key === 'vouchers') {
+              window.location.href = '/admin/vouchers';
+              return;
+            }
+            setActiveTab(tab.key);
+          };
           return (
             <button
               key={tab.key}
               className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={handleTabClick}
             >
               <Icon size={15} className="tab-icon" />
               <span className="tab-label">{tab.label}</span>
