@@ -320,7 +320,22 @@ router.post('/finish', authenticateToken, async (req, res) => {
     });
 
     // Determine pass/fail using absolute point thresholds
-    const isPass = twkPoints > 65 && tiuPoints > 85 && tkpPoints > 166;
+    const totalScore = Math.round(twkPoints + tiuPoints + tkpPoints);
+
+    // Use package-level pass_score if configured, else standard SKD thresholds
+    let isPass;
+    const { data: pkgRow } = await supabase
+      .from('packages')
+      .select('pass_score')
+      .eq('id', session.package_id)
+      .single()
+      .catch(() => ({ data: null }));
+    const packagePassScore = pkgRow?.pass_score;
+    if (packagePassScore !== null && packagePassScore !== undefined) {
+      isPass = totalScore >= Number(packagePassScore);
+    } else {
+      isPass = twkPoints > 65 && tiuPoints > 85 && tkpPoints > 166;
+    }
 
     // Update session with results (store raw point totals)
     const { data: updatedSession, error } = await supabase
@@ -331,7 +346,7 @@ router.post('/finish', authenticateToken, async (req, res) => {
         twk_score: twkPoints,
         tiu_score: tiuPoints,
         tkp_score: tkpPoints,
-        total_score: Math.round(twkPoints + tiuPoints + tkpPoints),
+        total_score: totalScore,
         is_passed: isPass,
       })
       .eq('id', sessionId)

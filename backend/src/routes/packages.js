@@ -170,7 +170,7 @@ router.get('/:id', async (req, res) => {
 // Create package (Admin only)
 router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
-    const { name, description, type, price, original_price, duration, question_count, category_id, included_package_ids } = req.body;
+    const { name, description, type, price, original_price, duration, question_count, category_id, included_package_ids, pass_score } = req.body;
 
     if (!name || !type || price === undefined) {
       return res.status(400).json({ error: 'Name, type, and price are required' });
@@ -192,6 +192,7 @@ router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) =
       question_count,
       category_id: category_id ? parseInt(category_id) : null,
       included_package_ids: Array.isArray(included_package_ids) ? included_package_ids : included_package_ids ? JSON.parse(included_package_ids) : [],
+      pass_score: pass_score !== undefined && pass_score !== null && pass_score !== '' ? Number(pass_score) : null,
       created_at: new Date(),
     };
 
@@ -218,7 +219,7 @@ router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) =
 router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, type, price, original_price, duration, question_count, category_id, included_package_ids } = req.body;
+    const { name, description, type, price, original_price, duration, question_count, category_id, included_package_ids, pass_score } = req.body;
 
     const normalizedPrice = price !== undefined ? (normalizeCurrencyNumber(price) || 0) : undefined;
     const normalizedOriginalPrice =
@@ -236,6 +237,7 @@ router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res)
       question_count,
       category_id: category_id ? parseInt(category_id) : null,
       included_package_ids: Array.isArray(included_package_ids) ? included_package_ids : included_package_ids ? JSON.parse(included_package_ids) : undefined,
+      pass_score: pass_score !== undefined ? (pass_score !== null && pass_score !== '' ? Number(pass_score) : null) : undefined,
       updated_at: new Date(),
     };
 

@@ -89,6 +89,7 @@ const AdminDashboard = () => {
     category_id: '',
     included_package_ids: [],
     visibility: 'visible',
+    pass_score: '',
   });
   const [otherCategoryName, setOtherCategoryName] = useState('');
   const [editingPackageId, setEditingPackageId] = useState(null);
@@ -206,6 +207,7 @@ const AdminDashboard = () => {
         category_id: '',
         included_package_ids: [],
         visibility: 'visible',
+        pass_score: '',
       });
       setOtherCategoryName('');
       loadDashboardData();
@@ -225,6 +227,7 @@ const AdminDashboard = () => {
       category_id: pkg.category_id ? String(pkg.category_id) : '',
       included_package_ids: normalizeIncludedPackageIds(pkg.included_package_ids),
       visibility: String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'hidden' : 'visible',
+      pass_score: pkg.pass_score !== null && pkg.pass_score !== undefined ? Number(pkg.pass_score) : '',
     };
 
     setEditingPackageId(pkg.id);
@@ -690,6 +693,17 @@ const AdminDashboard = () => {
                     />
                   </div>
                   <div className="form-group">
+                    <label>Nilai Minimum Lulus (pass score)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Kosongkan = gunakan standar SKD (TWK>65, TIU>85, TKP>166)"
+                      value={newPackage.pass_score}
+                      onChange={(e) => setNewPackage({ ...newPackage, pass_score: e.target.value })}
+                    />
+                    <small>Isi jika paket tidak menggunakan kategori TWK/TIU/TKP standar.</small>
+                  </div>
+                  <div className="form-group">
                     <label>Jumlah Soal</label>
                     <input
                       type="number"
@@ -962,6 +976,17 @@ const AdminDashboard = () => {
                         value={editPackage.duration}
                         onChange={(e) => setEditPackage({ ...editPackage, duration: parseInt(e.target.value || '100', 10) || 100 })}
                       />
+                    </div>
+                    <div className="form-group">
+                      <label>Nilai Minimum Lulus (pass score)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Kosongkan = gunakan standar SKD (TWK>65, TIU>85, TKP>166)"
+                        value={editPackage.pass_score ?? ''}
+                        onChange={(e) => setEditPackage({ ...editPackage, pass_score: e.target.value })}
+                      />
+                      <small>Isi jika paket tidak menggunakan kategori TWK/TIU/TKP standar.</small>
                     </div>
                     <div className="form-group">
                       <label>Jumlah Soal</label>

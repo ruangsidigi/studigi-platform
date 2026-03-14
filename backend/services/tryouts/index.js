@@ -200,8 +200,17 @@ router.post('/tryouts/finish', requireAuth, async (req, res) => {
       }
     }
 
-    const isPass = twkPoints > 65 && tiuPoints > 85 && tkpPoints > 166;
-    const totalScore = Math.round(twkPoints + tiuPoints + tkpPoints);
+  const totalScore = Math.round(twkPoints + tiuPoints + tkpPoints);
+
+    // Use package-level pass_score if configured, else standard SKD thresholds
+    let isPass;
+    const pkgResult = await db.query('SELECT pass_score FROM packages WHERE id = $1 LIMIT 1', [session.package_id]).catch(() => ({ rows: [] }));
+    const packagePassScore = pkgResult.rows[0]?.pass_score;
+    if (packagePassScore !== null && packagePassScore !== undefined) {
+      isPass = totalScore >= Number(packagePassScore);
+    } else {
+      isPass = twkPoints > 65 && tiuPoints > 85 && tkpPoints > 166;
+    }
 
     const updatedResult = await db.query(
       `UPDATE tryout_sessions

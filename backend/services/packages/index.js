@@ -42,6 +42,11 @@ const ensurePackageSchema = async (db) => {
     `ALTER TABLE packages
        ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 100`
   );
+  await safeExec(
+    db,
+    `ALTER TABLE packages
+       ADD COLUMN IF NOT EXISTS pass_score INTEGER DEFAULT NULL`
+  );
   packageSchemaReady = true;
 };
 
@@ -151,6 +156,7 @@ router.post('/packages', requireAdmin, async (req, res) => {
       content_type = 'question',
       visibility = 'visible',
       pdf_file_path = null,
+      pass_score = null,
     } = req.body || {};
 
     if (!name) return res.status(400).json({ error: 'name is required' });
@@ -158,9 +164,11 @@ router.post('/packages', requireAdmin, async (req, res) => {
     const normalizedPrice = normalizeCurrencyNumber(price) || 0;
     const normalizedOriginalPrice = normalizeOriginalPrice(original_price, normalizedPrice);
 
+    const normalizedPassScore = pass_score !== null && pass_score !== undefined && pass_score !== '' ? Number(pass_score) : null;
+
     const result = await db.query(
-      `INSERT INTO packages (name, description, type, price, original_price, duration, question_count, category_id, included_package_ids, content_type, visibility, pdf_file_path, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+      `INSERT INTO packages (name, description, type, price, original_price, duration, question_count, category_id, included_package_ids, content_type, visibility, pdf_file_path, pass_score, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
        RETURNING *`,
       [
         name,
@@ -175,6 +183,7 @@ router.post('/packages', requireAdmin, async (req, res) => {
         content_type || 'question',
         visibility || 'visible',
         pdf_file_path || null,
+        normalizedPassScore,
       ]
     );
 
@@ -202,6 +211,7 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
       content_type,
       visibility,
       pdf_file_path,
+      pass_score,
     } = req.body || {};
 
     const shouldUpdatePdfFilePath = Object.prototype.hasOwnProperty.call(req.body || {}, 'pdf_file_path');
@@ -228,8 +238,9 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
          content_type = COALESCE($11, content_type),
          visibility = COALESCE($12, visibility),
          pdf_file_path = CASE WHEN $13::boolean THEN $14 ELSE pdf_file_path END,
+         pass_score = CASE WHEN $15::boolean THEN $16::integer ELSE pass_score END,
          updated_at = NOW()
-       WHERE id = $15
+       WHERE id = $17
        RETURNING *`,
       [
         name ?? null,
@@ -246,6 +257,8 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
         visibility ?? null,
         shouldUpdatePdfFilePath,
         shouldUpdatePdfFilePath ? (pdf_file_path ?? null) : null,
+        pass_score !== undefined,
+        pass_score !== undefined && pass_score !== null && pass_score !== '' ? Number(pass_score) : null,
         id,
       ]
     );
