@@ -378,6 +378,7 @@ const Quiz = () => {
   const question = questions[currentQuestion];
   const currentAnswer = answers[question.id];
   const currentQuestionNumber = currentQuestion + 1;
+  const isLastQuestion = currentQuestion === questions.length - 1;
   const answeredCount = Object.keys(answers).length;
   const markedCount = Object.values(markedQuestions).filter(Boolean).length;
   const unansweredCount = Math.max(questions.length - answeredCount, 0);
@@ -546,12 +547,18 @@ const Quiz = () => {
 
               <button
                 type="button"
-                disabled={currentQuestion === questions.length - 1}
-                onClick={() => setCurrentQuestion((prev) => Math.min(prev + 1, questions.length - 1))}
+                disabled={isFinishing}
+                onClick={() => {
+                  if (isLastQuestion) {
+                    finishTryout();
+                    return;
+                  }
+                  setCurrentQuestion((prev) => Math.min(prev + 1, questions.length - 1));
+                }}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--header-color,#0f5132)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:px-6 sm:py-3 sm:text-base"
               >
-                Berikutnya
-                <ChevronRight size={18} />
+                {isLastQuestion ? 'Selesai' : 'Berikutnya'}
+                {!isLastQuestion && <ChevronRight size={18} />}
               </button>
             </section>
           </div>
