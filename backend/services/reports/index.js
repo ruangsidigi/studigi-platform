@@ -492,6 +492,16 @@ router.get('/reports/my-rankings', requireAuth, async (req, res) => {
          FROM ranked r
          WHERE r.participant_province IS NOT NULL
          GROUP BY r.package_id, r.participant_province
+      ),
+      latest_sessions AS (
+        SELECT DISTINCT ON (ts.package_id, ts.user_id)
+          ts.package_id,
+          ts.user_id,
+          ts.total_score AS latest_score
+        FROM tryout_sessions ts
+        WHERE ts.status = 'completed'
+          AND ts.total_score IS NOT NULL
+        ORDER BY ts.package_id, ts.user_id, ts.finished_at DESC NULLS LAST, ts.id DESC
        )
        SELECT r.package_id,
               p.name AS package_name,
@@ -502,10 +512,12 @@ router.get('/reports/my-rankings', requireAuth, async (req, res) => {
               r.province_rank,
               r.province_participant_count,
               r.total_score AS user_best_score,
+              ls.latest_score AS user_latest_score,
               tn.top_participants AS top_participants_national,
               tp.top_participants AS top_participants_province
        FROM ranked r
        JOIN packages p ON p.id = r.package_id
+       LEFT JOIN latest_sessions ls ON ls.package_id = r.package_id AND ls.user_id = r.user_id
        LEFT JOIN top3_national tn ON tn.package_id = r.package_id
        LEFT JOIN top3_province tp ON tp.package_id = r.package_id AND tp.participant_province = r.participant_province
        WHERE r.user_id = $1
@@ -523,6 +535,7 @@ router.get('/reports/my-rankings', requireAuth, async (req, res) => {
       userRankProvince: row.province_rank !== null ? Number(row.province_rank) : null,
       participantCountProvince: Number(row.province_participant_count || 0),
       userBestScore: Number(row.user_best_score || 0),
+      userLatestScore: Number(row.user_latest_score || 0),
       topParticipantsNational: Array.isArray(row.top_participants_national) ? row.top_participants_national : [],
       topParticipantsProvince: Array.isArray(row.top_participants_province) ? row.top_participants_province : [],
     }));

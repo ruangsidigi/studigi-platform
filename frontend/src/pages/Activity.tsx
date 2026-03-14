@@ -241,6 +241,7 @@ export default function Activity() {
                           <strong className="text-slate-900">{provinceRank ? `#${provinceRank}` : '-'}</strong> dari{' '}
                           <strong className="text-slate-900">{pkg.participantCountProvince || 0}</strong> peserta
                           {' '}• Skor terbaik: <strong className="text-slate-900">{pkg.userBestScore}</strong>
+                          {' '}• Skor terbaru: <strong className="text-slate-900">{pkg.userLatestScore ?? pkg.userBestScore}</strong>
                         </p>
                       </div>
                     </div>
