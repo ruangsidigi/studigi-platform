@@ -737,7 +737,7 @@ const AdminDashboard = () => {
             </div>
 
             <div className="card mt-20">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
                 <div className="card-title" style={{ marginBottom: 0 }}>Daftar Paket</div>
                 <button
                   type="button"

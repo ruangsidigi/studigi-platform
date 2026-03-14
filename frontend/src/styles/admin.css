@@ -94,6 +94,8 @@
   font-size: 30px;
   font-weight: 700;
   color: #0f172a;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
 .stats-grid {
@@ -260,6 +262,10 @@
   vertical-align: middle;
 }
 
+.admin-table td:last-child {
+  white-space: nowrap;
+}
+
 .admin-table tbody tr:hover {
   background-color: #f8fafc;
 }
@@ -371,6 +377,15 @@ small {
     top: 8px;
   }
 
+  .admin-tabs::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .admin-tabs::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+  }
+
   .tab-btn {
     flex: 0 0 auto;
     padding: 8px 11px;
@@ -381,6 +396,7 @@ small {
     display: block;
     overflow-x: auto;
     white-space: nowrap;
+    min-width: 720px;
   }
 
   .admin-table th,
@@ -395,6 +411,15 @@ small {
     margin-bottom: 16px;
   }
 
+  .admin-content .card-title {
+    font-size: 22px;
+  }
+
+  .form-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
   .stat-card {
     padding: 14px;
   }
@@ -402,5 +427,58 @@ small {
   .bundle-picker-grid {
     grid-template-columns: 1fr;
     max-height: 220px;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-container {
+    padding: 10px;
+  }
+
+  .admin-header {
+    padding: 14px;
+  }
+
+  .admin-header h1 {
+    font-size: 24px;
+  }
+
+  .admin-header p {
+    font-size: 13px;
+  }
+
+  .admin-header .btn {
+    width: 100%;
+  }
+
+  .tab-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .tab-label {
+    max-width: 125px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-content .card-title {
+    font-size: 19px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .admin-table {
+    min-width: 640px;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    font-size: 12px;
+    padding: 8px;
   }
 }
