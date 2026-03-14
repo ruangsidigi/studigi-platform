@@ -18,18 +18,32 @@ export default function Activity() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [overviewRes, historyRes, adaptiveRes, rankingsRes] = await Promise.all([
+        const [overviewRes, historyRes, adaptiveRes, rankingsRes] = await Promise.allSettled([
           reportService.getOverview(),
           reportService.getHistory(1, 6),
           adaptiveService.getDashboard(),
           reportService.getMyRankings(),
         ]);
 
-        setOverview(overviewRes.data || null);
-        setHistory(Array.isArray(historyRes.data?.items) ? historyRes.data.items : []);
-        setAdaptiveDashboard(adaptiveRes.data || null);
-        setMyRankings(Array.isArray(rankingsRes.data?.rankings) ? rankingsRes.data.rankings : []);
-        setError('');
+        const hasCoreFailure =
+          overviewRes.status === 'rejected' ||
+          historyRes.status === 'rejected' ||
+          adaptiveRes.status === 'rejected';
+
+        setOverview(overviewRes.status === 'fulfilled' ? overviewRes.value.data || null : null);
+        setHistory(
+          historyRes.status === 'fulfilled' && Array.isArray(historyRes.value.data?.items)
+            ? historyRes.value.data.items
+            : []
+        );
+        setAdaptiveDashboard(adaptiveRes.status === 'fulfilled' ? adaptiveRes.value.data || null : null);
+        setMyRankings(
+          rankingsRes.status === 'fulfilled' && Array.isArray(rankingsRes.value.data?.rankings)
+            ? rankingsRes.value.data.rankings
+            : []
+        );
+
+        setError(hasCoreFailure ? 'Gagal memuat sebagian data activity.' : '');
       } catch (loadErr) {
         setError('Gagal memuat data activity.');
       } finally {
