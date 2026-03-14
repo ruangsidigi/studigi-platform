@@ -8,6 +8,7 @@ import {
   Image,
   Medal,
   Palette,
+  TicketPercent,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -27,7 +28,7 @@ const ADMIN_TABS = [
   { key: 'upload', label: 'Upload Soal', icon: FileSpreadsheet },
   { key: 'materials', label: 'Materi PDF', icon: Image },
   { key: 'branding', label: 'Branding', icon: Palette },
-  { key: 'vouchers', label: 'Voucher', icon: Wallet },
+  { key: 'vouchers', label: 'Voucher Diskon', icon: TicketPercent },
   { key: 'results', label: 'Hasil Tryout', icon: Wallet },
   { key: 'ranking', label: 'Ranking Paket', icon: Medal },
   { key: 'users', label: 'Daftar Pengguna', icon: Users },
@@ -349,6 +350,16 @@ const AdminDashboard = () => {
       <div className="admin-header">
         <h1>Admin Dashboard</h1>
         <p>Pusat kontrol konten, paket tryout, dan operasional pengguna.</p>
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ marginTop: 10 }}
+          onClick={() => {
+            window.location.href = '/admin/vouchers';
+          }}
+        >
+          Kelola Voucher
+        </button>
       </div>
 
       {message && (
