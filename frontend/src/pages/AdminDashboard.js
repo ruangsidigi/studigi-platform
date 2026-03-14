@@ -1559,9 +1559,10 @@ const EditQuestionsTab = () => {
               </div>
 
               <div style={{ marginBottom: '10px' }}>
-                <strong>Poin (untuk TKP)</strong>
+                <strong>Poin per Opsi (TWK, TIU, TKP)</strong>
                 <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
-                  Isi poin tiap opsi jawaban secara manual. Kosongkan jika tidak digunakan.
+                  TWK/TIU bisa diatur manual. Jika semua poin kosong, sistem pakai aturan lama (jawaban benar = 5).
+                  TKP tetap menggunakan poin per opsi seperti sebelumnya.
                 </div>
               </div>
               {['A', 'B', 'C', 'D', 'E'].map((opt) => (

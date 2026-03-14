@@ -7,6 +7,16 @@ const adaptiveService = require('../services/adaptiveService');
 
 const router = express.Router();
 
+const getSelectedOptionPoint = (question, answer) => {
+  const key = `point_${String(answer || '').toLowerCase()}`;
+  return Number(question?.[key] ?? 0) || 0;
+};
+
+const hasManualPointConfig = (question) => {
+  const keys = ['point_a', 'point_b', 'point_c', 'point_d', 'point_e'];
+  return keys.some((key) => question?.[key] !== null && question?.[key] !== undefined && String(question?.[key]).trim() !== '');
+};
+
 const isAdminUser = (user) => {
   const role = String(user?.role || '').toLowerCase();
   const email = String(user?.email || '').toLowerCase();
@@ -278,8 +288,8 @@ router.post('/finish', authenticateToken, async (req, res) => {
     }
 
     // Calculate scores by category
-    // TWK & TIU: each correct answer = 5 points
-    // TKP: each selected option yields its configured point (point_a..point_e) regardless of correctness
+    // TWK & TIU: use manual point per selected option when configured, fallback to legacy (correct = 5)
+    // TKP: each selected option yields its configured point (point_a..point_e)
     let twkPoints = 0,
       tiuPoints = 0,
       tkpPoints = 0;
@@ -289,11 +299,15 @@ router.post('/finish', authenticateToken, async (req, res) => {
       const category = (question.category || '').toUpperCase();
 
       if (category === 'TWK') {
-        if (answer.user_answer && answer.user_answer === question.correct_answer) {
+        if (hasManualPointConfig(question)) {
+          twkPoints += getSelectedOptionPoint(question, answer.user_answer);
+        } else if (answer.user_answer && answer.user_answer === question.correct_answer) {
           twkPoints += 5;
         }
       } else if (category === 'TIU') {
-        if (answer.user_answer && answer.user_answer === question.correct_answer) {
+        if (hasManualPointConfig(question)) {
+          tiuPoints += getSelectedOptionPoint(question, answer.user_answer);
+        } else if (answer.user_answer && answer.user_answer === question.correct_answer) {
           tiuPoints += 5;
         }
       } else if (category === 'TKP') {

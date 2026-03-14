@@ -24,6 +24,16 @@ const requireAuth = (req, res, next) => {
   return next();
 };
 
+const getSelectedOptionPoint = (row, answer) => {
+  const key = `point_${String(answer || '').toLowerCase()}`;
+  return Number(row?.[key] ?? 0) || 0;
+};
+
+const hasManualPointConfig = (row) => {
+  const keys = ['point_a', 'point_b', 'point_c', 'point_d', 'point_e'];
+  return keys.some((key) => row?.[key] !== null && row?.[key] !== undefined && String(row?.[key]).trim() !== '');
+};
+
 router.post('/tryouts/start', requireAuth, async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -171,9 +181,19 @@ router.post('/tryouts/finish', requireAuth, async (req, res) => {
       const correctAnswer = String(row.correct_answer || '').toUpperCase();
 
       if (category === 'TWK') {
-        if (answer && answer === correctAnswer) twkPoints += 5;
+        // TWK now supports manual point mapping per option; keep legacy fallback if points are not configured.
+        if (hasManualPointConfig(row)) {
+          twkPoints += getSelectedOptionPoint(row, answer);
+        } else if (answer && answer === correctAnswer) {
+          twkPoints += 5;
+        }
       } else if (category === 'TIU') {
-        if (answer && answer === correctAnswer) tiuPoints += 5;
+        // TIU now supports manual point mapping per option; keep legacy fallback if points are not configured.
+        if (hasManualPointConfig(row)) {
+          tiuPoints += getSelectedOptionPoint(row, answer);
+        } else if (answer && answer === correctAnswer) {
+          tiuPoints += 5;
+        }
       } else if (category === 'TKP') {
         const key = `point_${answer.toLowerCase()}`;
         tkpPoints += Number(row[key] || 0);
