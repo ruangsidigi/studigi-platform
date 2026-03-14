@@ -278,6 +278,46 @@
   border-bottom: none;
 }
 
+.admin-desktop-table {
+  display: block;
+}
+
+.admin-mobile-cards {
+  display: none;
+}
+
+.admin-mobile-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.admin-mobile-card + .admin-mobile-card {
+  margin-top: 10px;
+}
+
+.admin-mobile-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.admin-mobile-card-meta {
+  font-size: 12px;
+  color: #475569;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.admin-mobile-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 /* Compact helpers for dense admin data tables */
 .admin-table .btn.btn-sm {
   padding: 4px 9px;
@@ -480,5 +520,13 @@ small {
   .admin-table td {
     font-size: 12px;
     padding: 8px;
+  }
+
+  .admin-desktop-table {
+    display: none;
+  }
+
+  .admin-mobile-cards {
+    display: block;
   }
 }

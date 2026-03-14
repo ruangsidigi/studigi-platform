@@ -747,68 +747,98 @@ const AdminDashboard = () => {
                   Hapus Semua Paket
                 </button>
               </div>
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Nama</th>
-                    <th>Kategori</th>
-                    <th>Tipe</th>
-                    <th>Tampil di Home</th>
-                    <th>Durasi</th>
-                    <th>Harga</th>
-                    <th>Jumlah Soal</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {packages.map((pkg) => (
-                    <tr key={pkg.id}>
-                      <td>{pkg.name}</td>
-                      <td>{categories.find((c)=>c.id===pkg.category_id)?.name || '-'}</td>
-                      <td>{pkg.type}</td>
-                      <td>
-                        {String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'Tidak' : 'Ya'}
-                      </td>
-                      <td>{Number(pkg.duration || 100)} menit</td>
-                      <td>
-                        {getOriginalPrice(pkg) ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ color: '#94a3b8', fontSize: 12, textDecoration: 'line-through' }}>
-                              {formatRupiah(getOriginalPrice(pkg))}
-                            </span>
-                            <span>{formatRupiah(pkg.price)}</span>
-                          </div>
-                        ) : (
-                          formatRupiah(pkg.price)
-                        )}
-                      </td>
-                      <td>{pkg.question_count || 0}</td>
-                      <td>
-                        <button
-                          onClick={() => handleStartEditPackage(pkg)}
-                          className="btn btn-warning btn-sm"
-                          style={{ marginRight: 8 }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleTogglePackageVisibility(pkg)}
-                          className="btn btn-secondary btn-sm"
-                          style={{ marginRight: 8 }}
-                        >
-                          {String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'Tampilkan' : 'Sembunyikan'}
-                        </button>
-                        <button
-                          onClick={() => handleDeletePackage(pkg.id)}
-                          className="btn btn-danger btn-sm"
-                        >
-                          Delete
-                        </button>
-                      </td>
+              <div className="admin-desktop-table">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Nama</th>
+                      <th>Kategori</th>
+                      <th>Tipe</th>
+                      <th>Tampil di Home</th>
+                      <th>Durasi</th>
+                      <th>Harga</th>
+                      <th>Jumlah Soal</th>
+                      <th>Aksi</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {packages.map((pkg) => (
+                      <tr key={pkg.id}>
+                        <td>{pkg.name}</td>
+                        <td>{categories.find((c)=>c.id===pkg.category_id)?.name || '-'}</td>
+                        <td>{pkg.type}</td>
+                        <td>
+                          {String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'Tidak' : 'Ya'}
+                        </td>
+                        <td>{Number(pkg.duration || 100)} menit</td>
+                        <td>
+                          {getOriginalPrice(pkg) ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ color: '#94a3b8', fontSize: 12, textDecoration: 'line-through' }}>
+                                {formatRupiah(getOriginalPrice(pkg))}
+                              </span>
+                              <span>{formatRupiah(pkg.price)}</span>
+                            </div>
+                          ) : (
+                            formatRupiah(pkg.price)
+                          )}
+                        </td>
+                        <td>{pkg.question_count || 0}</td>
+                        <td>
+                          <button
+                            onClick={() => handleStartEditPackage(pkg)}
+                            className="btn btn-warning btn-sm"
+                            style={{ marginRight: 8 }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleTogglePackageVisibility(pkg)}
+                            className="btn btn-secondary btn-sm"
+                            style={{ marginRight: 8 }}
+                          >
+                            {String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'Tampilkan' : 'Sembunyikan'}
+                          </button>
+                          <button
+                            onClick={() => handleDeletePackage(pkg.id)}
+                            className="btn btn-danger btn-sm"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="admin-mobile-cards">
+                {packages.map((pkg) => {
+                  const categoryName = categories.find((c)=>c.id===pkg.category_id)?.name || '-';
+                  const isHidden = String(pkg.visibility || 'visible').toLowerCase() === 'hidden';
+                  return (
+                    <div key={`mobile-pkg-${pkg.id}`} className="admin-mobile-card">
+                      <div className="admin-mobile-card-title">{pkg.name}</div>
+                      <div className="admin-mobile-card-meta">Kategori: {categoryName}</div>
+                      <div className="admin-mobile-card-meta">Tipe: {pkg.type}</div>
+                      <div className="admin-mobile-card-meta">Tampil di Home: {isHidden ? 'Tidak' : 'Ya'}</div>
+                      <div className="admin-mobile-card-meta">Durasi: {Number(pkg.duration || 100)} menit</div>
+                      <div className="admin-mobile-card-meta">Jumlah Soal: {pkg.question_count || 0}</div>
+                      <div className="admin-mobile-card-meta">
+                        Harga:{' '}
+                        {getOriginalPrice(pkg) ? `${formatRupiah(pkg.price)} (coret ${formatRupiah(getOriginalPrice(pkg))})` : formatRupiah(pkg.price)}
+                      </div>
+                      <div className="admin-mobile-card-actions">
+                        <button onClick={() => handleStartEditPackage(pkg)} className="btn btn-warning btn-sm">Edit</button>
+                        <button onClick={() => handleTogglePackageVisibility(pkg)} className="btn btn-secondary btn-sm">
+                          {isHidden ? 'Tampilkan' : 'Sembunyikan'}
+                        </button>
+                        <button onClick={() => handleDeletePackage(pkg.id)} className="btn btn-danger btn-sm">Delete</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {editPackage && (
@@ -1202,30 +1232,48 @@ const UsersTab = () => {
   return (
     <div className="card">
       <div className="card-title">Daftar Pengguna</div>
-      <table className="admin-table">
-        <thead>
-          <tr>
-            <th>Nama</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Tanggal Daftar</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => (
-            <tr key={user.id}>
-              <td>{user.name}</td>
-              <td>{user.email}</td>
-              <td>
-                <span className={user.role === 'admin' ? 'role-admin' : 'role-user'}>
-                  {user.role}
-                </span>
-              </td>
-              <td>{new Date(user.created_at).toLocaleDateString('id-ID')}</td>
+      <div className="admin-desktop-table">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Nama</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Tanggal Daftar</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {users.map((user) => (
+              <tr key={user.id}>
+                <td>{user.name}</td>
+                <td>{user.email}</td>
+                <td>
+                  <span className={user.role === 'admin' ? 'role-admin' : 'role-user'}>
+                    {user.role}
+                  </span>
+                </td>
+                <td>{new Date(user.created_at).toLocaleDateString('id-ID')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="admin-mobile-cards">
+        {users.map((user) => (
+          <div key={`mobile-user-${user.id}`} className="admin-mobile-card">
+            <div className="admin-mobile-card-title">{user.name || '-'}</div>
+            <div className="admin-mobile-card-meta">Email: {user.email || '-'}</div>
+            <div className="admin-mobile-card-meta">
+              Role:{' '}
+              <span className={user.role === 'admin' ? 'role-admin' : 'role-user'}>
+                {user.role}
+              </span>
+            </div>
+            <div className="admin-mobile-card-meta">Tanggal Daftar: {new Date(user.created_at).toLocaleDateString('id-ID')}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
