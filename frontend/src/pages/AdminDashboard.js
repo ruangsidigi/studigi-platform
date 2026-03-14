@@ -78,7 +78,17 @@ const AdminDashboard = () => {
   const [message, setMessage] = useState('');
 
   // Form states
-  const [newPackage, setNewPackage] = useState({ name: '', description: '', type: 'tryout', price: 0, original_price: '', question_count: 0, category_id: '', included_package_ids: [] });
+  const [newPackage, setNewPackage] = useState({
+    name: '',
+    description: '',
+    type: 'tryout',
+    price: 0,
+    original_price: '',
+    question_count: 0,
+    category_id: '',
+    included_package_ids: [],
+    visibility: 'visible',
+  });
   const [otherCategoryName, setOtherCategoryName] = useState('');
   const [editingPackageId, setEditingPackageId] = useState(null);
   const [editPackage, setEditPackage] = useState(null);
@@ -184,7 +194,17 @@ const AdminDashboard = () => {
 
       await packageService.create(payload);
       setMessage('Package created successfully');
-      setNewPackage({ name: '', description: '', type: 'tryout', price: 0, original_price: '', question_count: 0, category_id: '', included_package_ids: [] });
+      setNewPackage({
+        name: '',
+        description: '',
+        type: 'tryout',
+        price: 0,
+        original_price: '',
+        question_count: 0,
+        category_id: '',
+        included_package_ids: [],
+        visibility: 'visible',
+      });
       setOtherCategoryName('');
       loadDashboardData();
     } catch (err) {
@@ -201,6 +221,7 @@ const AdminDashboard = () => {
       question_count: Number(pkg.question_count || 0),
       category_id: pkg.category_id ? String(pkg.category_id) : '',
       included_package_ids: normalizeIncludedPackageIds(pkg.included_package_ids),
+      visibility: String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'hidden' : 'visible',
     };
 
     setEditingPackageId(pkg.id);
@@ -275,6 +296,22 @@ const AdminDashboard = () => {
       await loadDashboardData();
     } catch (err) {
       setMessage('Error updating package: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleTogglePackageVisibility = async (pkg) => {
+    const currentVisibility = String(pkg?.visibility || 'visible').toLowerCase();
+    const nextVisibility = currentVisibility === 'hidden' ? 'visible' : 'hidden';
+    try {
+      await packageService.update(pkg.id, { visibility: nextVisibility });
+      setMessage(
+        nextVisibility === 'hidden'
+          ? `Paket "${pkg.name}" disembunyikan dari halaman Home`
+          : `Paket "${pkg.name}" ditampilkan di halaman Home`
+      );
+      await loadDashboardData();
+    } catch (err) {
+      setMessage('Gagal mengubah visibilitas paket: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -648,6 +685,16 @@ const AdminDashboard = () => {
                       onChange={(e) => setNewPackage({ ...newPackage, question_count: parseInt(e.target.value) })}
                     />
                   </div>
+                  <div className="form-group">
+                    <label>Tampilkan di halaman Home</label>
+                    <select
+                      value={newPackage.visibility || 'visible'}
+                      onChange={(e) => setNewPackage({ ...newPackage, visibility: e.target.value })}
+                    >
+                      <option value="visible">Ya, tampilkan sebagai paket satuan</option>
+                      <option value="hidden">Tidak, hanya untuk bundling/internal</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="form-group">
                   <label>Deskripsi</label>
@@ -680,6 +727,7 @@ const AdminDashboard = () => {
                     <th>Nama</th>
                     <th>Kategori</th>
                     <th>Tipe</th>
+                    <th>Tampil di Home</th>
                     <th>Harga</th>
                     <th>Jumlah Soal</th>
                     <th>Aksi</th>
@@ -691,6 +739,9 @@ const AdminDashboard = () => {
                       <td>{pkg.name}</td>
                       <td>{categories.find((c)=>c.id===pkg.category_id)?.name || '-'}</td>
                       <td>{pkg.type}</td>
+                      <td>
+                        {String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'Tidak' : 'Ya'}
+                      </td>
                       <td>
                         {getOriginalPrice(pkg) ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -705,13 +756,20 @@ const AdminDashboard = () => {
                       </td>
                       <td>{pkg.question_count || 0}</td>
                       <td>
-                            <button
-                              onClick={() => handleStartEditPackage(pkg)}
-                              className="btn btn-warning btn-sm"
-                              style={{ marginRight: 8 }}
-                            >
-                              Edit
-                            </button>
+                        <button
+                          onClick={() => handleStartEditPackage(pkg)}
+                          className="btn btn-warning btn-sm"
+                          style={{ marginRight: 8 }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleTogglePackageVisibility(pkg)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ marginRight: 8 }}
+                        >
+                          {String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'Tampilkan' : 'Sembunyikan'}
+                        </button>
                         <button
                           onClick={() => handleDeletePackage(pkg.id)}
                           className="btn btn-danger btn-sm"
@@ -889,6 +947,16 @@ const AdminDashboard = () => {
                         value={editPackage.question_count}
                         onChange={(e) => setEditPackage({ ...editPackage, question_count: parseInt(e.target.value || '0', 10) })}
                       />
+                    </div>
+                    <div className="form-group">
+                      <label>Tampilkan di halaman Home</label>
+                      <select
+                        value={editPackage.visibility || 'visible'}
+                        onChange={(e) => setEditPackage({ ...editPackage, visibility: e.target.value })}
+                      >
+                        <option value="visible">Ya, tampilkan sebagai paket satuan</option>
+                        <option value="hidden">Tidak, hanya untuk bundling/internal</option>
+                      </select>
                     </div>
                   </div>
 
