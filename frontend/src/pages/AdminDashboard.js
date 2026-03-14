@@ -1058,8 +1058,10 @@ const AdminDashboard = () => {
                 />
                 <small>
                   Format: number | question_text | option_a | option_b | option_c | option_d | option_e |
-                  correct_answer | explanation | category | point_a | point_b | point_c | point_d | point_e |
-                  image_url
+                  correct_answer | explanation | category | <strong>poin_benar</strong> | point_a | point_b | point_c | point_d | point_e |
+                  image_url<br />
+                  <em>poin_benar</em>: khusus TWK/TIU – isi satu nilai poin untuk jawaban benar, sistem otomatis set poin 0 untuk pilihan lain.
+                  Untuk TKP, gunakan kolom point_a..point_e secara individual.
                 </small>
               </div>
               <button type="submit" className="btn btn-success">

@@ -420,7 +420,7 @@ router.post('/questions/upload', requireAdmin, upload.single('file'), async (req
       const preview = rows.slice(0, 2).map((item) => Object.keys(item || {}));
       return res.status(400).json({
         error: 'No valid rows to import. Pastikan kolom nomor dan teks soal terisi.',
-        hint: 'Gunakan header: number, question_text, option_a..option_e, correct_answer, explanation, category',
+        hint: 'Gunakan header: number, question_text, option_a..option_e, correct_answer, explanation, category, poin_benar (TWK/TIU), point_a..point_e (TKP), image_url',
         previewHeaders: preview,
       });
     }
