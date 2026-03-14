@@ -58,6 +58,12 @@ const toNumberOrNull = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const toIntegerOrNull = (value) => {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+};
+
 const aliasMap = {
   number: ['number', 'no', 'nomor'],
   question_text: ['question_text', 'question', 'soal', 'pertanyaan'],
@@ -424,6 +430,61 @@ router.post('/questions/:id/image', requireAdmin, upload.single('image'), async 
       image_url: finalImageUrl,
       question: result.rows[0],
     });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.put('/questions/:id', requireAdmin, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const questionId = Number(req.params.id);
+    if (!Number.isInteger(questionId)) return res.status(400).json({ error: 'Invalid question id' });
+
+    const body = req.body || {};
+    const payload = {
+      number: toIntegerOrNull(body.number),
+      question_text: body.question_text !== undefined ? String(body.question_text || '') : null,
+      option_a: body.option_a !== undefined ? String(body.option_a || '') : null,
+      option_b: body.option_b !== undefined ? String(body.option_b || '') : null,
+      option_c: body.option_c !== undefined ? String(body.option_c || '') : null,
+      option_d: body.option_d !== undefined ? String(body.option_d || '') : null,
+      option_e: body.option_e !== undefined ? String(body.option_e || '') : null,
+      correct_answer: body.correct_answer !== undefined ? String(body.correct_answer || '').trim().toUpperCase() : null,
+      explanation: body.explanation !== undefined ? String(body.explanation || '') : null,
+      category: body.category !== undefined ? String(body.category || '').trim().toUpperCase() : null,
+      point_a: body.point_a !== undefined ? toNumberOrNull(body.point_a) : null,
+      point_b: body.point_b !== undefined ? toNumberOrNull(body.point_b) : null,
+      point_c: body.point_c !== undefined ? toNumberOrNull(body.point_c) : null,
+      point_d: body.point_d !== undefined ? toNumberOrNull(body.point_d) : null,
+      point_e: body.point_e !== undefined ? toNumberOrNull(body.point_e) : null,
+      image_url: body.image_url !== undefined ? (body.image_url ? String(body.image_url) : null) : null,
+    };
+
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === null && body[key] === undefined) delete payload[key];
+    });
+
+    if (!Object.keys(payload).length) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    const fields = Object.keys(payload);
+    const setClauses = fields.map((field, idx) => `${field} = $${idx + 1}`);
+    const values = fields.map((field) => payload[field]);
+
+    values.push(questionId);
+    const query = `
+      UPDATE questions
+      SET ${setClauses.join(', ')}, updated_at = NOW()
+      WHERE id = $${values.length}
+      RETURNING *
+    `;
+
+    const result = await db.query(query, values);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Question not found' });
+
+    return res.json({ message: 'Question updated successfully', question: result.rows[0] });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

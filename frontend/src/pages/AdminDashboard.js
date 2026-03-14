@@ -84,6 +84,7 @@ const AdminDashboard = () => {
     type: 'tryout',
     price: 0,
     original_price: '',
+    duration: 100,
     question_count: 0,
     category_id: '',
     included_package_ids: [],
@@ -200,6 +201,7 @@ const AdminDashboard = () => {
         type: 'tryout',
         price: 0,
         original_price: '',
+        duration: 100,
         question_count: 0,
         category_id: '',
         included_package_ids: [],
@@ -218,6 +220,7 @@ const AdminDashboard = () => {
       type: pkg.type || 'tryout',
       price: Number(pkg.price || 0),
       original_price: pkg.original_price ? Number(pkg.original_price) : '',
+      duration: Number(pkg.duration || 100),
       question_count: Number(pkg.question_count || 0),
       category_id: pkg.category_id ? String(pkg.category_id) : '',
       included_package_ids: normalizeIncludedPackageIds(pkg.included_package_ids),
@@ -678,6 +681,15 @@ const AdminDashboard = () => {
                     />
                   </div>
                   <div className="form-group">
+                    <label>Durasi Pengerjaan (menit)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newPackage.duration}
+                      onChange={(e) => setNewPackage({ ...newPackage, duration: parseInt(e.target.value || '100', 10) || 100 })}
+                    />
+                  </div>
+                  <div className="form-group">
                     <label>Jumlah Soal</label>
                     <input
                       type="number"
@@ -728,6 +740,7 @@ const AdminDashboard = () => {
                     <th>Kategori</th>
                     <th>Tipe</th>
                     <th>Tampil di Home</th>
+                    <th>Durasi</th>
                     <th>Harga</th>
                     <th>Jumlah Soal</th>
                     <th>Aksi</th>
@@ -742,6 +755,7 @@ const AdminDashboard = () => {
                       <td>
                         {String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'Tidak' : 'Ya'}
                       </td>
+                      <td>{Number(pkg.duration || 100)} menit</td>
                       <td>
                         {getOriginalPrice(pkg) ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -938,6 +952,15 @@ const AdminDashboard = () => {
                           const nextDigits = normalizeCurrencyDigits(e.target.value);
                           setEditPackage({ ...editPackage, original_price: nextDigits });
                         }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Durasi Pengerjaan (menit)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={editPackage.duration}
+                        onChange={(e) => setEditPackage({ ...editPackage, duration: parseInt(e.target.value || '100', 10) || 100 })}
                       />
                     </div>
                     <div className="form-group">
@@ -1341,9 +1364,31 @@ const EditQuestionsTab = () => {
     setEditFormData({ ...editFormData, [field]: value });
   };
 
+  const toNullableNumber = (value) => {
+    if (value === undefined || value === null || String(value).trim() === '') return null;
+    const parsed = Number(String(value).replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const buildQuestionPayload = (form) => {
+    const payload = {
+      ...form,
+      number: Number(form.number || 0),
+      correct_answer: String(form.correct_answer || '').trim().toUpperCase() || null,
+      category: String(form.category || '').trim().toUpperCase() || null,
+    };
+
+    ['a', 'b', 'c', 'd', 'e'].forEach((opt) => {
+      payload[`point_${opt}`] = toNullableNumber(form[`point_${opt}`]);
+    });
+
+    return payload;
+  };
+
   const handleSaveQuestion = async () => {
     try {
-      await questionService.updateQuestion(selectedQuestion.id, editFormData);
+      const payload = buildQuestionPayload(editFormData);
+      await questionService.updateQuestion(selectedQuestion.id, payload);
       setMessage('Question updated successfully');
       // Reload questions
       const res = await questionService.getByPackage(selectedPackage);
@@ -1515,6 +1560,9 @@ const EditQuestionsTab = () => {
 
               <div style={{ marginBottom: '10px' }}>
                 <strong>Poin (untuk TKP)</strong>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                  Isi poin tiap opsi jawaban secara manual. Kosongkan jika tidak digunakan.
+                </div>
               </div>
               {['A', 'B', 'C', 'D', 'E'].map((opt) => (
                 <div className="form-group" key={`point-${opt}`}>

@@ -34,6 +34,17 @@ const safeExec = async (db, sql, values = []) => {
   }
 };
 
+let packageSchemaReady = false;
+const ensurePackageSchema = async (db) => {
+  if (packageSchemaReady) return;
+  await safeExec(
+    db,
+    `ALTER TABLE packages
+       ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 100`
+  );
+  packageSchemaReady = true;
+};
+
 const normalizeIncludedPackageIds = (rawValue) => {
   if (Array.isArray(rawValue)) {
     return JSON.stringify(
@@ -102,6 +113,7 @@ const normalizeOriginalPrice = (originalPrice, price) => {
 router.get('/packages', async (req, res) => {
   try {
     const db = req.app.locals.db;
+    await ensurePackageSchema(db);
     const result = await db.query('SELECT * FROM packages ORDER BY created_at DESC NULLS LAST, id DESC');
     return res.json(result.rows || []);
   } catch (error) {
@@ -112,6 +124,7 @@ router.get('/packages', async (req, res) => {
 router.get('/packages/:id', async (req, res) => {
   try {
     const db = req.app.locals.db;
+    await ensurePackageSchema(db);
     const { id } = req.params;
     const result = await db.query('SELECT * FROM packages WHERE id = $1 LIMIT 1', [id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Package not found' });
@@ -124,12 +137,14 @@ router.get('/packages/:id', async (req, res) => {
 router.post('/packages', requireAdmin, async (req, res) => {
   try {
     const db = req.app.locals.db;
+    await ensurePackageSchema(db);
     const {
       name,
       description = '',
       type = 'tryout',
       price = 0,
       original_price = null,
+      duration = 100,
       question_count = 0,
       category_id = null,
       included_package_ids = [],
@@ -144,8 +159,8 @@ router.post('/packages', requireAdmin, async (req, res) => {
     const normalizedOriginalPrice = normalizeOriginalPrice(original_price, normalizedPrice);
 
     const result = await db.query(
-      `INSERT INTO packages (name, description, type, price, original_price, question_count, category_id, included_package_ids, content_type, visibility, pdf_file_path, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+      `INSERT INTO packages (name, description, type, price, original_price, duration, question_count, category_id, included_package_ids, content_type, visibility, pdf_file_path, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
        RETURNING *`,
       [
         name,
@@ -153,6 +168,7 @@ router.post('/packages', requireAdmin, async (req, res) => {
         type,
         normalizedPrice,
         normalizedOriginalPrice,
+        Math.max(1, Number(duration || 100)),
         Number(question_count || 0),
         category_id || null,
         normalizeIncludedPackageIds(included_package_ids),
@@ -171,6 +187,7 @@ router.post('/packages', requireAdmin, async (req, res) => {
 router.put('/packages/:id', requireAdmin, async (req, res) => {
   try {
     const db = req.app.locals.db;
+    await ensurePackageSchema(db);
     const { id } = req.params;
     const {
       name,
@@ -178,6 +195,7 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
       type,
       price,
       original_price,
+      duration,
       question_count,
       category_id,
       included_package_ids,
@@ -203,14 +221,15 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
          type = COALESCE($3, type),
          price = COALESCE($4, price),
          original_price = CASE WHEN $5::boolean THEN $6::numeric ELSE original_price END,
-         question_count = COALESCE($7, question_count),
-         category_id = COALESCE($8, category_id),
-         included_package_ids = COALESCE($9, included_package_ids),
-         content_type = COALESCE($10, content_type),
-         visibility = COALESCE($11, visibility),
-         pdf_file_path = CASE WHEN $12::boolean THEN $13 ELSE pdf_file_path END,
+         duration = COALESCE($7, duration),
+         question_count = COALESCE($8, question_count),
+         category_id = COALESCE($9, category_id),
+         included_package_ids = COALESCE($10, included_package_ids),
+         content_type = COALESCE($11, content_type),
+         visibility = COALESCE($12, visibility),
+         pdf_file_path = CASE WHEN $13::boolean THEN $14 ELSE pdf_file_path END,
          updated_at = NOW()
-       WHERE id = $14
+       WHERE id = $15
        RETURNING *`,
       [
         name ?? null,
@@ -219,6 +238,7 @@ router.put('/packages/:id', requireAdmin, async (req, res) => {
         normalizedPrice,
         shouldUpdateOriginalPrice,
         normalizedOriginalPrice !== undefined ? normalizedOriginalPrice : null,
+        duration !== undefined ? Math.max(1, Number(duration || 100)) : null,
         question_count !== undefined ? Number(question_count) : null,
         category_id ?? null,
         included_package_ids !== undefined ? normalizeIncludedPackageIds(included_package_ids) : null,

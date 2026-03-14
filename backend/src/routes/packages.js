@@ -170,7 +170,7 @@ router.get('/:id', async (req, res) => {
 // Create package (Admin only)
 router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
-    const { name, description, type, price, original_price, question_count, category_id, included_package_ids } = req.body;
+    const { name, description, type, price, original_price, duration, question_count, category_id, included_package_ids } = req.body;
 
     if (!name || !type || price === undefined) {
       return res.status(400).json({ error: 'Name, type, and price are required' });
@@ -188,6 +188,7 @@ router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) =
       type,
       price: normalizedPrice,
       original_price: normalizedOriginalPrice,
+      duration: Math.max(1, Number(duration || 100)),
       question_count,
       category_id: category_id ? parseInt(category_id) : null,
       included_package_ids: Array.isArray(included_package_ids) ? included_package_ids : included_package_ids ? JSON.parse(included_package_ids) : [],
@@ -217,7 +218,7 @@ router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) =
 router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, type, price, original_price, question_count, category_id, included_package_ids } = req.body;
+    const { name, description, type, price, original_price, duration, question_count, category_id, included_package_ids } = req.body;
 
     const normalizedPrice = price !== undefined ? (normalizeCurrencyNumber(price) || 0) : undefined;
     const normalizedOriginalPrice =
@@ -231,6 +232,7 @@ router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res)
       type,
       price: normalizedPrice,
       original_price: original_price !== undefined ? normalizedOriginalPrice : undefined,
+      duration: duration !== undefined ? Math.max(1, Number(duration || 100)) : undefined,
       question_count,
       category_id: category_id ? parseInt(category_id) : null,
       included_package_ids: Array.isArray(included_package_ids) ? included_package_ids : included_package_ids ? JSON.parse(included_package_ids) : undefined,
