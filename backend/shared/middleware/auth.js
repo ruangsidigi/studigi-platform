@@ -8,14 +8,16 @@ module.exports = async function authMiddleware(req, res, next) {
   if (!header.startsWith('Bearer ')) return next();
   const token = header.slice(7);
 
-  // Step 1: verify JWT signature/expiry. Reject immediately if invalid.
+  // Step 1: verify JWT signature/expiry.
+  // Do NOT reject here — let individual routes enforce auth so public endpoints
+  // (like GET /api/packages) still work even when the client sends an expired token.
   let payload;
   try {
     const jwtSecret = config.jwtSecret || config.jwtSecretFallback;
     payload = jwt.verify(token, jwtSecret);
   } catch (err) {
-    console.warn('auth middleware: invalid token signature/expiry', err.message);
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    console.warn('auth middleware: invalid/expired token, skipping user load', err.message);
+    return next(); // skip req.user; protected routes will respond with 401 themselves
   }
 
   // Step 2: enrich with DB data. Fall back to JWT payload if DB is unavailable

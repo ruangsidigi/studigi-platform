@@ -22,6 +22,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// On 401: clear expired token so public endpoints don't keep failing
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      localStorage.removeItem('token');
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Auth Service
 export const authService = {
   register: (email, password, name) =>
