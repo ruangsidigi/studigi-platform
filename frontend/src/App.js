@@ -76,6 +76,14 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 };
 
 function App() {
+  // Keep backend warm: ping /api/health every 4 minutes to prevent cold-start.
+  useEffect(() => {
+    const ping = () => fetch('/api/health', { method: 'GET', cache: 'no-store' }).catch(() => {});
+    ping(); // ping on mount
+    const interval = setInterval(ping, 4 * 60 * 1000); // every 4 minutes
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     const cachedFavicon = localStorage.getItem(FAVICON_CACHE_KEY);
     if (cachedFavicon) {
