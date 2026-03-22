@@ -147,31 +147,25 @@ function App() {
             <Route
               path="/activity"
               element={
-                <ProtectedRoute>
-                  <DashboardLayout>
-                    <ActivityPage />
-                  </DashboardLayout>
-                </ProtectedRoute>
+                <DashboardLayout>
+                  <ActivityPage />
+                </DashboardLayout>
               }
             />
             <Route
               path="/payouts"
               element={
-                <ProtectedRoute>
-                  <DashboardLayout>
-                    <PayoutsPage />
-                  </DashboardLayout>
-                </ProtectedRoute>
+                <DashboardLayout>
+                  <PayoutsPage />
+                </DashboardLayout>
               }
             />
             <Route
               path="/settings"
               element={
-                <ProtectedRoute>
-                  <DashboardLayout>
-                    <SettingsPage />
-                  </DashboardLayout>
-                </ProtectedRoute>
+                <DashboardLayout>
+                  <SettingsPage />
+                </DashboardLayout>
               }
             />
             <Route

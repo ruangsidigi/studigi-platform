@@ -1,17 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
 import { purchaseService } from '../services/api';
 
 const COMPLETED_STATUSES = ['paid', 'completed', 'success', 'settlement'];
 
 export default function Payouts() {
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext as any);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     const loadTransactions = async () => {
+      if (!user) {
+        setTransactions([]);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         const response = await purchaseService.getAll();
@@ -27,7 +35,7 @@ export default function Payouts() {
     };
 
     loadTransactions();
-  }, []);
+  }, [user]);
 
   const summary = useMemo(() => {
     const paid = transactions.filter((item) => COMPLETED_STATUSES.includes(String(item.payment_status || '').toLowerCase())).length;

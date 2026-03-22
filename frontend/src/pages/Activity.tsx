@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
 import { adaptiveService, packageService, reportService } from '../services/api';
 
 export default function Activity() {
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext as any);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [overview, setOverview] = useState<any>(null);
@@ -17,6 +19,15 @@ export default function Activity() {
 
   useEffect(() => {
     const loadData = async () => {
+      if (!user) {
+        setOverview(null);
+        setHistory([]);
+        setAdaptiveDashboard(null);
+        setMyRankings([]);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         const [overviewRes, historyRes, adaptiveRes, rankingsRes] = await Promise.allSettled([
@@ -53,7 +64,7 @@ export default function Activity() {
     };
 
     loadData();
-  }, []);
+  }, [user]);
 
   const buildBoardKey = (packageId: number, scope: 'national' | 'province') => `${packageId}_${scope}`;
 

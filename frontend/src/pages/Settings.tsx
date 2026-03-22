@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
+import { AuthContext } from '../context/AuthContext';
 import { authService, userService } from '../services/api';
 
 const initialForm = {
@@ -9,6 +10,7 @@ const initialForm = {
 };
 
 export default function Settings() {
+  const { user } = useContext(AuthContext as any);
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -18,6 +20,12 @@ export default function Settings() {
 
   useEffect(() => {
     const loadProfile = async () => {
+      if (!user) {
+        setForm(initialForm);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         const response = await userService.getProfile();
@@ -36,7 +44,7 @@ export default function Settings() {
     };
 
     loadProfile();
-  }, []);
+  }, [user]);
 
   const handleChange = (field: keyof typeof initialForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
