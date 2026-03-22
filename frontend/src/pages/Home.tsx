@@ -44,45 +44,63 @@ export default function Home() {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const [activeCategory, setActiveCategory] = useState<(typeof CATEGORY_TABS)[number]>('CPNS');
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [ownedPackageIds, setOwnedPackageIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
+    let cancelled = false;
     const loadPackages = async () => {
-      try {
-        setLoading(true);
-        const [packagesResponse, categoriesResponse, purchasesResponse] = await Promise.all([
-          packageService.getAll(),
-          categoryService.getAll().catch(() => ({ data: [] })),
-          user ? purchaseService.getAll().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
-        ]);
+      const MAX_RETRIES = 3;
+      const RETRY_DELAY_MS = 2500;
 
-        const allPackages = Array.isArray(packagesResponse.data) ? packagesResponse.data : [];
-        const allCategories = Array.isArray(categoriesResponse.data) ? categoriesResponse.data : [];
-        const allPurchases = Array.isArray(purchasesResponse.data) ? purchasesResponse.data : [];
-        const validPackages = allPackages.filter((item) => Number(item?.id) > 0);
-        setPackages(validPackages);
-        setCategories(allCategories);
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          if (cancelled) return;
+          setLoading(true);
+          setError('');
+          const [packagesResponse, categoriesResponse, purchasesResponse] = await Promise.all([
+            packageService.getAll(),
+            categoryService.getAll().catch(() => ({ data: [] })),
+            user ? purchaseService.getAll().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+          ]);
 
-        const paidStatuses = new Set(['paid', 'completed', 'success', 'settlement']);
-        const paidPackageIds = new Set(
-          allPurchases
-            .filter((purchase) => paidStatuses.has(String(purchase?.payment_status || '').toLowerCase()))
-            .map((purchase) => Number(purchase?.package_id))
-            .filter((id) => Number.isInteger(id) && id > 0)
-        );
-        setOwnedPackageIds(paidPackageIds);
-        setError('');
-      } catch (loadErr) {
-        setError('Gagal memuat katalog tryout.');
-      } finally {
-        setLoading(false);
+          if (cancelled) return;
+          const allPackages = Array.isArray(packagesResponse.data) ? packagesResponse.data : [];
+          const allCategories = Array.isArray(categoriesResponse.data) ? categoriesResponse.data : [];
+          const allPurchases = Array.isArray(purchasesResponse.data) ? purchasesResponse.data : [];
+          const validPackages = allPackages.filter((item) => Number(item?.id) > 0);
+          setPackages(validPackages);
+          setCategories(allCategories);
+
+          const paidStatuses = new Set(['paid', 'completed', 'success', 'settlement']);
+          const paidPackageIds = new Set(
+            allPurchases
+              .filter((purchase) => paidStatuses.has(String(purchase?.payment_status || '').toLowerCase()))
+              .map((purchase) => Number(purchase?.package_id))
+              .filter((id) => Number.isInteger(id) && id > 0)
+          );
+          setOwnedPackageIds(paidPackageIds);
+          setError('');
+          setLoading(false);
+          return; // success — stop retrying
+        } catch (loadErr) {
+          if (cancelled) return;
+          if (attempt < MAX_RETRIES) {
+            // Wait before retrying (handles cold-start DB timeouts)
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+          } else {
+            setError('Gagal memuat katalog tryout. Silakan refresh halaman.');
+            setLoading(false);
+          }
+        }
       }
     };
 
     loadPackages();
-  }, [user]);
+    return () => { cancelled = true; };
+  }, [user, retryCount]);
 
   const categoryMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -266,7 +284,16 @@ export default function Home() {
           )}
 
           {error && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error}</div>
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 flex items-center justify-between gap-4">
+              <span>{error}</span>
+              <button
+                type="button"
+                onClick={() => setRetryCount((c) => c + 1)}
+                className="shrink-0 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200"
+              >
+                Coba Lagi
+              </button>
+            </div>
           )}
 
           {!loading && !error && filteredPackages.length === 0 && (
