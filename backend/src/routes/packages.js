@@ -1,3 +1,37 @@
+// Update sort order of packages (Admin only)
+router.patch('/order', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+  try {
+    const { orders } = req.body; // orders: [{id, sort_order}, ...]
+    if (!Array.isArray(orders)) {
+      return res.status(400).json({ error: 'orders must be an array' });
+    }
+    const updates = [];
+    const updateResults = [];
+    for (const item of orders) {
+      if (!item.id || typeof item.sort_order !== 'number') continue;
+      const updatePromise = supabase.from('packages').update({ sort_order: item.sort_order }).eq('id', item.id)
+        .then((result) => {
+          if (result.error) {
+            console.error('Update sort_order error:', { id: item.id, sort_order: item.sort_order, error: result.error });
+          } else {
+            console.log('Updated sort_order:', { id: item.id, sort_order: item.sort_order });
+          }
+          updateResults.push({ id: item.id, sort_order: item.sort_order, error: result.error });
+          return result;
+        });
+      updates.push(updatePromise);
+    }
+    await Promise.all(updates);
+    const failed = updateResults.filter(r => r.error);
+    if (failed.length > 0) {
+      return res.status(500).json({ error: 'Some updates failed', details: failed });
+    }
+    res.json({ message: 'Sort order updated', updateResults });
+  } catch (error) {
+    console.error('PATCH /api/packages/order fatal error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 const express = require('express');
 const supabase = require('../config/supabase');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
@@ -80,6 +114,7 @@ router.get('/', async (req, res) => {
     const { data: packages, error } = await supabase
       .from('packages')
       .select('*, categories(id, name)')
+      .order('sort_order', { ascending: true })
       .order('price', { ascending: true });
 
     if (error) {
