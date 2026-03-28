@@ -1,3 +1,21 @@
+// Fungsi untuk update urutan paket ke backend
+const updatePackageOrder = async (newOrder, setMessage, loadDashboardData) => {
+  try {
+    const orders = newOrder.map((pkg, idx) => ({ id: pkg.id, sort_order: idx }));
+    await fetch(API_ROOT + '/api/packages/order', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify({ orders }),
+    });
+    setMessage('Urutan paket berhasil disimpan');
+    await loadDashboardData();
+  } catch (err) {
+    setMessage('Gagal menyimpan urutan paket: ' + (err.message || 'Unknown error'));
+  }
+};
 import React, { useCallback, useEffect, useState } from 'react';
 import { adminService, packageService, questionService, materialService, brandingService, purchaseService } from '../services/api';
 import {
@@ -751,6 +769,7 @@ const AdminDashboard = () => {
                 <table className="admin-table">
                   <thead>
                     <tr>
+                      <th>Urutan</th>
                       <th>Nama</th>
                       <th>Kategori</th>
                       <th>Tipe</th>
@@ -762,8 +781,37 @@ const AdminDashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {packages.map((pkg) => (
+                    {packages.map((pkg, idx) => (
                       <tr key={pkg.id}>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <span>{idx + 1}</span>
+                            <button
+                              className="btn btn-xs"
+                              style={{ marginLeft: 4, padding: '2px 6px' }}
+                              disabled={idx === 0}
+                              title="Naikkan"
+                              onClick={async () => {
+                                if (idx === 0) return;
+                                const newOrder = [...packages];
+                                [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+                                await updatePackageOrder(newOrder, setMessage, loadDashboardData);
+                              }}
+                            >▲</button>
+                            <button
+                              className="btn btn-xs"
+                              style={{ marginLeft: 2, padding: '2px 6px' }}
+                              disabled={idx === packages.length - 1}
+                              title="Turunkan"
+                              onClick={async () => {
+                                if (idx === packages.length - 1) return;
+                                const newOrder = [...packages];
+                                [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+                                await updatePackageOrder(newOrder, setMessage, loadDashboardData);
+                              }}
+                            >▼</button>
+                          </div>
+                        </td>
                         <td>{pkg.name}</td>
                         <td>{categories.find((c)=>c.id===pkg.category_id)?.name || '-'}</td>
                         <td>{pkg.type}</td>
