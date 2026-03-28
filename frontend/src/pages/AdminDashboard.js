@@ -1,4 +1,3 @@
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { adminService, packageService, questionService, materialService, brandingService, purchaseService } from '../services/api';
@@ -770,96 +769,98 @@ const AdminDashboard = () => {
                 </button>
               </div>
               <div className="admin-desktop-table">
-                <DragDropContext
-                  onDragEnd={async (result) => {
-                    if (!result.destination) return;
-                    const reordered = Array.from(packages);
-                    const [removed] = reordered.splice(result.source.index, 1);
-                    reordered.splice(result.destination.index, 0, removed);
-                    await updatePackageOrder(reordered, setMessage, loadDashboardData);
-                  }}
-                >
-                  <Droppable droppableId="package-table">
-                    {(provided) => (
-                      <table className="admin-table" ref={provided.innerRef} {...provided.droppableProps}>
-                        <thead>
-                          <tr>
-                            <th style={{ width: 60 }}>Urutan</th>
-                            <th>Nama</th>
-                            <th>Kategori</th>
-                            <th>Tipe</th>
-                            <th>Tampil di Home</th>
-                            <th>Durasi</th>
-                            <th>Harga</th>
-                            <th>Jumlah Soal</th>
-                            <th>Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {packages.map((pkg, idx) => (
-                            <Draggable key={pkg.id} draggableId={String(pkg.id)} index={idx}>
-                              {(provided, snapshot) => (
-                                <tr
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  style={{
-                                    ...provided.draggableProps.style,
-                                    background: snapshot.isDragging ? '#f1f5f9' : undefined,
-                                  }}
-                                >
-                                  <td {...provided.dragHandleProps} style={{ cursor: 'grab', textAlign: 'center', fontSize: 20 }}>
-                                    &#9776;
-                                  </td>
-                                  <td>{pkg.name}</td>
-                                  <td>{categories.find((c)=>c.id===pkg.category_id)?.name || '-'}</td>
-                                  <td>{pkg.type}</td>
-                                  <td>{String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'Tidak' : 'Ya'}</td>
-                                  <td>{Number(pkg.duration || 100)} menit</td>
-                                  <td>
-                                    {getOriginalPrice(pkg) ? (
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                        <span style={{ color: '#94a3b8', fontSize: 12, textDecoration: 'line-through' }}>
-                                          {formatRupiah(getOriginalPrice(pkg))}
-                                        </span>
-                                        <span>{formatRupiah(pkg.price)}</span>
-                                      </div>
-                                    ) : (
-                                      formatRupiah(pkg.price)
-                                    )}
-                                  </td>
-                                  <td>{pkg.question_count || 0}</td>
-                                  <td>
-                                    <button
-                                      onClick={() => handleStartEditPackage(pkg)}
-                                      className="btn btn-warning btn-sm"
-                                      style={{ marginRight: 8 }}
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      onClick={() => handleTogglePackageVisibility(pkg)}
-                                      className="btn btn-secondary btn-sm"
-                                      style={{ marginRight: 8 }}
-                                    >
-                                      {String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'Tampilkan' : 'Sembunyikan'}
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeletePackage(pkg.id)}
-                                      className="btn btn-danger btn-sm"
-                                    >
-                                      Delete
-                                    </button>
-                                  </td>
-                                </tr>
-                              )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
-                        </tbody>
-                      </table>
-                    )}
-                  </Droppable>
-                </DragDropContext>
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Urutan</th>
+                      <th>Nama</th>
+                      <th>Kategori</th>
+                      <th>Tipe</th>
+                      <th>Tampil di Home</th>
+                      <th>Durasi</th>
+                      <th>Harga</th>
+                      <th>Jumlah Soal</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {packages.map((pkg, idx) => (
+                      <tr key={pkg.id}>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <span>{idx + 1}</span>
+                            <button
+                              className="btn btn-xs"
+                              style={{ marginLeft: 4, padding: '2px 6px' }}
+                              disabled={idx === 0}
+                              title="Naikkan"
+                              onClick={async () => {
+                                if (idx === 0) return;
+                                const newOrder = [...packages];
+                                [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+                                await updatePackageOrder(newOrder, setMessage, loadDashboardData);
+                              }}
+                            >▲</button>
+                            <button
+                              className="btn btn-xs"
+                              style={{ marginLeft: 2, padding: '2px 6px' }}
+                              disabled={idx === packages.length - 1}
+                              title="Turunkan"
+                              onClick={async () => {
+                                if (idx === packages.length - 1) return;
+                                const newOrder = [...packages];
+                                [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+                                await updatePackageOrder(newOrder, setMessage, loadDashboardData);
+                              }}
+                            >▼</button>
+                          </div>
+                        </td>
+                        <td>{pkg.name}</td>
+                        <td>{categories.find((c)=>c.id===pkg.category_id)?.name || '-'}</td>
+                        <td>{pkg.type}</td>
+                        <td>
+                          {String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'Tidak' : 'Ya'}
+                        </td>
+                        <td>{Number(pkg.duration || 100)} menit</td>
+                        <td>
+                          {getOriginalPrice(pkg) ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ color: '#94a3b8', fontSize: 12, textDecoration: 'line-through' }}>
+                                {formatRupiah(getOriginalPrice(pkg))}
+                              </span>
+                              <span>{formatRupiah(pkg.price)}</span>
+                            </div>
+                          ) : (
+                            formatRupiah(pkg.price)
+                          )}
+                        </td>
+                        <td>{pkg.question_count || 0}</td>
+                        <td>
+                          <button
+                            onClick={() => handleStartEditPackage(pkg)}
+                            className="btn btn-warning btn-sm"
+                            style={{ marginRight: 8 }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleTogglePackageVisibility(pkg)}
+                            className="btn btn-secondary btn-sm"
+                            style={{ marginRight: 8 }}
+                          >
+                            {String(pkg.visibility || 'visible').toLowerCase() === 'hidden' ? 'Tampilkan' : 'Sembunyikan'}
+                          </button>
+                          <button
+                            onClick={() => handleDeletePackage(pkg.id)}
+                            className="btn btn-danger btn-sm"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
               <div className="admin-mobile-cards">
