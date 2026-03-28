@@ -191,7 +191,6 @@ const Reports = () => {
       return {
         ...point,
         heightPercent,
-        barColor: point.isPassed === false ? '#dc2626' : '#1d7a7a',
       };
     });
   }, [overview]);
@@ -233,7 +232,7 @@ const Reports = () => {
                   progressPoints.map((point) => (
                     <div key={`p-${point.attemptId}`} className="mini-chart-item" title={`${point.packageName}: ${point.scoreValue}`}>
                       <div className="mini-chart-bar-wrap">
-                        <div className="mini-chart-bar" style={{ height: `${point.heightPercent}%`, backgroundColor: point.barColor }} />
+                        <div className="mini-chart-bar" style={{ height: `${point.heightPercent}%` }} />
                       </div>
                       <span>{point.scoreValue}</span>
                     </div>

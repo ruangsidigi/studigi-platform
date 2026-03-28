@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+yarn-error.log
+.git
+.gitignore
+.vercel
+.env
+.env.*
+*.log
+coverage
+tmp
+temp
+storage

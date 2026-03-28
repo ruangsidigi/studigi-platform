@@ -9,9 +9,12 @@
     "migrate": "node scripts/run_migrations_local.js",
     "seed:admin": "node scripts/seed_admin.js",
     "smtp:test": "node scripts/test_smtp.js",
+    "smtp:send:test": "node scripts/test_smtp_send.js",
+    "apps-script:test": "node scripts/test_apps_script.js",
     "auth:flow:test": "node scripts/test_auth_email_flow.js",
     "smoke:home-flow": "node scripts/smoke_home_dashboard_flow.js",
-    "smoke:home-flow:local": "node scripts/smoke_home_dashboard_flow.js http://127.0.0.1:3000"
+    "smoke:home-flow:local": "node scripts/smoke_home_dashboard_flow.js http://127.0.0.1:3000",
+    "test:regression": "node scripts/regression_test.js https://backend-rosy-tau-87.vercel.app/api https://studigi.vercel.app"
   },
   "keywords": [
     "studigi",
