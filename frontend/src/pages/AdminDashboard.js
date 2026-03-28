@@ -786,35 +786,7 @@ const AdminDashboard = () => {
                   <tbody>
                     {packages.map((pkg, idx) => (
                       <tr key={pkg.id}>
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <span>{idx + 1}</span>
-                            <button
-                              className="btn btn-xs"
-                              style={{ marginLeft: 4, padding: '2px 6px' }}
-                              disabled={idx === 0}
-                              title="Naikkan"
-                              onClick={async () => {
-                                if (idx === 0) return;
-                                const newOrder = [...packages];
-                                [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
-                                await updatePackageOrder(newOrder, setMessage, loadDashboardData);
-                              }}
-                            >▲</button>
-                            <button
-                              className="btn btn-xs"
-                              style={{ marginLeft: 2, padding: '2px 6px' }}
-                              disabled={idx === packages.length - 1}
-                              title="Turunkan"
-                              onClick={async () => {
-                                if (idx === packages.length - 1) return;
-                                const newOrder = [...packages];
-                                [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
-                                await updatePackageOrder(newOrder, setMessage, loadDashboardData);
-                              }}
-                            >▼</button>
-                          </div>
-                        </td>
+                        <td>{idx + 1}</td>
                         <td>{pkg.name}</td>
                         <td>{categories.find((c)=>c.id===pkg.category_id)?.name || '-'}</td>
                         <td>{pkg.type}</td>
