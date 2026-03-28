@@ -1,3 +1,21 @@
+
+import React, { useCallback, useEffect, useState } from 'react';
+import { adminService, packageService, questionService, materialService, brandingService, purchaseService } from '../services/api';
+import {
+  BarChart3,
+  Boxes,
+  FileEdit,
+  FileSpreadsheet,
+  Image,
+  Medal,
+  Palette,
+  TicketPercent,
+  Users,
+  Wallet,
+} from 'lucide-react';
+import '../styles/admin.css';
+import { formatRupiah, getOriginalPrice } from '../utils/pricing';
+
 // Fungsi untuk update urutan paket ke backend
 const updatePackageOrder = async (newOrder, setMessage, loadDashboardData) => {
   try {
@@ -16,22 +34,6 @@ const updatePackageOrder = async (newOrder, setMessage, loadDashboardData) => {
     setMessage('Gagal menyimpan urutan paket: ' + (err.message || 'Unknown error'));
   }
 };
-import React, { useCallback, useEffect, useState } from 'react';
-import { adminService, packageService, questionService, materialService, brandingService, purchaseService } from '../services/api';
-import {
-  BarChart3,
-  Boxes,
-  FileEdit,
-  FileSpreadsheet,
-  Image,
-  Medal,
-  Palette,
-  TicketPercent,
-  Users,
-  Wallet,
-} from 'lucide-react';
-import '../styles/admin.css';
-import { formatRupiah, getOriginalPrice } from '../utils/pricing';
 
 const isLocalHost =
   typeof window !== 'undefined' &&
