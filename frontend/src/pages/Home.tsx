@@ -416,7 +416,7 @@ export default function Home() {
               {singlePackages.length > 0 && (
                 <section className="space-y-3">
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
-                    <h3 className="text-sm font-semibold text-emerald-900 sm:text-base">Paket Tryout Satuan</h3>
+                    <h3 className="text-sm font-semibold text-emerald-900 sm:text-base">Paket Tryout</h3>
                     <p className="mt-0.5 text-xs text-emerald-700 sm:text-sm">Pilih paket per tryout sesuai kebutuhan latihanmu.</p>
                   </div>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
