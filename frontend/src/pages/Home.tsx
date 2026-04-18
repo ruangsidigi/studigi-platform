@@ -36,6 +36,11 @@ const isEbookPackage = (pkg: any, categoryMap: Record<string, string>) => {
   return packageType === 'ebook' || contentType === 'material' || categoryName === 'EBOOK';
 };
 
+const isBundlePackage = (pkg: any) => {
+  const packageType = String(pkg?.type || '').trim().toLowerCase();
+  return packageType === 'bundling' || packageType === 'bundle' || (Array.isArray(pkg?.included_package_ids) && pkg.included_package_ids.length > 0);
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -178,6 +183,9 @@ export default function Home() {
     });
   }, [activePackages, activeCategory, categoryMap, location.search]);
 
+  const bundlePackages = useMemo(() => filteredPackages.filter((pkg) => isBundlePackage(pkg)), [filteredPackages]);
+  const singlePackages = useMemo(() => filteredPackages.filter((pkg) => !isBundlePackage(pkg)), [filteredPackages]);
+
   const handleAddToCart = (pkg: any) => {
     const mapped = normalizePackageToCartItem(pkg, categoryMap);
     setCartItems((prev) => {
@@ -246,6 +254,95 @@ export default function Home() {
     }
   };
 
+  const renderPackageCard = (pkg: any) => {
+    const inCart = cartItems.some((item) => item.id === Number(pkg.id));
+    const categoryLabel = getCategoryName(pkg, categoryMap) || 'LAINNYA';
+    const isEbook = isEbookPackage(pkg, categoryMap);
+    const isBundle = isBundlePackage(pkg);
+
+    return (
+      <article key={pkg.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">{categoryLabel}</span>
+            {isBundle ? (
+              <span className="rounded-full bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700">BUNDLING</span>
+            ) : null}
+            {isEbook ? (
+              <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">EBOOK</span>
+            ) : null}
+          </div>
+          <div className="flex flex-col items-end gap-1 text-right">
+            {getOriginalPrice(pkg) ? (
+              <span className="text-xs text-slate-400 line-through">
+                {formatRupiah(getOriginalPrice(pkg))}
+              </span>
+            ) : null}
+            <span className="text-sm font-semibold text-[var(--header-color,#103c21)]">
+              {formatRupiah(pkg.price)}
+            </span>
+          </div>
+        </div>
+
+        <h3 className="text-xl font-semibold text-slate-900">{pkg.name}</h3>
+        <p className="mt-1 text-sm text-[var(--secondary-color,#69655e)]">{pkg.description || 'Paket tryout terbaik untuk latihan.'}</p>
+
+        <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-600">
+          <div className="flex items-center gap-1.5">
+            <FileText size={13} />
+            <span>{Number(pkg.question_count || 0)} soal</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Clock3 size={13} />
+            <span>{Number(pkg.duration || 100)} menit</span>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+          <button
+            type="button"
+            onClick={() => handleAddToCart(pkg)}
+            disabled={inCart}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          >
+            <ShoppingCart size={15} />
+            {inCart ? 'Sudah di Cart' : 'Add to Cart'}
+          </button>
+
+          {isBundle && (
+            <button
+              type="button"
+              onClick={() => navigate(`/bundles/${pkg.id}`)}
+              className="w-full rounded-xl border border-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-[var(--header-color,#103c21)] hover:bg-emerald-50 sm:w-auto"
+            >
+              Detail
+            </button>
+          )}
+
+          {isEbook && (
+            <button
+              type="button"
+              onClick={() => handleReadEbook(pkg)}
+              className="w-full rounded-xl border border-amber-400 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 sm:w-auto"
+            >
+              Baca PDF
+            </button>
+          )}
+
+          {user && ownedPackageIds.has(Number(pkg.id)) && (
+            <button
+              type="button"
+              onClick={() => navigate(`/quiz/${pkg.id}`)}
+              className="w-full rounded-xl border border-[var(--secondary-color,#69655e)] px-4 py-2 text-sm font-semibold text-[var(--secondary-color,#69655e)] hover:bg-slate-50 sm:w-auto"
+            >
+              Start Tryout
+            </button>
+          )}
+        </div>
+      </article>
+    );
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-20 md:pb-4 lg:pb-2">
       <section className="rounded-2xl bg-[var(--header-color,#103c21)] p-5 text-white sm:p-6">
@@ -302,96 +399,33 @@ export default function Home() {
             </div>
           )}
 
-          {!loading &&
-            !error &&
-            filteredPackages.length > 0 &&
-            filteredPackages.map((pkg) => {
-              const inCart = cartItems.some((item) => item.id === Number(pkg.id));
-              const categoryLabel = getCategoryName(pkg, categoryMap) || 'LAINNYA';
-              const isEbook = isEbookPackage(pkg, categoryMap);
-              const isBundlePackage =
-                String(pkg?.type || '').toLowerCase() === 'bundling' ||
-                String(pkg?.type || '').toLowerCase() === 'bundle' ||
-                (Array.isArray(pkg?.included_package_ids) && pkg.included_package_ids.length > 0);
-              return (
-                <article key={pkg.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">{categoryLabel}</span>
-                      {isEbook ? (
-                        <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">EBOOK</span>
-                      ) : null}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 text-right">
-                      {getOriginalPrice(pkg) ? (
-                        <span className="text-xs text-slate-400 line-through">
-                          {formatRupiah(getOriginalPrice(pkg))}
-                        </span>
-                      ) : null}
-                      <span className="text-sm font-semibold text-[var(--header-color,#103c21)]">
-                        {formatRupiah(pkg.price)}
-                      </span>
-                    </div>
+          {!loading && !error && filteredPackages.length > 0 && (
+            <div className="space-y-5">
+              {bundlePackages.length > 0 && (
+                <section className="space-y-3">
+                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
+                    <h3 className="text-sm font-semibold text-indigo-900 sm:text-base">Paket Bundling</h3>
+                    <p className="mt-0.5 text-xs text-indigo-700 sm:text-sm">Kumpulan paket pilihan dengan harga lebih hemat.</p>
                   </div>
-
-                  <h3 className="text-base font-semibold text-slate-900">{pkg.name}</h3>
-                  <p className="mt-1 text-sm text-[var(--secondary-color,#69655e)]">{pkg.description || 'Paket tryout terbaik untuk latihan.'}</p>
-
-                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-600">
-                    <div className="flex items-center gap-1.5">
-                      <FileText size={13} />
-                      <span>{Number(pkg.question_count || 0)} soal</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock3 size={13} />
-                      <span>{Number(pkg.duration || 100)} menit</span>
-                    </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {bundlePackages.map((pkg) => renderPackageCard(pkg))}
                   </div>
+                </section>
+              )}
 
-                  <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => handleAddToCart(pkg)}
-                      disabled={inCart}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                    >
-                      <ShoppingCart size={15} />
-                      {inCart ? 'Sudah di Cart' : 'Add to Cart'}
-                    </button>
-
-                    {isBundlePackage && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/bundles/${pkg.id}`)}
-                        className="w-full rounded-xl border border-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-[var(--header-color,#103c21)] hover:bg-emerald-50 sm:w-auto"
-                      >
-                        Detail
-                      </button>
-                    )}
-
-                    {isEbook && (
-                      <button
-                        type="button"
-                        onClick={() => handleReadEbook(pkg)}
-                        className="w-full rounded-xl border border-amber-400 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 sm:w-auto"
-                      >
-                        Baca PDF
-                      </button>
-                    )}
-
-                    {user && ownedPackageIds.has(Number(pkg.id)) && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/quiz/${pkg.id}`)}
-                        className="w-full rounded-xl border border-[var(--secondary-color,#69655e)] px-4 py-2 text-sm font-semibold text-[var(--secondary-color,#69655e)] hover:bg-slate-50 sm:w-auto"
-                      >
-                        Start Tryout
-                      </button>
-                    )}
+              {singlePackages.length > 0 && (
+                <section className="space-y-3">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
+                    <h3 className="text-sm font-semibold text-emerald-900 sm:text-base">Paket Tryout Satuan</h3>
+                    <p className="mt-0.5 text-xs text-emerald-700 sm:text-sm">Pilih paket per tryout sesuai kebutuhan latihanmu.</p>
                   </div>
-                </article>
-              );
-            })}
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {singlePackages.map((pkg) => renderPackageCard(pkg))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
         </div>
 
         <CartWidget items={cartItems} onRemove={handleRemoveCart} onCheckout={handleCheckout} />
