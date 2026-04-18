@@ -46,7 +46,7 @@ const navItems = [
   { to: '/home', label: 'Home', icon: Home },
   { to: '/library', label: 'Library', icon: BookOpen },
   { to: '/activity', label: 'Activity', icon: Activity },
-  { to: '/payouts', label: 'Payouts', icon: CreditCard },
+  { to: '/payouts', label: 'Transaction', icon: CreditCard },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
