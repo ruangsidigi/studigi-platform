@@ -4,6 +4,38 @@ import TryoutCard from '../components/TryoutCard.tsx';
 import { AuthContext } from '../context/AuthContext';
 import { materialService, packageService, purchaseService } from '../services/api';
 
+const isBundlePackage = (pkg: any) => {
+  const packageType = String(pkg?.type || '').toLowerCase();
+  return (
+    packageType === 'bundle' ||
+    packageType === 'bundling' ||
+    (Array.isArray(pkg?.included_package_ids) && pkg.included_package_ids.length > 0)
+  );
+};
+
+const getIncludedPackageIds = (pkg: any): number[] => {
+  const raw = pkg?.included_package_ids;
+  if (!raw) return [];
+
+  const normalizeIdList = (list: any[]) =>
+    list
+      .map((item) => Number(item))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+  if (Array.isArray(raw)) return normalizeIdList(raw);
+
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return normalizeIdList(parsed);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  return [];
+};
+
 export default function Library() {
   const { user } = useContext(AuthContext as any);
   const navigate = useNavigate();
@@ -121,9 +153,27 @@ export default function Library() {
     loadOwnedPackages();
   }, [user]);
 
+  const visibleOwnedPackages = useMemo(() => {
+    if (!Array.isArray(ownedPackages) || ownedPackages.length === 0) return [];
+
+    const hiddenChildIds = new Set<number>();
+
+    ownedPackages.forEach((pkg) => {
+      if (!isBundlePackage(pkg)) return;
+      getIncludedPackageIds(pkg).forEach((id) => hiddenChildIds.add(id));
+    });
+
+    return ownedPackages.filter((pkg) => {
+      const id = Number(pkg?.id);
+      if (!Number.isInteger(id) || id <= 0) return false;
+      if (isBundlePackage(pkg)) return true;
+      return !hiddenChildIds.has(id);
+    });
+  }, [ownedPackages]);
+
   const cards = useMemo(
     () =>
-      ownedPackages.map((pkg) => ({
+      visibleOwnedPackages.map((pkg) => ({
         id: pkg.id,
         raw: pkg,
         title: pkg.name,
@@ -134,19 +184,18 @@ export default function Library() {
         actionLabel: (() => {
           const packageType = String(pkg?.type || '').toLowerCase();
           const categoryName = String(pkg?.category_name || pkg?.category || '').toUpperCase();
-          const isBundle =
-            packageType === 'bundle' ||
-            packageType === 'bundling' ||
-            (Array.isArray(pkg?.included_package_ids) && pkg.included_package_ids.length > 0);
+          const isBundle = isBundlePackage(pkg);
           const isEbook =
             packageType === 'ebook' ||
             String(pkg?.content_type || '').toLowerCase() === 'material' ||
             categoryName === 'EBOOK';
 
-          return isEbook || isBundle ? 'Buka' : 'Mulai';
+          if (isBundle) return 'Detail';
+          if (isEbook) return 'Buka';
+          return 'Mulai';
         })(),
       })),
-    [ownedPackages]
+    [visibleOwnedPackages]
   );
 
   return (
