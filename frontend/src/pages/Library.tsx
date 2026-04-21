@@ -13,28 +13,6 @@ const isBundlePackage = (pkg: any) => {
   );
 };
 
-const getIncludedPackageIds = (pkg: any): number[] => {
-  const raw = pkg?.included_package_ids;
-  if (!raw) return [];
-
-  const normalizeIdList = (list: any[]) =>
-    list
-      .map((item) => Number(item))
-      .filter((id) => Number.isInteger(id) && id > 0);
-
-  if (Array.isArray(raw)) return normalizeIdList(raw);
-
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return normalizeIdList(parsed);
-    } catch (_) {
-      return [];
-    }
-  }
-
-  return [];
-};
 
 export default function Library() {
   const { user } = useContext(AuthContext as any);
@@ -122,14 +100,48 @@ export default function Library() {
         const purchases = Array.isArray(purchasesRes.data) ? purchasesRes.data : [];
         const packageMap = new Map(allPackages.map((item) => [String(item.id), item]));
 
-        const completedStatuses = ['completed', 'paid', 'success'];
+        // Build a map of packageId -> latest purchase attempts info
+        const attemptsMap = new Map<string, { maxAttempts: number; usedAttempts: number }>();
+        purchases.forEach((purchase) => {
+          const pkgIdKey = String(purchase.package_id);
+          const maxAttempts = purchase.max_attempts ?? 10;
+          const usedAttempts = purchase.used_attempts ?? 0;
+          // Keep the last (highest id) purchase — data is ordered DESC
+          if (!attemptsMap.has(pkgIdKey)) {
+            attemptsMap.set(pkgIdKey, { maxAttempts, usedAttempts });
+          }
+        });
+
+        const completedStatuses = ['completed', 'paid', 'success', 'settlement'];
         const result: any[] = [];
 
         purchases.forEach((purchase) => {
           const normalizedStatus = String(purchase.payment_status || '').toLowerCase();
           if (!completedStatuses.includes(normalizedStatus)) return;
-          const pkg = packageMap.get(String(purchase.package_id));
-          if (pkg) result.push(pkg);
+          const rawPurchasePackageId = purchase.package_id ?? purchase.package_ref_id ?? purchase.packages?.id;
+          const pkgIdKey = String(rawPurchasePackageId || '').trim();
+          if (!pkgIdKey) return;
+
+          // Prefer full package data from packageMap; then purchase.packages; then top-level purchase fields.
+          const pkg =
+            packageMap.get(pkgIdKey) ||
+            (purchase.packages && purchase.packages.id ? purchase.packages : null) ||
+            {
+              id: pkgIdKey,
+              name: purchase.package_name || `Paket #${pkgIdKey}`,
+              type: purchase.package_type || 'tryout',
+              description: 'Paket milikmu, siap dikerjakan.',
+              question_count: 0,
+              duration: 100,
+              category_name: purchase.package_type || 'Tryout',
+            };
+          if (!pkg) return;
+          const attemptsInfo = attemptsMap.get(pkgIdKey);
+          result.push({
+            ...pkg,
+            _maxAttempts: attemptsInfo?.maxAttempts ?? 10,
+            _usedAttempts: attemptsInfo?.usedAttempts ?? 0,
+          });
         });
 
         const dedupeById = (list: any[]) => {
@@ -156,45 +168,44 @@ export default function Library() {
   const visibleOwnedPackages = useMemo(() => {
     if (!Array.isArray(ownedPackages) || ownedPackages.length === 0) return [];
 
-    const hiddenChildIds = new Set<number>();
-
-    ownedPackages.forEach((pkg) => {
-      if (!isBundlePackage(pkg)) return;
-      getIncludedPackageIds(pkg).forEach((id) => hiddenChildIds.add(id));
-    });
-
     return ownedPackages.filter((pkg) => {
-      const id = Number(pkg?.id);
-      if (!Number.isInteger(id) || id <= 0) return false;
-      if (isBundlePackage(pkg)) return true;
-      return !hiddenChildIds.has(id);
+      const id = String(pkg?.id ?? '').trim();
+      return id.length > 0;
     });
   }, [ownedPackages]);
 
   const cards = useMemo(
     () =>
-      visibleOwnedPackages.map((pkg) => ({
-        id: pkg.id,
-        raw: pkg,
-        title: pkg.name,
-        description: pkg.description || 'Paket milikmu, siap dikerjakan.',
-        questions: Number(pkg.question_count || 0),
-        duration: Number(pkg.duration || 100),
-        category: (pkg.category_name || pkg.type || 'Tryout').toUpperCase(),
-        actionLabel: (() => {
-          const packageType = String(pkg?.type || '').toLowerCase();
-          const categoryName = String(pkg?.category_name || pkg?.category || '').toUpperCase();
-          const isBundle = isBundlePackage(pkg);
-          const isEbook =
-            packageType === 'ebook' ||
-            String(pkg?.content_type || '').toLowerCase() === 'material' ||
-            categoryName === 'EBOOK';
+      visibleOwnedPackages.map((pkg) => {
+        const packageType = String(pkg?.type || '').toLowerCase();
+        const categoryName = String(pkg?.category_name || pkg?.category || '').toUpperCase();
+        const isBundle = isBundlePackage(pkg);
+        const isEbook =
+          packageType === 'ebook' ||
+          String(pkg?.content_type || '').toLowerCase() === 'material' ||
+          categoryName === 'EBOOK';
 
-          if (isBundle) return 'Detail';
-          if (isEbook) return 'Buka';
-          return 'Mulai';
-        })(),
-      })),
+        const maxAttempts: number = pkg._maxAttempts ?? 10;
+        const usedAttempts: number = pkg._usedAttempts ?? 0;
+        const attemptsLeft: number = maxAttempts - usedAttempts;
+
+        return {
+          id: pkg.id,
+          raw: pkg,
+          title: pkg.name,
+          description: pkg.description || 'Paket milikmu, siap dikerjakan.',
+          questions: Number(pkg.question_count || 0),
+          duration: Number(pkg.duration || 100),
+          category: (pkg.category_name || pkg.type || 'Tryout').toUpperCase(),
+          attemptsLeft: isBundle || isEbook ? null : attemptsLeft,
+          maxAttempts: isBundle || isEbook ? null : maxAttempts,
+          actionLabel: (() => {
+            if (isBundle) return 'Detail';
+            if (isEbook) return 'Buka';
+            return 'Mulai';
+          })(),
+        };
+      }),
     [visibleOwnedPackages]
   );
 
@@ -243,7 +254,40 @@ export default function Library() {
       {user && !loading && !error && cards.length > 0 && (
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {cards.map((item) => (
-            <TryoutCard key={item.id} {...item} onAction={() => handleCardAction(item.raw)} />
+            <div key={item.id} className="flex flex-col gap-1">
+              <TryoutCard {...item} onAction={() => handleCardAction(item.raw)} />
+              {item.attemptsLeft !== null && (
+                <div
+                  className={`flex items-center justify-between rounded-xl px-3 py-1.5 text-xs font-medium ${
+                    item.attemptsLeft === 0
+                      ? 'bg-red-50 text-red-700'
+                      : item.attemptsLeft <= 3
+                      ? 'bg-amber-50 text-amber-700'
+                      : 'bg-emerald-50 text-emerald-700'
+                  }`}
+                >
+                  <span>
+                    {item.attemptsLeft === 0
+                      ? 'Batas pengerjaan habis — silakan beli ulang'
+                      : `Sisa ${item.attemptsLeft} dari ${item.maxAttempts} kali pengerjaan`}
+                  </span>
+                  {item.attemptsLeft <= 3 && item.attemptsLeft > 0 && (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">
+                      Hampir habis!
+                    </span>
+                  )}
+                  {item.attemptsLeft === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/packages/${item.id}`)}
+                      className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-red-800 hover:bg-red-200"
+                    >
+                      Beli ulang
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
         </section>
       )}
