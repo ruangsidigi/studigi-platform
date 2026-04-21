@@ -116,4 +116,37 @@ router.get('/purchases/admin/all', requireAdmin, async (req, res) => {
   }
 });
 
+// Get attempt usage info for a specific package
+router.get('/purchases/attempts/:packageId', requireAuth, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const packageId = Number(req.params.packageId);
+    if (!Number.isInteger(packageId) || packageId <= 0) {
+      return res.status(400).json({ error: 'Invalid package ID' });
+    }
+
+    const result = await db.query(
+      `SELECT id, max_attempts, used_attempts
+       FROM purchases
+       WHERE user_id = $1 AND package_id = $2
+       ORDER BY id DESC
+       LIMIT 1`,
+      [req.user.id, packageId]
+    );
+
+    const purchase = result.rows[0];
+    if (!purchase) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+
+    const maxAttempts = purchase.max_attempts ?? 10;
+    const usedAttempts = purchase.used_attempts ?? 0;
+    const attemptsLeft = maxAttempts - usedAttempts;
+
+    return res.json({ packageId, maxAttempts, usedAttempts, attemptsLeft });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

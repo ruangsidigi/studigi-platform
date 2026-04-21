@@ -13,6 +13,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { reviewService } from '../services/api';
 import QuestionSidebar from '../components/QuestionSidebar';
 import QuestionViewer from '../components/QuestionViewer';
+import MathText from '../components/MathText';
 import '../styles/review.css';
 
 const ReviewPage = () => {
@@ -294,7 +295,7 @@ const ReviewPage = () => {
 
                 {showExplanation && (
                   <div className="explanation-content">
-                    {questionDetail.explanation}
+                    <MathText text={questionDetail.explanation} display />
                   </div>
                 )}
               </section>

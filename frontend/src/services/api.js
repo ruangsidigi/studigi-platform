@@ -101,6 +101,7 @@ export const purchaseService = {
   create: (packageIds, totalPrice, paymentMethod = 'transfer') =>
     api.post('/purchases', { packageIds, totalPrice, paymentMethod }),
   getAllAdmin: () => api.get('/purchases/admin/all'),
+  getAttemptsInfo: (packageId) => api.get(`/purchases/attempts/${packageId}`),
 };
 
 export const paymentService = {

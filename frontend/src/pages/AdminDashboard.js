@@ -1,6 +1,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { adminService, packageService, questionService, materialService, brandingService, purchaseService } from '../services/api';
+import MathText from '../components/MathText';
 import {
   BarChart3,
   Boxes,
@@ -1604,6 +1605,12 @@ const EditQuestionsTab = () => {
                   onChange={(e) => handleFormChange('question_text', e.target.value)}
                   rows="3"
                 />
+                {!!editFormData.question_text && (
+                  <div style={{ marginTop: 10, padding: 12, border: '1px solid #e2e8f0', borderRadius: 8, background: '#f8fafc' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 8 }}>Preview</div>
+                    <MathText text={editFormData.question_text} display />
+                  </div>
+                )}
               </div>
 
               <div className="form-group">
@@ -1629,6 +1636,12 @@ const EditQuestionsTab = () => {
                     value={editFormData[`option_${opt.toLowerCase()}`] || ''}
                     onChange={(e) => handleFormChange(`option_${opt.toLowerCase()}`, e.target.value)}
                   />
+                  {!!editFormData[`option_${opt.toLowerCase()}`] && (
+                    <div style={{ marginTop: 10, padding: 12, border: '1px solid #e2e8f0', borderRadius: 8, background: '#f8fafc' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 8 }}>Preview Opsi {opt}</div>
+                      <MathText text={editFormData[`option_${opt.toLowerCase()}`]} />
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -1654,6 +1667,12 @@ const EditQuestionsTab = () => {
                   onChange={(e) => handleFormChange('explanation', e.target.value)}
                   rows="2"
                 />
+                {!!editFormData.explanation && (
+                  <div style={{ marginTop: 10, padding: 12, border: '1px solid #e2e8f0', borderRadius: 8, background: '#f8fafc' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 8 }}>Preview</div>
+                    <MathText text={editFormData.explanation} display />
+                  </div>
+                )}
               </div>
 
               <div style={{ marginBottom: '10px' }}>

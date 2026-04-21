@@ -55,6 +55,11 @@ const ensureVoucherSchema = async (db) => {
       used_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  // Enforce one voucher use per user
+  await db.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS voucher_usages_voucher_user_unique
+    ON voucher_usages (voucher_id, user_id)
+  `);
   // Attempt to add voucher columns to payment_transactions (may already exist)
   try {
     await db.query(`ALTER TABLE payment_transactions
@@ -69,9 +74,9 @@ const ensureVoucherSchema = async (db) => {
 /**
  * Validate a voucher code against a subtotal amount.
  * Returns { valid, error, voucher, discountAmount } but does NOT mutate the DB.
- * Pass `userId` (optional) to check per-user one-time restriction in future.
+ * Pass `userId` to check per-user one-time restriction.
  */
-const validateVoucherCode = async (db, code, subtotal) => {
+const validateVoucherCode = async (db, code, subtotal, userId = null) => {
   const normalized = String(code || '').trim().toUpperCase();
   if (!normalized) return { valid: false, error: 'Kode voucher tidak boleh kosong' };
 
@@ -95,6 +100,17 @@ const validateVoucherCode = async (db, code, subtotal) => {
 
   if (v.max_uses !== null && v.used_count >= Number(v.max_uses)) {
     return { valid: false, error: 'Kuota kode voucher sudah habis' };
+  }
+
+  // Per-user one-time restriction
+  if (userId) {
+    const usageCheck = await db.query(
+      `SELECT id FROM voucher_usages WHERE voucher_id = $1 AND user_id = $2 LIMIT 1`,
+      [v.id, userId]
+    );
+    if (usageCheck.rowCount > 0) {
+      return { valid: false, error: 'Kode voucher sudah pernah digunakan oleh akun ini' };
+    }
   }
 
   const sub = Number(subtotal || 0);
@@ -129,7 +145,7 @@ router.post('/vouchers/validate', requireAuth, async (req, res) => {
     await ensureVoucherSchema(db);
     const { code, subtotal } = req.body || {};
     const sub = Number(subtotal || 0);
-    const result = await validateVoucherCode(db, code, sub);
+    const result = await validateVoucherCode(db, code, sub, req.user.id);
     if (!result.valid) {
       return res.status(400).json({ valid: false, error: result.error });
     }

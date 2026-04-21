@@ -1,5 +1,6 @@
 import React from 'react';
 import '../styles/question-modal.css';
+import MathText from './MathText';
 
 const QuestionDetailModal = ({ question, onClose, loading, error }) => {
   if (!question) return null;
@@ -17,7 +18,7 @@ const QuestionDetailModal = ({ question, onClose, loading, error }) => {
     return (
       <div key={option.label} className={className}>
         <span className="option-label">[{option.label}]</span>
-        <span className="option-text">{option.text}</span>
+        <MathText text={option.text} className="option-text" />
       </div>
     );
   };
@@ -47,7 +48,7 @@ const QuestionDetailModal = ({ question, onClose, loading, error }) => {
             <div className="question-section">
               <h3>Soal</h3>
               <div className="question-text-box">
-                {question.question_text}
+                <MathText text={question.question_text} display />
               </div>
               {question.image_url && (
                 <div className="question-image">
@@ -127,7 +128,7 @@ const QuestionDetailModal = ({ question, onClose, loading, error }) => {
             <div className="explanation-section">
               <h3>Pembahasan</h3>
               <div className="explanation-box">
-                {question.explanation}
+                <MathText text={question.explanation} display />
               </div>
             </div>
           </div>

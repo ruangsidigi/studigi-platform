@@ -4,8 +4,10 @@ import 'katex/dist/katex.min.css';
 
 const BLOCK_MATH_RE = /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\])/g;
 const INLINE_MATH_RE = /(\$[^$\n]+\$|\\\([^\n]+?\\\))/g;
+const ALL_MATH_RE = /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\$[^$\n]+\$|\\\([^\n]+?\\\))/g;
+const LATEX_CMD_RE = /\\(times|implies|cdot|div|leq|geq|le|ge|in|notin|sqrt|frac|sum|int|log|sin|cos|tan|exp|partial|Delta|alpha|beta|gamma|lambda|mu|pi|sigma|theta|omega|Sigma|Pi|Omega|infty|approx|equiv|neq|pm)\b/;
 
-const normalizeLegacyMathMarkers = (rawText) => {
+const normalizePlainTextSegment = (rawText) => {
   let text = String(rawText || '');
 
   // Support legacy root marker typed as '?72' in some old datasets.
@@ -23,8 +25,32 @@ const normalizeLegacyMathMarkers = (rawText) => {
   // Common fraction notation for numeric values, e.g. '3/4'.
   text = text.replace(/\b(\d+)\s*\/\s*(\d+)\b/g, (match, num, den) => `$\\frac{${num}}{${den}}$`);
 
+  // Auto-wrap plain lines containing LaTeX commands (e.g. \times, \implies)
+  // when the line is not already wrapped in math delimiters.
+  text = text
+    .split('\n')
+    .map((line) => {
+      if (!line || !LATEX_CMD_RE.test(line)) return line;
+
+      const trimmed = line.trim();
+      const alreadyWrapped =
+        (trimmed.startsWith('$$') && trimmed.endsWith('$$')) ||
+        (trimmed.startsWith('$') && trimmed.endsWith('$')) ||
+        (trimmed.startsWith('\\(') && trimmed.endsWith('\\)')) ||
+        (trimmed.startsWith('\\[') && trimmed.endsWith('\\]'));
+
+      if (alreadyWrapped) return line;
+      return `$${line}$`;
+    })
+    .join('\n');
+
   return text;
 };
+
+const normalizeLegacyMathMarkers = (rawText) => String(rawText || '')
+  .split(ALL_MATH_RE)
+  .map((segment) => (parseMathToken(segment) ? segment : normalizePlainTextSegment(segment)))
+  .join('');
 
 const renderMath = (expr, displayMode) => {
   try {

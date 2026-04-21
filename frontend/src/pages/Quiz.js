@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { questionService, tryoutService, bundleService, packageService, materialService } from '../services/api';
+import { questionService, tryoutService, bundleService, packageService, materialService, purchaseService } from '../services/api';
 import { GraduationCap, Clock3, Flag, ChevronLeft, ChevronRight } from 'lucide-react';
 import MathText from '../components/MathText';
 import { INDONESIA_PROVINCES } from '../constants/indonesiaProvinces';
@@ -22,12 +22,55 @@ const Quiz = () => {
   const [bundleMaterials, setBundleMaterials] = useState([]);
   const [packageInfo, setPackageInfo] = useState(null);
   const [timeLeft, setTimeLeft] = useState(100 * 60);
+  const [deadlineAt, setDeadlineAt] = useState(null);
   const [questionStartAt, setQuestionStartAt] = useState(Date.now());
   const [isFinishing, setIsFinishing] = useState(false);
   const [questionsReady, setQuestionsReady] = useState(false);
   const [participantName, setParticipantName] = useState('');
   const [participantProvince, setParticipantProvince] = useState('');
   const [isStartingSession, setIsStartingSession] = useState(false);
+  const [attemptsInfo, setAttemptsInfo] = useState(null);
+  const autoFinishTriggeredRef = useRef(false);
+
+  const createTimerWorker = useCallback(() => {
+    if (typeof Worker === 'undefined') return null;
+
+    const workerSource = `
+      let timerId = null;
+
+      const start = () => {
+        if (timerId !== null) clearInterval(timerId);
+        timerId = setInterval(() => {
+          self.postMessage({ type: 'tick', now: Date.now() });
+        }, 1000);
+      };
+
+      self.onmessage = (event) => {
+        const message = event.data || {};
+        if (message.type === 'start') {
+          start();
+          self.postMessage({ type: 'tick', now: Date.now() });
+          return;
+        }
+
+        if (message.type === 'stop' && timerId !== null) {
+          clearInterval(timerId);
+          timerId = null;
+        }
+      };
+    `;
+
+    const workerUrl = window.URL.createObjectURL(new Blob([workerSource], { type: 'application/javascript' }));
+    const worker = new Worker(workerUrl);
+
+    return {
+      worker,
+      dispose: () => {
+        worker.terminate();
+        window.URL.revokeObjectURL(workerUrl);
+      },
+    };
+  }, []);
 
   const convertGoogleDriveUrl = (url) => {
     if (!url) return null;
@@ -47,6 +90,11 @@ const Quiz = () => {
     return url;
   };
 
+  const getRemainingSeconds = useCallback((deadlineTimestamp) => {
+    if (!Number.isFinite(deadlineTimestamp)) return 0;
+    return Math.max(0, Math.ceil((deadlineTimestamp - Date.now()) / 1000));
+  }, []);
+
   const startSession = useCallback(async () => {
     try {
       setLoading(true);
@@ -56,6 +104,13 @@ const Quiz = () => {
       const pkg = pkgRes.data;
       setPackageInfo(pkg);
       setTimeLeft((Number(pkg?.duration) || 100) * 60);
+      setDeadlineAt(null);
+      autoFinishTriggeredRef.current = false;
+
+      // Fetch attempt usage info (non-blocking, ignore errors)
+      purchaseService.getAttemptsInfo(parseInt(packageId, 10))
+        .then((res) => { if (res?.data) setAttemptsInfo(res.data); })
+        .catch(() => {});
 
       const isBundleType =
         pkg.type === 'bundling' ||
@@ -134,36 +189,93 @@ const Quiz = () => {
         participantName: trimmedName,
         participantProvince,
       });
+      const session = sessionRes.data?.session || {};
+      const durationSeconds = (Number(packageInfo?.duration) || 100) * 60;
+      const startedAtMs = Date.parse(session.started_at || session.startedAt || '');
+      const nextDeadlineAt = (Number.isFinite(startedAtMs) ? startedAtMs : Date.now()) + durationSeconds * 1000;
       const startedSessionId = sessionRes.data?.session?.id;
 
       const questionsRes = await questionService.getByPackage(parsedPackageId);
       const loadedQuestions = Array.isArray(questionsRes.data) ? questionsRes.data : [];
       setQuestions(loadedQuestions);
       setQuestionsReady(true);
+      setDeadlineAt(nextDeadlineAt);
+      setTimeLeft(getRemainingSeconds(nextDeadlineAt));
+      autoFinishTriggeredRef.current = false;
       setSessionId(startedSessionId);
+
+      // Update attemptsLeft from response
+      const newAttemptsLeft = sessionRes.data?.attemptsLeft;
+      if (newAttemptsLeft !== null && newAttemptsLeft !== undefined) {
+        setAttemptsInfo((prev) => ({
+          ...prev,
+          attemptsLeft: newAttemptsLeft,
+          usedAttempts: (prev?.maxAttempts ?? 10) - newAttemptsLeft,
+        }));
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to start tryout');
     } finally {
       setIsStartingSession(false);
     }
-  }, [participantName, participantProvince, packageId]);
+  }, [participantName, participantProvince, packageId, packageInfo, getRemainingSeconds]);
 
   useEffect(() => {
-    if (!sessionId || loading || isBundling || questions.length === 0) return undefined;
+    if (!sessionId || loading || isBundling || questions.length === 0 || !Number.isFinite(deadlineAt)) {
+      return undefined;
+    }
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          finishTryout({ force: true });
-          return 0;
+    const syncRemainingTime = () => {
+      const remainingSeconds = getRemainingSeconds(deadlineAt);
+      setTimeLeft((prev) => (prev === remainingSeconds ? prev : remainingSeconds));
+
+      if (remainingSeconds <= 0 && !autoFinishTriggeredRef.current) {
+        autoFinishTriggeredRef.current = true;
+        finishTryout({ force: true });
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        syncRemainingTime();
+      }
+    };
+
+    syncRemainingTime();
+
+    const workerController = createTimerWorker();
+    let timer = null;
+
+    if (workerController) {
+      workerController.worker.onmessage = (event) => {
+        if (event.data?.type === 'tick') {
+          syncRemainingTime();
         }
-        return prev - 1;
-      });
-    }, 1000);
+      };
+      workerController.worker.postMessage({ type: 'start' });
+    } else {
+      timer = window.setInterval(syncRemainingTime, 1000);
+    }
 
-    return () => clearInterval(timer);
-  }, [sessionId, loading, isBundling, questions.length, finishTryout]);
+    window.addEventListener('focus', syncRemainingTime);
+    window.addEventListener('blur', syncRemainingTime);
+    window.addEventListener('pageshow', syncRemainingTime);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (timer !== null) {
+        window.clearInterval(timer);
+      }
+      if (workerController) {
+        workerController.worker.postMessage({ type: 'stop' });
+        workerController.dispose();
+      }
+      window.removeEventListener('focus', syncRemainingTime);
+      window.removeEventListener('blur', syncRemainingTime);
+      window.removeEventListener('pageshow', syncRemainingTime);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [sessionId, loading, isBundling, questions.length, deadlineAt, finishTryout, getRemainingSeconds, createTimerWorker]);
 
   const handleSelectAnswer = async (option) => {
     const current = questions[currentQuestion];
@@ -319,6 +431,24 @@ const Quiz = () => {
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
           ) : null}
 
+          {attemptsInfo && (
+            <div
+              className={`mt-4 rounded-xl border px-3 py-2.5 text-sm font-medium ${
+                attemptsInfo.attemptsLeft === 0
+                  ? 'border-red-200 bg-red-50 text-red-700'
+                  : attemptsInfo.attemptsLeft <= 3
+                  ? 'border-amber-200 bg-amber-50 text-amber-700'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              }`}
+            >
+              {attemptsInfo.attemptsLeft === 0
+                ? '\u26A0\uFE0F Batas pengerjaan paket ini sudah habis. Silakan lakukan pembelian ulang.'
+                : `\uD83D\uDCCB Sisa ${attemptsInfo.attemptsLeft} dari ${attemptsInfo.maxAttempts} kali pengerjaan.${
+                    attemptsInfo.attemptsLeft <= 3 ? ' Segera beli ulang sebelum habis!' : ''
+                  }`}
+            </div>
+          )}
+
           <div className="mt-4 space-y-4">
             <div>
               <label htmlFor="participant-name" className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -356,7 +486,7 @@ const Quiz = () => {
             <button
               type="button"
               onClick={startTryoutSession}
-              disabled={isStartingSession}
+              disabled={isStartingSession || (attemptsInfo !== null && attemptsInfo.attemptsLeft === 0)}
               className="w-full rounded-xl bg-[var(--header-color,#0f5132)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
             >
               {isStartingSession ? 'Memulai Tryout...' : 'Mulai Tryout'}

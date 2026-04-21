@@ -232,7 +232,7 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
     let voucherDiscountAmount = 0;
     if (voucherCode && String(voucherCode).trim()) {
       await voucherHelpers.ensureVoucherSchema(db);
-      const vResult = await voucherHelpers.validateVoucherCode(db, String(voucherCode).trim(), subtotalAmount);
+      const vResult = await voucherHelpers.validateVoucherCode(db, String(voucherCode).trim(), subtotalAmount, req.user.id);
       if (!vResult.valid) {
         return res.status(400).json({ error: vResult.error });
       }
@@ -254,6 +254,16 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
     const callbackUrls = getPaymentCallbackUrls();
     const notificationUrl = getNotificationUrl(req);
 
+
+    // AUTO-SUCCESS SANDBOX LOGIC UNTUK REVIEWER MIDTRANS
+    let autoSuccessReviewer = false;
+    if (!config.midtransIsProduction && String(req.user.email).toLowerCase() === 'dummy.reviewer@skdcpns.com') {
+      autoSuccessReviewer = true;
+      console.log('[AUTO-SUCCESS] Reviewer detected:', req.user.email, 'MIDTRANS_IS_PRODUCTION:', config.midtransIsProduction);
+    } else {
+      console.log('[CHECKOUT] Not auto-success. Email:', req.user.email, 'MIDTRANS_IS_PRODUCTION:', config.midtransIsProduction);
+    }
+
     await db.query('BEGIN');
 
     const transactionResult = await db.query(
@@ -265,7 +275,7 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
       [
         req.user.id,
         effectivePaymentMethod,
-        'pending',
+        autoSuccessReviewer ? 'paid' : 'pending',
         String(currency || 'IDR').toUpperCase(),
         subtotalAmount,
         discountAmount,
@@ -294,9 +304,34 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
          VALUES
           ($1, $2, $3, $4, $5, $6, $7, NOW())
          RETURNING *`,
-        [req.user.id, packageId, effectivePaymentMethod, 'pending', perPackageAmount, transaction.id, paymentReference]
+        [
+          req.user.id,
+          packageId,
+          effectivePaymentMethod,
+          autoSuccessReviewer ? 'completed' : 'pending',
+          perPackageAmount,
+          transaction.id,
+          paymentReference
+        ]
       );
       if (purchaseResult.rows[0]) insertedPurchases.push(purchaseResult.rows[0]);
+    }
+
+    // Tambahan: jika autoSuccessReviewer, update semua purchases ke completed (jaga-jaga jika logic frontend cek status setelah insert)
+    if (autoSuccessReviewer && insertedPurchases.length > 0) {
+      await db.query(
+        `UPDATE purchases SET payment_status = 'completed', paid_at = NOW() WHERE payment_transaction_id = $1`,
+        [transaction.id]
+      );
+      // Refresh insertedPurchases agar statusnya up-to-date
+      const refreshed = await db.query(
+        `SELECT * FROM purchases WHERE payment_transaction_id = $1 ORDER BY id ASC`,
+        [transaction.id]
+      );
+      if (refreshed.rows) {
+        insertedPurchases.length = 0;
+        for (const row of refreshed.rows) insertedPurchases.push(row);
+      }
     }
 
     // Apply voucher inside the transaction (lock row to prevent concurrent over-use)
@@ -309,6 +344,15 @@ router.post('/payments/checkout', requireAuth, async (req, res) => {
       if (!lv || (lv.max_uses !== null && Number(lv.used_count) >= Number(lv.max_uses))) {
         await db.query('ROLLBACK');
         return res.status(400).json({ error: 'Kuota kode voucher sudah habis' });
+      }
+      // Double-check per-user usage (race condition guard inside transaction)
+      const userUsageCheck = await db.query(
+        `SELECT id FROM voucher_usages WHERE voucher_id = $1 AND user_id = $2 LIMIT 1`,
+        [appliedVoucherId, req.user.id]
+      );
+      if (userUsageCheck.rowCount > 0) {
+        await db.query('ROLLBACK');
+        return res.status(400).json({ error: 'Kode voucher sudah pernah digunakan oleh akun ini' });
       }
       await db.query(
         `INSERT INTO voucher_usages (voucher_id, user_id, payment_transaction_id, discount_applied, used_at)

@@ -6,6 +6,7 @@
 
 import React from 'react';
 import '../styles/question-viewer.css';
+import MathText from './MathText';
 
 const QuestionViewer = ({
   question,
@@ -40,7 +41,7 @@ const QuestionViewer = ({
           <span className="option-label">{option.label}</span>
         </div>
         <div className="option-text-box">
-          <span className="option-text">{option.text}</span>
+          <MathText text={option.text} className="option-text" />
           {isUserAnswer && (
             <span className="option-user-badge">Jawaban Anda</span>
           )}
@@ -92,7 +93,7 @@ const QuestionViewer = ({
       <div className="question-section">
         <h3 className="section-title">Soal</h3>
         <div className="question-text-content">
-          {question.questionText}
+          <MathText text={question.questionText} display />
         </div>
 
         {/* Question Image if exists */}

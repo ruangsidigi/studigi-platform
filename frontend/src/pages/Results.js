@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tryoutService } from '../services/api';
+import MathText from '../components/MathText';
 import '../styles/results.css';
 
 const Results = () => {
@@ -115,7 +116,7 @@ const Results = () => {
                 <div className="question-explanation">
                   <div className="explanation-content">
                     <h4>Soal:</h4>
-                    <p>{result.questionText}</p>
+                    <MathText text={result.questionText} display />
 
                     {result.imageUrl && (
                       <div className="explanation-image">
@@ -137,7 +138,7 @@ const Results = () => {
                     {result.explanation && (
                       <div className="explanation-box">
                         <h4>Pembahasan:</h4>
-                        <p>{result.explanation}</p>
+                        <MathText text={result.explanation} display />
                       </div>
                     )}
                   </div>
