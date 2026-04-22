@@ -305,7 +305,7 @@ export const brandingService = {
   uploadFavicon: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/admin/upload-favicon', formData, {
+    return api.post('/branding/favicon', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
