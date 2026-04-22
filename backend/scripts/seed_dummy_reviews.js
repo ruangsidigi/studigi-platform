@@ -14,45 +14,93 @@ const pool = new Pool({
 });
 
 const REVIEWERS = [
-  { email: 'dummy.ranking1@studigi.id', displayName: 'Naufal Pratama', comment: 'Soalnya relate banget sama model SKD sekarang, vibes tryout-nya dapet.' },
-  { email: 'dummy.ranking2@studigi.id', displayName: 'Alya Rahma', comment: 'UI clean parah, jadi bisa fokus ngerjain tanpa buyar.' },
-  { email: 'dummy.ranking3@studigi.id', displayName: 'Rafi Akbar', comment: 'Pembahasan ringkas tapi ngena, TIU jadi lebih kebaca polanya.' },
-  { email: 'dummy.ranking4@studigi.id', displayName: 'Citra Maharani', comment: 'Timer-nya bikin deg-degan realistis, serasa lagi ujian beneran.' },
-  { email: 'dummy.ranking5@studigi.id', displayName: 'Bagas Nugroho', comment: 'Ngebantu banget buat mapping kelemahan, jadi tau next belajar apa.' },
-  { email: 'dummy.ranking6@studigi.id', displayName: 'Salsa Kirana', comment: 'Variasi soalnya oke, ga monoton, bikin latihan tetep seru.' },
-  { email: 'dummy.ranking7@studigi.id', displayName: 'Dimas Saputra', comment: 'Flow app-nya smooth, dari mulai kerjain sampe review enak banget.' },
-  { email: 'dummy.ranking8@studigi.id', displayName: 'Intan Lestari', comment: 'HOTS-nya challenging tapi masih masuk akal, worth tiap sesinya.' },
-  { email: 'dummy.ranking9@studigi.id', displayName: 'Fikri Maulana', comment: 'Lumayan ngangkat speed ngerjain, cocok buat simulasi sebelum hari H.' },
-  { email: 'dummy.ranking10@studigi.id', displayName: 'Nadia Putri', comment: 'Overall clean dan nyaman dipake di laptop maupun HP, no ribet.' },
-  { email: 'dummy.ranking11@studigi.id', displayName: 'Rizky Ananta', comment: 'Tryout 2 ini pas banget buat nguji fokus, ritmenya mirip kondisi tes asli.' },
-  { email: 'dummy.ranking12@studigi.id', displayName: 'Maya Salsabila', comment: 'Penjelasan jawabannya to the point, jadi cepet paham kenapa pilihan lain kurang tepat.' },
-  { email: 'dummy.ranking13@studigi.id', displayName: 'Farhan Zidan', comment: 'Soal HOTS-nya menantang tapi tetap fair, bikin latihan jadi berasa progres.' },
-  { email: 'dummy.ranking14@studigi.id', displayName: 'Tiara Nabila', comment: 'Suka banget sama pembagian level kesulitannya, ga bikin kaget di tengah sesi.' },
-  { email: 'dummy.ranking15@studigi.id', displayName: 'Aditio Wibowo', comment: 'Layout rapi dan responsif, enak dipakai maraton latihan tanpa gangguan.' },
+  { email: 'dummy.ranking1@studigi.id', displayName: 'Naufal Pratama' },
+  { email: 'dummy.ranking2@studigi.id', displayName: 'Alya Rahma' },
+  { email: 'dummy.ranking3@studigi.id', displayName: 'Rafi Akbar' },
+  { email: 'dummy.ranking4@studigi.id', displayName: 'Citra Maharani' },
+  { email: 'dummy.ranking5@studigi.id', displayName: 'Bagas Nugroho' },
+  { email: 'dummy.ranking6@studigi.id', displayName: 'Salsa Kirana' },
+  { email: 'dummy.ranking7@studigi.id', displayName: 'Dimas Saputra' },
+  { email: 'dummy.ranking8@studigi.id', displayName: 'Intan Lestari' },
+  { email: 'dummy.ranking9@studigi.id', displayName: 'Fikri Maulana' },
+  { email: 'dummy.ranking10@studigi.id', displayName: 'Nadia Putri' },
+  { email: 'dummy.ranking11@studigi.id', displayName: 'Rizky Ananta' },
+  { email: 'dummy.ranking12@studigi.id', displayName: 'Maya Salsabila' },
+  { email: 'dummy.ranking13@studigi.id', displayName: 'Farhan Zidan' },
+  { email: 'dummy.ranking14@studigi.id', displayName: 'Tiara Nabila' },
+  { email: 'dummy.ranking15@studigi.id', displayName: 'Aditio Wibowo' },
 ];
 
-const MAX_PACKAGE_PER_REVIEWER = 3;
-const TARGET_REVIEW_COUNTS = [15, 5, 6, 6, 6];
+const MAX_PACKAGE_PER_REVIEWER = 4;
+const TARGET_REVIEW_COUNTS = [10, 8, 7, 7, 7, 6];
 
-const TRYOUT_2_TESTIMONIALS = [
-  'Tryout 2 lebih fokus ke nalar, cocok banget buat ngelatih keputusan cepat pas waktu mepet.',
-  'Format soalnya bikin mikir terstruktur, enak buat ngebangun konsistensi tiap sesi.',
-  'Komposisi TWK-TIU-TKP di paket ini kerasa seimbang dan relevan buat simulasi real.',
-  'Pembahasannya bantu ngerti strategi jawab, bukan cuma hafal kunci jawaban.',
-  'Setelah kerjain TRYOUT 2, aku lebih kebayang pola soal yang sering muncul saat seleksi.',
+const PACKAGE_TESTIMONIALS = [
+  [
+    'tampilannya keren parahh berasa tes asli',
+    'soalnya susah banget tapi mirip sama tes asli 2024 kemarin',
+    'soalnya nampol abis',
+    'ngebantu banget soal tryoutnya buat latihan',
+    'pembahasannya oke banget',
+    'mulai dari tampilan soal sampe tampilan pembahasannya pun oke banget',
+    'gak ekspek ada sistem ranking nya juga',
+    null,
+    null,
+    'timer dan navigasinya enak, jadi ga panik pas ngerjain',
+  ],
+  [
+    'banyakin voucher diskonnya plis',
+    'nunggu update soal lainnya',
+    'adain untuk latihan tes BUMN juga dong, soalnya ini bener2 ngebantu',
+    'ngebantu banget buat latihan',
+    'goksss',
+    'mantap',
+    null,
+    null,
+  ],
+  [
+    'kereennn abisss',
+    'latihan untuk tes lain selain CPNS dong',
+    'murah tapi mantep banget soal2nya',
+    'beneran HOTS',
+    'SKB please',
+    null,
+    null,
+  ],
+  [
+    'gokiiiilll',
+    'keren banget',
+    'bismillah CPNS 2026',
+    'rekomen si ini',
+    'murah mantap',
+    null,
+    null,
+  ],
+  [
+    'semurah ini tapi gacor abis',
+    'nyesel beli yang mahal2, inimurah tapi oke',
+    'tampilan tesnya itulohh keren banget',
+    'ga nyesel beli tryout disini',
+    'fitur review hasilnya ngebantu banget buat evaluasi kelemahan',
+    null,
+    null,
+  ],
+  [
+    'paket bonusnya juga kepake banget buat pemanasan sebelum latihan utama',
+    'soalnya fresh dan ga ngebosenin, cocok buat tambahan jam terbang',
+    'moga ada update paket lanjutannya, ini udah bagus banget',
+    'buat harga segini worth it parah, ngebantu banget latihan harian',
+    null,
+    null,
+  ],
 ];
 
 const PACKAGE_RATING_PROFILES = [
-  // Paket 1 -> 4.8
-  [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 4],
-  // Paket 2 -> 4.9
-  [5, 5, 5, 5, 4],
-  // Paket 3 -> 4.8
-  [5, 5, 5, 5, 5, 4],
-  // Paket 4 -> 4.7
-  [5, 5, 5, 5, 4, 4],
-  // Paket 5 -> 4.8
-  [5, 5, 5, 5, 5, 4],
+  [5, 5, 5, 5, 5, 5, 5, 5, 4, 4],
+  [5, 5, 5, 5, 5, 4, 4, 4],
+  [5, 5, 5, 5, 4, 4, 4],
+  [5, 5, 5, 5, 4, 4, 4],
+  [5, 5, 5, 4, 4, 4, 4],
+  [5, 5, 5, 4, 4, 4],
 ];
 
 async function ensureReviewSchema(client) {
@@ -83,24 +131,24 @@ async function getTargetTryoutPackages(client) {
        'TRYOUT 2 SKD CPNS (HOTS)',
        'TRYOUT 3 SKD CPNS (HOTS)',
        'TRYOUT 4 SKD CPNS (HOTS)',
-       'TRYOUT 5 SKD CPNS (HOTS)'
+       'TRYOUT 5 SKD CPNS (HOTS)',
+       'TRYOUT 6 SKD CPNS (HOTS) BONUS'
      )
      ORDER BY id ASC`
   );
 
-  if ((preferred.rows || []).length >= 5) return preferred.rows;
+  if ((preferred.rows || []).length >= 6) return preferred.rows;
 
   const fallback = await client.query(
     `SELECT id, name
      FROM packages
      WHERE LOWER(COALESCE(type, 'tryout')) IN ('tryout', 'latihan')
-       AND LOWER(COALESCE(name, '')) NOT LIKE '%bonus%'
      ORDER BY id ASC
-     LIMIT 5`
+     LIMIT 6`
   );
 
-  if ((fallback.rows || []).length < 5) {
-    throw new Error('Butuh minimal 5 paket tryout (non-bonus) untuk seed review ini.');
+  if ((fallback.rows || []).length < 6) {
+    throw new Error('Butuh minimal 6 paket tryout untuk seed review ini.');
   }
 
   return fallback.rows;
@@ -199,7 +247,6 @@ async function main() {
         ...rawReviewer,
         userId: Number(userId),
         assignedPackages: [],
-        usedComment: false,
       });
     }
 
@@ -228,13 +275,8 @@ async function main() {
         const rating = profile[i] || 5;
         const sessionId = await getOrCreateCompletedSession(client, reviewer.userId, Number(pkg.id), reviewer.displayName, packageIndex * 20 + i);
 
-        let comment = null;
-        if (packageIndex === 1) {
-          comment = TRYOUT_2_TESTIMONIALS[i] || null;
-        } else if (reviewer.comment && !reviewer.usedComment) {
-          comment = reviewer.comment;
-          reviewer.usedComment = true;
-        }
+        const testimonialRows = PACKAGE_TESTIMONIALS[packageIndex] || [];
+        const comment = testimonialRows[i] || null;
 
         await client.query(
           `INSERT INTO package_reviews (user_id, session_id, package_id, rating, comment, is_skipped, is_dummy, created_at, updated_at)

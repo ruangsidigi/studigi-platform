@@ -84,19 +84,7 @@ export default function RatePage() {
   }, [reviews]);
 
   const activePackage = packages.find((item) => item.id === activePackageId) || null;
-  const activeReviews = useMemo(() => {
-    if (!activePackageId) return [];
-
-    const rows = reviewsByPackage[activePackageId] || [];
-    const rowsWithComment = rows.filter((item) => String(item.comment || '').trim().length > 0);
-    const prioritizedRows = rowsWithComment.length > 0 ? rowsWithComment : rows;
-
-    if (activePackage?.name === 'TRYOUT 2 SKD CPNS (HOTS)') {
-      return prioritizedRows.slice(0, 5);
-    }
-
-    return prioritizedRows;
-  }, [activePackageId, activePackage?.name, reviewsByPackage]);
+  const activeReviews = activePackageId ? reviewsByPackage[activePackageId] || [] : [];
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-20 md:pb-4 lg:pb-2">
