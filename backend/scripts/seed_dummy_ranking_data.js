@@ -100,7 +100,7 @@ function buildDummyParticipants(count) {
 
   for (let i = 0; i < count; i += 1) {
     const first = firstNames[i % firstNames.length];
-    const second = secondNames[Math.floor(i / firstNames.length) % secondNames.length];
+    const second = secondNames[(i * 3 + 7) % secondNames.length];
     const useSecondName = i >= firstNames.length || i % 3 !== 0;
     const name = useSecondName ? `${first} ${second}` : first;
 

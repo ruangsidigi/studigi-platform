@@ -13,41 +13,39 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const DUMMY_REVIEWS = [
-  { email: 'dummy.ranking1@studigi.id', rating: 5, comment: 'Soalnya bagus dan pembahasan membantu banget.' },
-  { email: 'dummy.ranking2@studigi.id', rating: 5, comment: 'Layout rapi, waktu pas, dan tingkat kesulitan seimbang.' },
-  { email: 'dummy.ranking3@studigi.id', rating: 4, comment: 'Membantu latihan manajemen waktu sebelum ujian asli.' },
-  { email: 'dummy.ranking4@studigi.id', rating: 5, comment: 'Pembahasan jelas, terutama di bagian TIU numerik.' },
-  { email: 'dummy.ranking5@studigi.id', rating: 4, comment: 'Kategori soal variatif, jadi latihan terasa komplit.' },
-  { email: 'dummy.ranking6@studigi.id', rating: 5, comment: 'Simulasi tryout-nya mirip kondisi tes sesungguhnya.' },
-  { email: 'dummy.ranking7@studigi.id', rating: 5, comment: 'Progress dan ranking bikin saya lebih termotivasi belajar.' },
-  { email: 'dummy.ranking8@studigi.id', rating: 4, comment: 'Bagus untuk evaluasi kelemahan per kategori soal.' },
-  { email: 'dummy.ranking9@studigi.id', rating: 5, comment: 'Paket latihan sangat worth it, soal berkualitas.' },
-  { email: 'dummy.ranking10@studigi.id', rating: 4, comment: 'Antarmuka nyaman dipakai di laptop maupun HP.' },
-  { email: 'dummy.ranking11@studigi.id', rating: 5, comment: null },
-  { email: 'dummy.ranking12@studigi.id', rating: 4, comment: null },
-  { email: 'dummy.ranking13@studigi.id', rating: 5, comment: null },
-  { email: 'dummy.ranking14@studigi.id', rating: 4, comment: null },
-  { email: 'dummy.ranking15@studigi.id', rating: 5, comment: null },
+const REVIEWERS = [
+  { email: 'dummy.ranking1@studigi.id', displayName: 'Naufal Pratama', comment: 'Soalnya relate sama pola SKD terbaru. Enak banget buat latihan harian.' },
+  { email: 'dummy.ranking2@studigi.id', displayName: 'Alya Rahma', comment: 'UI-nya clean, jadi fokus ngerjain tanpa distraksi. Mantap.' },
+  { email: 'dummy.ranking3@studigi.id', displayName: 'Rafi Akbar', comment: 'Pembahasannya to the point dan gampang dipahami, terutama TIU.' },
+  { email: 'dummy.ranking4@studigi.id', displayName: 'Citra Maharani', comment: 'Timer dan nuansa tryout-nya bikin kerasa kayak tes beneran.' },
+  { email: 'dummy.ranking5@studigi.id', displayName: 'Bagas Nugroho', comment: 'Bantu banget buat ukur progres. Jadi tahu harus fokus belajar di mana.' },
+  { email: 'dummy.ranking6@studigi.id', displayName: 'Salsa Kirana', comment: 'Paket soalnya variatif, nggak ngebosenin. Cocok buat prepare intensif.' },
+  { email: 'dummy.ranking7@studigi.id', displayName: 'Dimas Saputra', comment: 'Flow dari mulai tryout sampai review hasil itu smooth. Suka banget.' },
+  { email: 'dummy.ranking8@studigi.id', displayName: 'Intan Lestari', comment: 'Soal HOTS-nya menantang tapi masih realistis. Worth it untuk latihan.' },
+  { email: 'dummy.ranking9@studigi.id', displayName: 'Fikri Maulana', comment: 'Ngebantu ningkatin speed ngerjain. Pas buat simulasi sebelum ujian.' },
+  { email: 'dummy.ranking10@studigi.id', displayName: 'Nadia Putri', comment: 'Overall experience-nya modern dan nyaman dipakai di laptop maupun HP.' },
+  { email: 'dummy.ranking11@studigi.id', displayName: 'Rizky Ananta', comment: null },
+  { email: 'dummy.ranking12@studigi.id', displayName: 'Maya Salsabila', comment: null },
+  { email: 'dummy.ranking13@studigi.id', displayName: 'Farhan Zidan', comment: null },
+  { email: 'dummy.ranking14@studigi.id', displayName: 'Tiara Nabila', comment: null },
+  { email: 'dummy.ranking15@studigi.id', displayName: 'Aditio Wibowo', comment: null },
 ];
 
-const REVIEWER_PACKAGE_COUNT = {
-  'dummy.ranking1@studigi.id': 2,
-  'dummy.ranking2@studigi.id': 2,
-  'dummy.ranking3@studigi.id': 2,
-  'dummy.ranking4@studigi.id': 2,
-  'dummy.ranking5@studigi.id': 2,
-  'dummy.ranking6@studigi.id': 2,
-  'dummy.ranking7@studigi.id': 2,
-  'dummy.ranking8@studigi.id': 2,
-  'dummy.ranking9@studigi.id': 2,
-  'dummy.ranking10@studigi.id': 2,
-  'dummy.ranking11@studigi.id': 1,
-  'dummy.ranking12@studigi.id': 1,
-  'dummy.ranking13@studigi.id': 1,
-  'dummy.ranking14@studigi.id': 1,
-  'dummy.ranking15@studigi.id': 1,
-};
+const MAX_PACKAGE_PER_REVIEWER = 3;
+const TARGET_REVIEW_COUNTS = [15, 10, 6, 6, 6];
+
+const PACKAGE_RATING_PROFILES = [
+  // Paket 1 -> 4.8
+  [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 4],
+  // Paket 2 -> 4.9
+  [5, 5, 5, 5, 5, 5, 5, 5, 5, 4],
+  // Paket 3 -> 4.8
+  [5, 5, 5, 5, 5, 4],
+  // Paket 4 -> 4.7
+  [5, 5, 5, 5, 4, 4],
+  // Paket 5 -> 4.8
+  [5, 5, 5, 5, 5, 4],
+];
 
 async function ensureReviewSchema(client) {
   await client.query(
@@ -68,45 +66,39 @@ async function ensureReviewSchema(client) {
   );
 }
 
-async function getTargetTryoutPackageIds(client) {
+async function getTargetTryoutPackages(client) {
   const preferred = await client.query(
-    `SELECT id
+    `SELECT id, name
      FROM packages
-     WHERE name IN ('Tryout SKD CPNS 1', 'Tryout SKD CPNS 2')
-     ORDER BY CASE name WHEN 'Tryout SKD CPNS 1' THEN 1 WHEN 'Tryout SKD CPNS 2' THEN 2 ELSE 3 END`
+     WHERE name IN (
+       'TRYOUT 1 SKD CPNS (HOTS)',
+       'TRYOUT 2 SKD CPNS (HOTS)',
+       'TRYOUT 3 SKD CPNS (HOTS)',
+       'TRYOUT 4 SKD CPNS (HOTS)',
+       'TRYOUT 5 SKD CPNS (HOTS)'
+     )
+     ORDER BY id ASC`
   );
 
-  const preferredIds = preferred.rows.map((row) => Number(row.id)).filter((id) => Number.isInteger(id) && id > 0);
+  if ((preferred.rows || []).length >= 5) return preferred.rows;
 
   const fallback = await client.query(
-    `SELECT id
+    `SELECT id, name
      FROM packages
      WHERE LOWER(COALESCE(type, 'tryout')) IN ('tryout', 'latihan')
+       AND LOWER(COALESCE(name, '')) NOT LIKE '%bonus%'
      ORDER BY id ASC
-     LIMIT 3`
+     LIMIT 5`
   );
 
-  const fallbackIds = fallback.rows.map((row) => Number(row.id)).filter((id) => Number.isInteger(id) && id > 0);
-
-  const combined = [...preferredIds, ...fallbackIds].filter((id, index, arr) => arr.indexOf(id) === index);
-  if (combined.length < 2) {
-    throw new Error('Butuh minimal 2 paket tryout untuk seeding review dummy.');
+  if ((fallback.rows || []).length < 5) {
+    throw new Error('Butuh minimal 5 paket tryout (non-bonus) untuk seed review ini.');
   }
 
-  return combined.slice(0, 2);
+  return fallback.rows;
 }
 
-const getTargetAverageProfile = (index) => {
-  if (index % 2 === 0) {
-    // 12x bintang 5 + 3x bintang 4 = 4.8 (15 reviewer)
-    return [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 4];
-  }
-
-  // 9x bintang 5 + 1x bintang 4 = 4.9 (10 reviewer)
-  return [5, 5, 5, 5, 5, 5, 5, 5, 5, 4];
-};
-
-async function getOrCreateCompletedSession(client, userId, packageId) {
+async function getOrCreateCompletedSession(client, userId, packageId, displayName, offsetIndex) {
   const existing = await client.query(
     `SELECT id
      FROM tryout_sessions
@@ -116,7 +108,16 @@ async function getOrCreateCompletedSession(client, userId, packageId) {
     [userId, packageId]
   );
 
-  if (existing.rows[0]) return Number(existing.rows[0].id);
+  if (existing.rows[0]) {
+    const sessionId = Number(existing.rows[0].id);
+    await client.query(
+      `UPDATE tryout_sessions
+       SET participant_name = $2
+       WHERE id = $1`,
+      [sessionId, displayName]
+    );
+    return sessionId;
+  }
 
   const inserted = await client.query(
     `INSERT INTO tryout_sessions (
@@ -136,23 +137,36 @@ async function getOrCreateCompletedSession(client, userId, packageId) {
      ) VALUES (
        $1,
        $2,
+       $3,
        NULL,
-       NULL,
-       NOW() - INTERVAL '120 minutes',
-       NOW() - INTERVAL '20 minutes',
+       NOW() - (($4 || ' minutes')::interval),
+       NOW() - (($5 || ' minutes')::interval),
        'completed',
        80,
        95,
        210,
        385,
        TRUE,
-       NOW() - INTERVAL '120 minutes'
+       NOW() - (($4 || ' minutes')::interval)
      )
      RETURNING id`,
-    [userId, packageId]
+    [userId, packageId, displayName, 180 + offsetIndex * 3, 75 + offsetIndex * 3]
   );
 
   return Number(inserted.rows[0].id);
+}
+
+function pickReviewers(reviewers, targetCount) {
+  const available = reviewers
+    .filter((reviewer) => reviewer.assignedPackages.length < MAX_PACKAGE_PER_REVIEWER)
+    .sort((a, b) => {
+      if (a.assignedPackages.length !== b.assignedPackages.length) {
+        return a.assignedPackages.length - b.assignedPackages.length;
+      }
+      return String(a.email).localeCompare(String(b.email));
+    });
+
+  return available.slice(0, targetCount);
 }
 
 async function main() {
@@ -163,18 +177,26 @@ async function main() {
     await client.query('BEGIN');
     await ensureReviewSchema(client);
 
-    const packageIds = await getTargetTryoutPackageIds(client);
-    const reviewers = [];
+    const targetPackages = await getTargetTryoutPackages(client);
 
-    for (const item of DUMMY_REVIEWS) {
-      const userResult = await client.query('SELECT id FROM users WHERE email = $1 LIMIT 1', [item.email]);
+    const reviewers = [];
+    for (const rawReviewer of REVIEWERS) {
+      const userResult = await client.query('SELECT id FROM users WHERE email = $1 LIMIT 1', [rawReviewer.email]);
       const userId = userResult.rows[0]?.id;
       if (!userId) continue;
-      reviewers.push({ ...item, userId: Number(userId) });
+
+      await client.query('UPDATE users SET name = $2 WHERE id = $1', [userId, rawReviewer.displayName]);
+
+      reviewers.push({
+        ...rawReviewer,
+        userId: Number(userId),
+        assignedPackages: [],
+        usedComment: false,
+      });
     }
 
-    if (reviewers.length < 10) {
-      throw new Error('User dummy ranking tidak cukup untuk pembagian reviewer.');
+    if (reviewers.length < 15) {
+      throw new Error('Reviewer dummy yang ditemukan kurang dari 15 user.');
     }
 
     await client.query(
@@ -183,32 +205,26 @@ async function main() {
           OR user_id IN (SELECT id FROM users WHERE email LIKE 'dummy.ranking%@studigi.id')`
     );
 
-    const commentUsedByEmail = new Set();
+    for (let packageIndex = 0; packageIndex < targetPackages.length; packageIndex += 1) {
+      const pkg = targetPackages[packageIndex];
+      const targetCount = TARGET_REVIEW_COUNTS[packageIndex] || 6;
+      const profile = PACKAGE_RATING_PROFILES[packageIndex] || [5, 5, 5, 5, 4, 4];
 
-    for (let packageIndex = 0; packageIndex < packageIds.length; packageIndex += 1) {
-      const packageId = packageIds[packageIndex];
-      const targetRatings = getTargetAverageProfile(packageIndex);
-      const selectedReviewers = [];
-
-      for (let i = 0; i < reviewers.length; i += 1) {
-        const reviewer = reviewers[i];
-        const allowedCount = Number(REVIEWER_PACKAGE_COUNT[reviewer.email] || 1);
-        if (packageIndex < allowedCount) {
-          selectedReviewers.push(reviewer);
-        }
-        if (selectedReviewers.length === targetRatings.length) break;
-      }
-
-      if (selectedReviewers.length < targetRatings.length) {
-        throw new Error(`Reviewer tidak cukup untuk paket ${packageId}`);
+      const selectedReviewers = pickReviewers(reviewers, targetCount);
+      if (selectedReviewers.length < targetCount) {
+        throw new Error(`Reviewer tidak cukup untuk paket ${pkg.name}`);
       }
 
       for (let i = 0; i < selectedReviewers.length; i += 1) {
         const reviewer = selectedReviewers[i];
-        const rating = targetRatings[i];
-        const sessionId = await getOrCreateCompletedSession(client, reviewer.userId, packageId);
-        const shouldUseComment = reviewer.comment && !commentUsedByEmail.has(reviewer.email);
-        const comment = shouldUseComment ? reviewer.comment : null;
+        const rating = profile[i] || 5;
+        const sessionId = await getOrCreateCompletedSession(client, reviewer.userId, Number(pkg.id), reviewer.displayName, packageIndex * 20 + i);
+
+        let comment = null;
+        if (reviewer.comment && !reviewer.usedComment) {
+          comment = reviewer.comment;
+          reviewer.usedComment = true;
+        }
 
         await client.query(
           `INSERT INTO package_reviews (user_id, session_id, package_id, rating, comment, is_skipped, is_dummy, created_at, updated_at)
@@ -220,19 +236,17 @@ async function main() {
              is_skipped = FALSE,
              is_dummy = TRUE,
              updated_at = NOW()`,
-          [reviewer.userId, sessionId, packageId, rating, comment]
+          [reviewer.userId, sessionId, Number(pkg.id), rating, comment]
         );
 
-        if (shouldUseComment) {
-          commentUsedByEmail.add(reviewer.email);
-        }
+        reviewer.assignedPackages.push(Number(pkg.id));
         inserted += 1;
       }
     }
 
     await client.query('COMMIT');
     console.log('Dummy reviews upserted:', inserted);
-    console.log('Target packages:', packageIds.join(', '));
+    console.log('Target packages:', targetPackages.map((pkg) => `${pkg.id}:${pkg.name}`).join(', '));
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Seed dummy reviews failed:', error.message || error);
