@@ -10,12 +10,15 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const mobileItems = [
+const mobileMainItems = [
   { to: '/home', label: 'Home', icon: Home },
   { to: '/library', label: 'Library', icon: BookOpen },
   { to: '/activity', label: 'Activity', icon: Activity },
   { to: '/payouts', label: 'Transaction', icon: CreditCard },
   { to: '/settings', label: 'Settings', icon: Settings },
+];
+
+const mobileUtilityItems = [
   { to: '/rate', label: 'Rate', icon: Star },
   { to: '/contact-us', label: 'Contact Us', icon: MessageCircle },
 ];
@@ -45,9 +48,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
   const { user } = (useContext(AuthContext as any) as any);
   const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
-  const drawerItems = isAdmin
-    ? [{ to: '/admin', label: 'Dashboard Admin', icon: Home }, ...mobileItems]
-    : mobileItems;
+  const drawerMainItems = isAdmin
+    ? [{ to: '/admin', label: 'Dashboard Admin', icon: Home }, ...mobileMainItems]
+    : mobileMainItems;
 
   const pageTitle = useMemo(() => titles[location.pathname] || 'Dashboard', [location.pathname]);
   const resolvedTitle = useMemo(() => {
@@ -74,26 +77,49 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <X size={16} />
                 </button>
               </div>
-              <nav className="space-y-1">
-                {drawerItems.map(({ to, label, icon: Icon }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    onClick={() => setMobileOpen(false)}
-                    className={({ isActive }) =>
-                      [
-                        'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                        isActive
-                          ? 'bg-[var(--header-color,#103c21)] text-white'
-                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
-                      ].join(' ')
-                    }
-                  >
-                    <Icon size={17} />
-                    {label}
-                  </NavLink>
-                ))}
-              </nav>
+              <div className="flex min-h-[calc(100%-3.25rem)] flex-col">
+                <nav className="space-y-1">
+                  {drawerMainItems.map(({ to, label, icon: Icon }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) =>
+                        [
+                          'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                          isActive
+                            ? 'bg-[var(--header-color,#103c21)] text-white'
+                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                        ].join(' ')
+                      }
+                    >
+                      <Icon size={17} />
+                      {label}
+                    </NavLink>
+                  ))}
+                </nav>
+
+                <nav className="mt-auto space-y-1 border-t border-slate-200 pt-3">
+                  {mobileUtilityItems.map(({ to, label, icon: Icon }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) =>
+                        [
+                          'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                          isActive
+                            ? 'bg-[var(--header-color,#103c21)] text-white'
+                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                        ].join(' ')
+                      }
+                    >
+                      <Icon size={17} />
+                      {label}
+                    </NavLink>
+                  ))}
+                </nav>
+              </div>
             </div>
           </div>
         )}
