@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { questionService, tryoutService, bundleService, packageService, materialService, purchaseService } from '../services/api';
+import { questionService, tryoutService, bundleService, packageService, materialService } from '../services/api';
 import { GraduationCap, Clock3, Flag, ChevronLeft, ChevronRight } from 'lucide-react';
 import MathText from '../components/MathText';
 import { INDONESIA_PROVINCES } from '../constants/indonesiaProvinces';
@@ -29,7 +29,6 @@ const Quiz = () => {
   const [participantName, setParticipantName] = useState('');
   const [participantProvince, setParticipantProvince] = useState('');
   const [isStartingSession, setIsStartingSession] = useState(false);
-  const [attemptsInfo, setAttemptsInfo] = useState(null);
   const autoFinishTriggeredRef = useRef(false);
 
   const createTimerWorker = useCallback(() => {
@@ -106,11 +105,6 @@ const Quiz = () => {
       setTimeLeft((Number(pkg?.duration) || 100) * 60);
       setDeadlineAt(null);
       autoFinishTriggeredRef.current = false;
-
-      // Fetch attempt usage info (non-blocking, ignore errors)
-      purchaseService.getAttemptsInfo(parseInt(packageId, 10))
-        .then((res) => { if (res?.data) setAttemptsInfo(res.data); })
-        .catch(() => {});
 
       const isBundleType =
         pkg.type === 'bundling' ||
@@ -203,16 +197,6 @@ const Quiz = () => {
       setTimeLeft(getRemainingSeconds(nextDeadlineAt));
       autoFinishTriggeredRef.current = false;
       setSessionId(startedSessionId);
-
-      // Update attemptsLeft from response
-      const newAttemptsLeft = sessionRes.data?.attemptsLeft;
-      if (newAttemptsLeft !== null && newAttemptsLeft !== undefined) {
-        setAttemptsInfo((prev) => ({
-          ...prev,
-          attemptsLeft: newAttemptsLeft,
-          usedAttempts: (prev?.maxAttempts ?? 10) - newAttemptsLeft,
-        }));
-      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to start tryout');
     } finally {
@@ -431,24 +415,6 @@ const Quiz = () => {
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
           ) : null}
 
-          {attemptsInfo && (
-            <div
-              className={`mt-4 rounded-xl border px-3 py-2.5 text-sm font-medium ${
-                attemptsInfo.attemptsLeft === 0
-                  ? 'border-red-200 bg-red-50 text-red-700'
-                  : attemptsInfo.attemptsLeft <= 3
-                  ? 'border-amber-200 bg-amber-50 text-amber-700'
-                  : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              }`}
-            >
-              {attemptsInfo.attemptsLeft === 0
-                ? '\u26A0\uFE0F Batas pengerjaan paket ini sudah habis. Silakan lakukan pembelian ulang.'
-                : `\uD83D\uDCCB Sisa ${attemptsInfo.attemptsLeft} dari ${attemptsInfo.maxAttempts} kali pengerjaan.${
-                    attemptsInfo.attemptsLeft <= 3 ? ' Segera beli ulang sebelum habis!' : ''
-                  }`}
-            </div>
-          )}
-
           <div className="mt-4 space-y-4">
             <div>
               <label htmlFor="participant-name" className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -486,7 +452,7 @@ const Quiz = () => {
             <button
               type="button"
               onClick={startTryoutSession}
-              disabled={isStartingSession || (attemptsInfo !== null && attemptsInfo.attemptsLeft === 0)}
+              disabled={isStartingSession}
               className="w-full rounded-xl bg-[var(--header-color,#0f5132)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
             >
               {isStartingSession ? 'Memulai Tryout...' : 'Mulai Tryout'}

@@ -50,39 +50,6 @@ const BundleDetail = () => {
   const bundleOwned = ownedIds.has(String(bundleId));
   const canViewBundleMaterials = bundleOwned || isAdmin;
 
-  const attemptsMap = useMemo(() => {
-    const paidStatuses = new Set(['paid', 'completed', 'success', 'settlement']);
-    const map = {};
-
-    for (const purchase of purchases || []) {
-      if (!paidStatuses.has(String(purchase?.payment_status || '').toLowerCase())) continue;
-      const packageKey = String(purchase?.package_id || '');
-      if (!packageKey || map[packageKey]) continue;
-
-      const maxAttempts = Number(purchase?.max_attempts ?? 10) || 10;
-      const usedAttempts = Number(purchase?.used_attempts ?? 0) || 0;
-      map[packageKey] = {
-        maxAttempts,
-        usedAttempts,
-        attemptsLeft: Math.max(0, maxAttempts - usedAttempts),
-      };
-    }
-
-    if (bundleOwned) {
-      for (const pkg of bundleDetail?.packages || []) {
-        const packageKey = String(pkg?.id || '');
-        if (!packageKey || map[packageKey]) continue;
-        map[packageKey] = {
-          maxAttempts: 10,
-          usedAttempts: 0,
-          attemptsLeft: 10,
-        };
-      }
-    }
-
-    return map;
-  }, [purchases, bundleOwned, bundleDetail]);
-
   const openMaterial = async (materialId) => {
     navigate(`/materials/${materialId}/view`, { state: { backTo: `/bundles/${bundleId}` } });
   };
@@ -131,9 +98,6 @@ const BundleDetail = () => {
           <div className="bundle-package-grid">
             {packages.map((pkg) => {
               const owned = bundleOwned || ownedIds.has(String(pkg.id));
-              const attemptInfo = attemptsMap[String(pkg.id)] || (owned
-                ? { maxAttempts: 10, usedAttempts: 0, attemptsLeft: 10 }
-                : null);
               return (
                 <div key={pkg.id} className="bundle-package-card">
                   <div className="bundle-package-header">
@@ -155,44 +119,12 @@ const BundleDetail = () => {
                     </div>
                   </div>
                   {owned ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {attemptInfo && (
-                        <div
-                          style={{
-                            fontSize: 12,
-                            padding: '6px 8px',
-                            borderRadius: 6,
-                            backgroundColor:
-                              attemptInfo.attemptsLeft === 0
-                                ? '#fee2e2'
-                                : attemptInfo.attemptsLeft <= 3
-                                ? '#fef3c7'
-                                : '#dcfce7',
-                            color:
-                              attemptInfo.attemptsLeft === 0
-                                ? '#991b1b'
-                                : attemptInfo.attemptsLeft <= 3
-                                ? '#92400e'
-                                : '#166534',
-                            fontWeight: 500,
-                            textAlign: 'center',
-                          }}
-                        >
-                          Sisa {attemptInfo.attemptsLeft} dari {attemptInfo.maxAttempts} kali
-                        </div>
-                      )}
-                      <button
-                        className="btn btn-success"
-                        onClick={() => navigate(`/quiz/${pkg.id}`)}
-                        disabled={attemptInfo?.attemptsLeft === 0}
-                        style={{
-                          opacity: attemptInfo?.attemptsLeft === 0 ? 0.6 : 1,
-                          cursor: attemptInfo?.attemptsLeft === 0 ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        Mulai
-                      </button>
-                    </div>
+                    <button
+                      className="btn btn-success"
+                      onClick={() => navigate(`/quiz/${pkg.id}`)}
+                    >
+                      Mulai
+                    </button>
                   ) : (
                     <div
                       className="participant-lock"

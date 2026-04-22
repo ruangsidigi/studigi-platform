@@ -58,10 +58,9 @@ router.post('/tryouts/start', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Provinsi tidak valid' });
     }
 
-    let purchaseId = null;
     if (!isAdminUser(req.user)) {
       const purchaseResult = await db.query(
-        `SELECT id, max_attempts, used_attempts
+        `SELECT id
          FROM purchases
          WHERE user_id = $1 AND package_id = $2
          ORDER BY id DESC
@@ -72,17 +71,6 @@ router.post('/tryouts/start', requireAuth, async (req, res) => {
       if (!purchase) {
         return res.status(403).json({ error: 'User does not have access to this package' });
       }
-      const maxAttempts = purchase.max_attempts ?? 10;
-      const usedAttempts = purchase.used_attempts ?? 0;
-      if (usedAttempts >= maxAttempts) {
-        return res.status(403).json({
-          error: 'Batas pengerjaan paket ini sudah habis. Silakan lakukan pembelian ulang untuk melanjutkan.',
-          attemptsLeft: 0,
-          maxAttempts,
-          usedAttempts,
-        });
-      }
-      purchaseId = purchase.id;
     }
 
     const schemaResult = await db.query(
@@ -111,26 +99,9 @@ router.post('/tryouts/start', requireAuth, async (req, res) => {
       [userId, packageId, participantName, participantProvince]
     );
 
-    // Increment used_attempts for non-admin users
-    let attemptsLeft = null;
-    if (purchaseId !== null) {
-      const updatedPurchase = await db.query(
-        `UPDATE purchases
-         SET used_attempts = used_attempts + 1
-         WHERE id = $1
-         RETURNING max_attempts, used_attempts`,
-        [purchaseId]
-      );
-      const upd = updatedPurchase.rows[0];
-      if (upd) {
-        attemptsLeft = (upd.max_attempts ?? 10) - (upd.used_attempts ?? 0);
-      }
-    }
-
     return res.json({
       message: 'Tryout session started',
       session: sessionResult.rows[0],
-      attemptsLeft,
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });

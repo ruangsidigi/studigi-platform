@@ -100,18 +100,6 @@ export default function Library() {
         const purchases = Array.isArray(purchasesRes.data) ? purchasesRes.data : [];
         const packageMap = new Map(allPackages.map((item) => [String(item.id), item]));
 
-        // Build a map of packageId -> latest purchase attempts info
-        const attemptsMap = new Map<string, { maxAttempts: number; usedAttempts: number }>();
-        purchases.forEach((purchase) => {
-          const pkgIdKey = String(purchase.package_id);
-          const maxAttempts = purchase.max_attempts ?? 10;
-          const usedAttempts = purchase.used_attempts ?? 0;
-          // Keep the last (highest id) purchase — data is ordered DESC
-          if (!attemptsMap.has(pkgIdKey)) {
-            attemptsMap.set(pkgIdKey, { maxAttempts, usedAttempts });
-          }
-        });
-
         const completedStatuses = ['completed', 'paid', 'success', 'settlement'];
         const result: any[] = [];
 
@@ -136,12 +124,7 @@ export default function Library() {
               category_name: purchase.package_type || 'Tryout',
             };
           if (!pkg) return;
-          const attemptsInfo = attemptsMap.get(pkgIdKey);
-          result.push({
-            ...pkg,
-            _maxAttempts: attemptsInfo?.maxAttempts ?? 10,
-            _usedAttempts: attemptsInfo?.usedAttempts ?? 0,
-          });
+          result.push(pkg);
         });
 
         const dedupeById = (list: any[]) => {
@@ -185,10 +168,6 @@ export default function Library() {
           String(pkg?.content_type || '').toLowerCase() === 'material' ||
           categoryName === 'EBOOK';
 
-        const maxAttempts: number = pkg._maxAttempts ?? 10;
-        const usedAttempts: number = pkg._usedAttempts ?? 0;
-        const attemptsLeft: number = maxAttempts - usedAttempts;
-
         return {
           id: pkg.id,
           raw: pkg,
@@ -197,8 +176,6 @@ export default function Library() {
           questions: Number(pkg.question_count || 0),
           duration: Number(pkg.duration || 100),
           category: (pkg.category_name || pkg.type || 'Tryout').toUpperCase(),
-          attemptsLeft: isBundle || isEbook ? null : attemptsLeft,
-          maxAttempts: isBundle || isEbook ? null : maxAttempts,
           actionLabel: (() => {
             if (isBundle) return 'Detail';
             if (isEbook) return 'Buka';
@@ -254,40 +231,7 @@ export default function Library() {
       {user && !loading && !error && cards.length > 0 && (
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {cards.map((item) => (
-            <div key={item.id} className="flex flex-col gap-1">
-              <TryoutCard {...item} onAction={() => handleCardAction(item.raw)} />
-              {item.attemptsLeft !== null && (
-                <div
-                  className={`flex items-center justify-between rounded-xl px-3 py-1.5 text-xs font-medium ${
-                    item.attemptsLeft === 0
-                      ? 'bg-red-50 text-red-700'
-                      : item.attemptsLeft <= 3
-                      ? 'bg-amber-50 text-amber-700'
-                      : 'bg-emerald-50 text-emerald-700'
-                  }`}
-                >
-                  <span>
-                    {item.attemptsLeft === 0
-                      ? 'Batas pengerjaan habis — silakan beli ulang'
-                      : `Sisa ${item.attemptsLeft} dari ${item.maxAttempts} kali pengerjaan`}
-                  </span>
-                  {item.attemptsLeft <= 3 && item.attemptsLeft > 0 && (
-                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">
-                      Hampir habis!
-                    </span>
-                  )}
-                  {item.attemptsLeft === 0 && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/packages/${item.id}`)}
-                      className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-red-800 hover:bg-red-200"
-                    >
-                      Beli ulang
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+            <TryoutCard key={item.id} {...item} onAction={() => handleCardAction(item.raw)} />
           ))}
         </section>
       )}
