@@ -23,6 +23,7 @@ import PayoutsPage from './pages/Payouts.tsx';
 import SettingsPage from './pages/Settings.tsx';
 import PaymentPage from './pages/Payment.tsx';
 import RatePage from './pages/Rate.tsx';
+import MyVouchersPage from './pages/MyVouchers.tsx';
 import ContactUsPage from './pages/ContactUs.tsx';
 import DashboardLayout from './layouts/DashboardLayout.tsx';
 
@@ -183,6 +184,16 @@ function App() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <PaymentPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-vouchers"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <MyVouchersPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

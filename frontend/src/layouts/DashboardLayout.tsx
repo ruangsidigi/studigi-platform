@@ -25,6 +25,7 @@ const titles: Record<string, string> = {
   '/payouts': 'Transaction',
   '/settings': 'Settings',
   '/payment': 'Payment',
+  '/my-vouchers': 'Voucher Saya',
   '/rate': 'Rate & Testimoni',
   '/contact-us': 'Contact Us',
 };

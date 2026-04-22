@@ -201,7 +201,8 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
     }
 
     if (item.type === 'voucher_reward') {
-      navigate('/home');
+      const query = item.voucherCode ? `?code=${encodeURIComponent(item.voucherCode)}` : '';
+      navigate(`/my-vouchers${query}`);
       return;
     }
 
