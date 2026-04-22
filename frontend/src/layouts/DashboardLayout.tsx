@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { X, Home, BookOpen, Activity, CreditCard, Settings } from 'lucide-react';
+import { X, Home, BookOpen, Activity, CreditCard, Settings, Star, MessageCircle } from 'lucide-react';
 import Sidebar from '../components/Sidebar.tsx';
 import Navbar from '../components/Navbar.tsx';
 import { useContext } from 'react';
@@ -11,6 +11,16 @@ interface DashboardLayoutProps {
 }
 
 const mobileItems = [
+  { to: '/home', label: 'Home', icon: Home },
+  { to: '/library', label: 'Library', icon: BookOpen },
+  { to: '/activity', label: 'Activity', icon: Activity },
+  { to: '/payouts', label: 'Transaction', icon: CreditCard },
+  { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/rate', label: 'Rate', icon: Star },
+  { to: '/contact-us', label: 'Contact Us', icon: MessageCircle },
+];
+
+const mobileBottomItems = [
   { to: '/home', label: 'Home', icon: Home },
   { to: '/library', label: 'Library', icon: BookOpen },
   { to: '/activity', label: 'Activity', icon: Activity },
@@ -33,7 +43,7 @@ const titles: Record<string, string> = {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
-  const { user } = useContext(AuthContext as any);
+  const { user } = (useContext(AuthContext as any) as any);
   const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
   const drawerItems = isAdmin
     ? [{ to: '/admin', label: 'Dashboard Admin', icon: Home }, ...mobileItems]
@@ -52,7 +62,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {mobileOpen && (
           <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)}>
-            <div className="h-full w-64 bg-white p-3" onClick={(event) => event.stopPropagation()}>
+            <div className="h-full w-[85vw] max-w-xs overflow-y-auto bg-white p-3 shadow-xl" onClick={(event) => event.stopPropagation()}>
               <div className="mb-3 flex items-center justify-between px-1 py-2">
                 <p className="text-sm font-semibold text-slate-900">Navigation</p>
                 <button
@@ -90,13 +100,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <Navbar title={resolvedTitle} onMenuClick={() => setMobileOpen(true)} />
-          <main className="flex-1 px-4 py-5 sm:px-5 md:px-6 md:py-6 lg:px-8">{children}</main>
+          <main className="flex-1 px-4 py-5 pb-24 sm:px-5 md:px-6 md:py-6 md:pb-6 lg:px-8">{children}</main>
         </div>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white md:hidden">
         <div className="grid grid-cols-5">
-          {mobileItems.map(({ to, label, icon: Icon }) => (
+          {mobileBottomItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
