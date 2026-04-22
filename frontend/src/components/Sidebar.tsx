@@ -8,6 +8,7 @@ import {
   Settings,
   GraduationCap,
   MessageCircle,
+  Star,
 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import { brandingService } from '../services/api';
@@ -51,7 +52,7 @@ const navItems = [
 ];
 
 export default function Sidebar() {
-  const { user } = useContext(AuthContext as any);
+  const { user } = useContext(AuthContext as any) as any;
   const [logoUrl, setLogoUrl] = useState<string>('');
   const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
   const sidebarItems = isAdmin
@@ -144,6 +145,20 @@ export default function Sidebar() {
         </nav>
 
         <div className="mt-auto border-t border-slate-200 p-3">
+          <NavLink
+            to="/rate"
+            className={({ isActive }) =>
+              [
+                'mb-1 flex w-full items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors lg:justify-start',
+                isActive
+                  ? 'bg-[var(--header-color,#103c21)] text-white'
+                  : 'text-[var(--secondary-color,#69655e)] hover:bg-slate-100 hover:text-slate-900',
+              ].join(' ')
+            }
+          >
+            <Star size={17} />
+            <span className="hidden lg:inline">Rate</span>
+          </NavLink>
           <NavLink
             to="/contact-us"
             className={({ isActive }) =>

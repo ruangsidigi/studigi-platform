@@ -119,8 +119,24 @@ router.get('/packages', async (req, res) => {
   try {
     const db = req.app.locals.db;
     await ensurePackageSchema(db);
-    const result = await db.query('SELECT * FROM packages ORDER BY created_at DESC NULLS LAST, id DESC');
-    return res.json(result.rows || []);
+    try {
+      const result = await db.query(
+        `SELECT
+           p.*,
+           ROUND(AVG(pr.rating) FILTER (WHERE pr.is_skipped = FALSE AND pr.rating IS NOT NULL), 1) AS rating_average,
+           COUNT(pr.id) FILTER (WHERE pr.is_skipped = FALSE AND pr.rating IS NOT NULL) AS rating_count
+         FROM packages p
+         LEFT JOIN package_reviews pr ON pr.package_id = p.id
+         GROUP BY p.id
+         ORDER BY p.created_at DESC NULLS LAST, p.id DESC`
+      );
+
+      return res.json(result.rows || []);
+    } catch (innerError) {
+      if (!isMissingRelation(innerError.message)) throw innerError;
+      const fallback = await db.query('SELECT * FROM packages ORDER BY created_at DESC NULLS LAST, id DESC');
+      return res.json(fallback.rows || []);
+    }
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -131,9 +147,29 @@ router.get('/packages/:id', async (req, res) => {
     const db = req.app.locals.db;
     await ensurePackageSchema(db);
     const { id } = req.params;
-    const result = await db.query('SELECT * FROM packages WHERE id = $1 LIMIT 1', [id]);
-    if (!result.rows[0]) return res.status(404).json({ error: 'Package not found' });
-    return res.json(result.rows[0]);
+
+    try {
+      const result = await db.query(
+        `SELECT
+           p.*,
+           ROUND(AVG(pr.rating) FILTER (WHERE pr.is_skipped = FALSE AND pr.rating IS NOT NULL), 1) AS rating_average,
+           COUNT(pr.id) FILTER (WHERE pr.is_skipped = FALSE AND pr.rating IS NOT NULL) AS rating_count
+         FROM packages p
+         LEFT JOIN package_reviews pr ON pr.package_id = p.id
+         WHERE p.id = $1
+         GROUP BY p.id
+         LIMIT 1`,
+        [id]
+      );
+
+      if (!result.rows[0]) return res.status(404).json({ error: 'Package not found' });
+      return res.json(result.rows[0]);
+    } catch (innerError) {
+      if (!isMissingRelation(innerError.message)) throw innerError;
+      const fallback = await db.query('SELECT * FROM packages WHERE id = $1 LIMIT 1', [id]);
+      if (!fallback.rows[0]) return res.status(404).json({ error: 'Package not found' });
+      return res.json(fallback.rows[0]);
+    }
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -286,6 +322,7 @@ router.delete('/packages/:id', requireAdmin, async (req, res) => {
     );
     await safeExec(db, 'DELETE FROM purchases WHERE package_id = $1', [id]);
     await safeExec(db, 'DELETE FROM tryout_sessions WHERE package_id = $1', [id]);
+    await safeExec(db, 'DELETE FROM package_reviews WHERE package_id = $1', [id]);
     await safeExec(db, 'DELETE FROM package_materials WHERE package_id = $1', [id]);
     await safeExec(db, 'DELETE FROM bundle_packages WHERE package_id = $1 OR bundle_id = $1', [id]);
     await safeExec(db, 'UPDATE materials SET package_id = NULL WHERE package_id = $1', [id]);
@@ -319,6 +356,7 @@ router.delete('/packages', requireAdmin, async (req, res) => {
     );
     await safeExec(db, 'DELETE FROM purchases WHERE package_id IN (SELECT id FROM packages)');
     await safeExec(db, 'DELETE FROM tryout_sessions WHERE package_id IN (SELECT id FROM packages)');
+    await safeExec(db, 'DELETE FROM package_reviews WHERE package_id IN (SELECT id FROM packages)');
     await safeExec(db, 'DELETE FROM package_materials WHERE package_id IN (SELECT id FROM packages)');
     await safeExec(db, 'DELETE FROM bundle_packages WHERE package_id IN (SELECT id FROM packages)');
     await safeExec(db, 'UPDATE materials SET package_id = NULL WHERE package_id IN (SELECT id FROM packages)');

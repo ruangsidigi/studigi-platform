@@ -14,21 +14,115 @@ const pool = new Pool({
 });
 
 const DUMMY_PASSWORD_HASH = '$2a$10$UgXqNqJ7qZ3EWU8r0aJ5P.YX2W.wjYXGdnF6H6LQq6kH1K8W5pMWC';
+const TARGET_PARTICIPANT_COUNT = 100;
+const TARGET_PASS_COUNT = 40;
 
-const dummyParticipants = [
-  { name: 'Budi Santoso', province: 'Lampung', email: 'dummy.ranking1@studigi.id', packageSlot: 0, total: 540, twk: 130, tiu: 170, tkp: 240 },
-  { name: 'Siti Aisyah', province: 'Lampung', email: 'dummy.ranking2@studigi.id', packageSlot: 0, total: 515, twk: 125, tiu: 165, tkp: 225 },
-  { name: 'Andi Pratama', province: 'Lampung', email: 'dummy.ranking3@studigi.id', packageSlot: 1, total: 498, twk: 118, tiu: 160, tkp: 220 },
-
-  { name: 'Rina Wulandari', province: 'Sumatera Selatan', email: 'dummy.ranking4@studigi.id', packageSlot: 0, total: 522, twk: 126, tiu: 168, tkp: 228 },
-  { name: 'Dedi Kurniawan', province: 'Sumatera Selatan', email: 'dummy.ranking5@studigi.id', packageSlot: 1, total: 505, twk: 122, tiu: 164, tkp: 219 },
-  { name: 'Nabila Putri', province: 'Sumatera Selatan', email: 'dummy.ranking6@studigi.id', packageSlot: 1, total: 486, twk: 115, tiu: 156, tkp: 215 },
-
-  { name: 'Fajar Ramadhan', province: 'Jawa Barat', email: 'dummy.ranking7@studigi.id', packageSlot: 0, total: 532, twk: 128, tiu: 169, tkp: 235 },
-  { name: 'Intan Permata', province: 'Jawa Barat', email: 'dummy.ranking8@studigi.id', packageSlot: 1, total: 512, twk: 124, tiu: 163, tkp: 225 },
-  { name: 'Rizky Maulana', province: 'Jawa Barat', email: 'dummy.ranking9@studigi.id', packageSlot: 0, total: 503, twk: 120, tiu: 162, tkp: 221 },
-  { name: 'Dewi Lestari', province: 'Jawa Barat', email: 'dummy.ranking10@studigi.id', packageSlot: 1, total: 495, twk: 117, tiu: 159, tkp: 219 },
+const provinces = [
+  'Aceh',
+  'Sumatera Utara',
+  'Sumatera Barat',
+  'Riau',
+  'Kepulauan Riau',
+  'Jambi',
+  'Bengkulu',
+  'Sumatera Selatan',
+  'Kepulauan Bangka Belitung',
+  'Lampung',
+  'Banten',
+  'DKI Jakarta',
+  'Jawa Barat',
+  'Jawa Tengah',
+  'DI Yogyakarta',
+  'Jawa Timur',
+  'Bali',
+  'Nusa Tenggara Barat',
+  'Nusa Tenggara Timur',
+  'Kalimantan Barat',
+  'Kalimantan Tengah',
+  'Kalimantan Selatan',
+  'Kalimantan Timur',
+  'Kalimantan Utara',
+  'Sulawesi Utara',
+  'Sulawesi Tengah',
+  'Sulawesi Selatan',
+  'Sulawesi Tenggara',
+  'Gorontalo',
+  'Sulawesi Barat',
+  'Maluku',
+  'Maluku Utara',
+  'Papua Barat',
+  'Papua',
 ];
+
+const firstNames = [
+  'Aksa', 'Alena', 'Alif', 'Amel', 'Arka', 'Aurel', 'Ayin', 'Bagas', 'Bara', 'Bima',
+  'Calya', 'Candra', 'Cila', 'Dafa', 'Damar', 'Davin', 'Dian', 'Dira', 'Elga', 'Elsa',
+  'Fano', 'Farrel', 'Felix', 'Fina', 'Gala', 'Gavin', 'Gio', 'Hana', 'Hanif', 'Iqis',
+  'Jano', 'Jihan', 'Jordi', 'Kai', 'Keila', 'Kian', 'Lala', 'Laras', 'Lio', 'Madin',
+  'Maira', 'Miko', 'Mila', 'Nadhif', 'Nael', 'Nala', 'Naufal', 'Naya', 'Niko', 'Oji',
+  'Putra', 'Qila', 'Rafi', 'Raisa', 'Raka', 'Rara', 'Rasya', 'Rei', 'Reno', 'Rian',
+  'Risa', 'Rizal', 'Safa', 'Salma', 'Satria', 'Sava', 'Seno', 'Sisi', 'Tama', 'Tara',
+  'Tegar', 'Tio', 'Vano', 'Vina', 'Wafi', 'Wira', 'Yaya', 'Yoga', 'Yori', 'Zaki',
+];
+
+const secondNames = [
+  'Aditya', 'Agustin', 'Aldebar', 'Alfian', 'Anjani', 'Ardana', 'Azzam', 'Baskara', 'Bella', 'Cakra',
+  'Danis', 'Dirgantara', 'Fadila', 'Faiz', 'Fikri', 'Firda', 'Gabriela', 'Hakim', 'Irawan', 'Jelita',
+  'Kirana', 'Kusuma', 'Lazuardi', 'Mahendra', 'Maulani', 'Nirwana', 'Nur', 'Pangestu', 'Permata', 'Pradana',
+  'Prakoso', 'Pratama', 'Putri', 'Ramadhan', 'Ranggana', 'Saputra', 'Sari', 'Setiawan', 'Syahputra', 'Wicaksono',
+  'Wulandari', 'Yunita',
+];
+
+function createScores(index) {
+  const isPass = index < TARGET_PASS_COUNT;
+
+  let twk;
+  let tiu;
+  let tkp;
+
+  if (isPass) {
+    twk = 69 + ((index * 2) % 12);
+    tiu = 90 + ((index * 4) % 22);
+    tkp = 191 + ((index * 5) % 30);
+  } else {
+    twk = 56 + ((index * 3) % 12);
+    tiu = 74 + ((index * 4) % 18);
+    tkp = 145 + ((index * 5) % 30);
+  }
+
+  // Keep score realistic and avoid any perfect/full score patterns.
+  const total = Math.min(410, twk + tiu + tkp);
+  return { twk, tiu, tkp, total, isPass: total >= 350 };
+}
+
+function buildDummyParticipants(count) {
+  const participants = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const first = firstNames[i % firstNames.length];
+    const second = secondNames[Math.floor(i / firstNames.length) % secondNames.length];
+    const useSecondName = i >= firstNames.length || i % 3 !== 0;
+    const name = useSecondName ? `${first} ${second}` : first;
+
+    const scores = createScores(i);
+
+    participants.push({
+      name,
+      province: provinces[(i * 7) % provinces.length],
+      email: `dummy.ranking${i + 1}@studigi.id`,
+      packageSlot: i % 2,
+      twk: scores.twk,
+      tiu: scores.tiu,
+      tkp: scores.tkp,
+      total: scores.total,
+      isPass: scores.isPass,
+    });
+  }
+
+  return participants;
+}
+
+const dummyParticipants = buildDummyParticipants(TARGET_PARTICIPANT_COUNT);
 
 async function getTargetPackageIds(client) {
   const preferred = await client.query(
@@ -142,7 +236,7 @@ async function main() {
           p.tiu,
           p.tkp,
           p.total,
-          p.total >= 350,
+          p.isPass,
         ]
       );
     }

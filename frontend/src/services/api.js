@@ -225,6 +225,13 @@ export const reviewService = {
   getBookmarks: (attemptId) => api.get(`/reviews/attempt/${attemptId}/bookmarks`),
 };
 
+export const ratingService = {
+  getSessionStatus: (sessionId) => api.get(`/ratings/session/${sessionId}/status`),
+  submitSessionReview: (sessionId, payload) => api.post(`/ratings/session/${sessionId}/submit`, payload),
+  getPackageReviews: (packageId) => api.get(`/ratings/package/${packageId}`),
+  getHighlights: () => api.get('/ratings/highlights'),
+};
+
 // Retention Dashboard Service
 export const retentionDashboardService = {
   getAnalytics: () => api.get('/dashboard/analytics'),

@@ -8,6 +8,7 @@
     "dev": "nodemon --watch src --exec node src/start.js",
     "migrate": "node scripts/run_migrations_local.js",
     "seed:admin": "node scripts/seed_admin.js",
+    "seed:reviews": "node scripts/seed_dummy_reviews.js",
     "smtp:test": "node scripts/test_smtp.js",
     "smtp:send:test": "node scripts/test_smtp_send.js",
     "apps-script:test": "node scripts/test_apps_script.js",

@@ -10,7 +10,8 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { reviewService } from '../services/api';
+import { Star } from 'lucide-react';
+import { reviewService, ratingService } from '../services/api';
 import QuestionSidebar from '../components/QuestionSidebar';
 import QuestionViewer from '../components/QuestionViewer';
 import MathText from '../components/MathText';
@@ -27,11 +28,41 @@ const ReviewPage = () => {
   const [loading, setLoading] = useState(true);
   const [loadingQuestion, setLoadingQuestion] = useState(false);
   const [error, setError] = useState('');
+  const [gateLoading, setGateLoading] = useState(true);
+  const [gateUnlocked, setGateUnlocked] = useState(false);
+  const [gateSubmitting, setGateSubmitting] = useState(false);
+  const [sessionRating, setSessionRating] = useState(0);
+  const [sessionComment, setSessionComment] = useState('');
 
   // UI State
   const [showExplanation, setShowExplanation] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState('all'); // all, correct, incorrect, unanswered, bookmarked
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState(new Set());
+
+  const loadGateStatus = useCallback(async () => {
+    try {
+      setGateLoading(true);
+      const response = await ratingService.getSessionStatus(attemptId);
+      const payload = response?.data || {};
+
+      if (!payload?.isCompleted) {
+        setGateUnlocked(true);
+        return;
+      }
+
+      if (payload?.isSubmitted) {
+        setGateUnlocked(true);
+        return;
+      }
+
+      setGateUnlocked(false);
+    } catch (_) {
+      // If endpoint not available, avoid blocking review access.
+      setGateUnlocked(true);
+    } finally {
+      setGateLoading(false);
+    }
+  }, [attemptId]);
 
   const initLoad = useCallback(async () => {
     try {
@@ -80,8 +111,53 @@ const ReviewPage = () => {
 
   // Initialize - Load review data
   useEffect(() => {
+    loadGateStatus();
+  }, [loadGateStatus]);
+
+  useEffect(() => {
+    if (!gateUnlocked) return;
     initLoad();
-  }, [initLoad]);
+  }, [initLoad, gateUnlocked]);
+
+  const submitSessionReview = async () => {
+    if (gateSubmitting) return;
+    if (!Number.isInteger(sessionRating) || sessionRating < 1 || sessionRating > 5) {
+      setError('Pilih bintang terlebih dahulu, atau tekan Lewati.');
+      return;
+    }
+
+    try {
+      setGateSubmitting(true);
+      setError('');
+      await ratingService.submitSessionReview(attemptId, {
+        rating: sessionRating,
+        comment: sessionComment,
+        skip: false,
+      });
+      setGateUnlocked(true);
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Gagal menyimpan review.');
+    } finally {
+      setGateSubmitting(false);
+    }
+  };
+
+  const skipSessionReview = async () => {
+    if (gateSubmitting) return;
+
+    try {
+      setGateSubmitting(true);
+      setError('');
+      await ratingService.submitSessionReview(attemptId, {
+        skip: true,
+      });
+      setGateUnlocked(true);
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Gagal melewati review.');
+    } finally {
+      setGateSubmitting(false);
+    }
+  };
 
   const loadQuestion = useCallback(
     async (questionNumber) => {
@@ -176,6 +252,115 @@ const ReviewPage = () => {
         return questions;
     }
   }, [reviewData, selectedFilter]);
+
+  if (gateLoading) {
+    return (
+      <div className="review-container loading">
+        <div className="review-spinner">Memuat status review...</div>
+      </div>
+    );
+  }
+
+  if (!gateUnlocked) {
+    return (
+      <div className="review-container loading" style={{ alignItems: 'stretch', justifyContent: 'flex-start', padding: 24 }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 20 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8, color: '#0f172a' }}>Rate Tryout Anda</h1>
+          <p style={{ color: '#475569', fontSize: 14, marginBottom: 16 }}>
+            Sebelum melihat hasil tes dan pembahasan, Anda bisa memberikan rating dan testimoni. Ini opsional dan bisa dilewati.
+          </p>
+
+          <div style={{ marginBottom: 14 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Rating</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[1, 2, 3, 4, 5].map((value) => {
+                const active = value <= sessionRating;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setSessionRating(value)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      color: active ? '#f59e0b' : '#cbd5e1',
+                    }}
+                    aria-label={`Beri ${value} bintang`}
+                  >
+                    <Star size={28} fill={active ? '#fbbf24' : 'none'} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Testimoni (opsional)</p>
+            <textarea
+              value={sessionComment}
+              onChange={(event) => setSessionComment(event.target.value)}
+              placeholder="Tulis pengalaman Anda mengerjakan tryout ini..."
+              rows={4}
+              style={{
+                width: '100%',
+                borderRadius: 12,
+                border: '1px solid #cbd5e1',
+                padding: '10px 12px',
+                fontSize: 14,
+                color: '#0f172a',
+                resize: 'vertical',
+              }}
+            />
+          </div>
+
+          {error ? (
+            <div style={{ marginBottom: 12, borderRadius: 12, border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c', padding: '8px 10px', fontSize: 13 }}>
+              {error}
+            </div>
+          ) : null}
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={submitSessionReview}
+              disabled={gateSubmitting}
+              style={{
+                border: 'none',
+                borderRadius: 12,
+                padding: '10px 14px',
+                background: 'var(--header-color,#103c21)',
+                color: '#fff',
+                fontWeight: 600,
+                cursor: gateSubmitting ? 'not-allowed' : 'pointer',
+                opacity: gateSubmitting ? 0.6 : 1,
+              }}
+            >
+              {gateSubmitting ? 'Menyimpan...' : 'Kirim Review'}
+            </button>
+
+            <button
+              type="button"
+              onClick={skipSessionReview}
+              disabled={gateSubmitting}
+              style={{
+                border: '1px solid #cbd5e1',
+                borderRadius: 12,
+                padding: '10px 14px',
+                background: '#fff',
+                color: '#334155',
+                fontWeight: 600,
+                cursor: gateSubmitting ? 'not-allowed' : 'pointer',
+                opacity: gateSubmitting ? 0.6 : 1,
+              }}
+            >
+              Lewati
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

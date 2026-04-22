@@ -15,7 +15,7 @@ const isBundlePackage = (pkg: any) => {
 
 
 export default function Library() {
-  const { user } = useContext(AuthContext as any);
+  const { user } = useContext(AuthContext as any) as any;
   const navigate = useNavigate();
   const [ownedPackages, setOwnedPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,6 +175,7 @@ export default function Library() {
           description: pkg.description || 'Paket milikmu, siap dikerjakan.',
           questions: Number(pkg.question_count || 0),
           duration: Number(pkg.duration || 100),
+          rating: Number(pkg.rating_average || 4.8),
           category: (pkg.category_name || pkg.type || 'Tryout').toUpperCase(),
           actionLabel: (() => {
             if (isBundle) return 'Detail';

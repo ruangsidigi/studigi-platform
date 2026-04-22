@@ -22,6 +22,7 @@ import ActivityPage from './pages/Activity.tsx';
 import PayoutsPage from './pages/Payouts.tsx';
 import SettingsPage from './pages/Settings.tsx';
 import PaymentPage from './pages/Payment.tsx';
+import RatePage from './pages/Rate.tsx';
 import ContactUsPage from './pages/ContactUs.tsx';
 import DashboardLayout from './layouts/DashboardLayout.tsx';
 
@@ -184,6 +185,14 @@ function App() {
                     <PaymentPage />
                   </DashboardLayout>
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/rate"
+              element={
+                <DashboardLayout>
+                  <RatePage />
+                </DashboardLayout>
               }
             />
             <Route
