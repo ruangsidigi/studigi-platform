@@ -307,7 +307,7 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
           type="button"
           className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100"
           aria-label="Cart"
-          onClick={() => navigate('/home#cart-widget')}
+          onClick={() => navigate('/payment')}
         >
           <ShoppingCart size={18} />
           {cartCount > 0 && (
