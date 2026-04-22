@@ -1,6 +1,34 @@
 const express = require('express');
+const multer = require('multer');
 
 const router = express.Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 1024 * 1024 },
+});
+
+const FAVICON_ALLOWED_MIME = new Set([
+  'image/x-icon',
+  'image/vnd.microsoft.icon',
+  'image/png',
+]);
+
+const upsertFaviconUrl = async (db, faviconUrl) => {
+  await db.query('ALTER TABLE branding_settings ADD COLUMN IF NOT EXISTS favicon_url TEXT');
+
+  await db.query(
+    `WITH updated AS (
+       UPDATE branding_settings
+       SET favicon_url = $1,
+           updated_at = NOW()
+       RETURNING id
+     )
+     INSERT INTO branding_settings (favicon_url, header_color, button_color, line_color, created_at, updated_at)
+     SELECT $1, '#103c21', '#007bff', '#dddddd', NOW(), NOW()
+     WHERE NOT EXISTS (SELECT 1 FROM updated)`,
+    [faviconUrl]
+  );
+};
 
 const getUserRoleNames = (user) => {
   if (!user || !Array.isArray(user.roles)) return [];
@@ -245,6 +273,32 @@ router.get('/admin/rankings/package/:packageId', requireAdmin, async (req, res) 
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/admin/upload-favicon', requireAdmin, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'File favicon wajib diisi' });
+    }
+
+    const mimeType = String(req.file.mimetype || '').toLowerCase();
+    if (!FAVICON_ALLOWED_MIME.has(mimeType)) {
+      return res.status(400).json({ error: 'Format favicon harus ICO atau PNG' });
+    }
+
+    const dataUrl = `data:${mimeType};base64,${req.file.buffer.toString('base64')}`;
+    const db = req.app.locals.db;
+    await upsertFaviconUrl(db, dataUrl);
+
+    return res.json({
+      message: 'Favicon uploaded',
+      faviconUrl: dataUrl,
+      persisted: true,
+      source: 'database',
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Gagal upload favicon' });
   }
 });
 

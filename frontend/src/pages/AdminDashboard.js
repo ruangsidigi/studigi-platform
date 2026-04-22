@@ -1921,28 +1921,16 @@ const BrandingSettingsForm = ({ setMessage }) => {
 
     try {
       setLoading(true);
-      const form = new FormData();
-      form.append('file', faviconFile);
+      const response = await brandingService.uploadFavicon(faviconFile);
+      const payload = response?.data || {};
+      const nextFavicon = String(payload.faviconUrl || payload.publicUrl || '').trim() || `/api/favicon.ico?t=${Date.now()}`;
 
-      const res = await fetch(API_ROOT + '/api/admin/upload-favicon', {
-        method: 'POST',
-        body: form,
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-      const json = await res.json();
-
-      if (!res.ok) {
-        setMessage(json.error || 'Error uploading favicon');
-        return;
-      }
-
-      const nextFavicon = `/api/favicon.ico?t=${Date.now()}`;
       applyFavicon(nextFavicon);
       localStorage.setItem(FAVICON_CACHE_KEY, nextFavicon);
       setFaviconFile(null);
       setMessage('Favicon uploaded');
     } catch (error) {
-      setMessage('Error upload favicon: ' + (error.response?.data?.error || error.message));
+      setMessage('Error upload favicon: ' + extractErrorMessage(error, 'Gagal upload favicon'));
     } finally {
       setLoading(false);
     }

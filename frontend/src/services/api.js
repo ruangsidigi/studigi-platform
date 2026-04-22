@@ -302,6 +302,13 @@ export const brandingService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  uploadFavicon: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/admin/upload-favicon', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 export const campaignService = {
