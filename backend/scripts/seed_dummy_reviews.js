@@ -32,13 +32,21 @@ const REVIEWERS = [
 ];
 
 const MAX_PACKAGE_PER_REVIEWER = 3;
-const TARGET_REVIEW_COUNTS = [15, 10, 6, 6, 6];
+const TARGET_REVIEW_COUNTS = [15, 5, 6, 6, 6];
+
+const TRYOUT_2_TESTIMONIALS = [
+  'Tryout 2 lebih fokus ke nalar, cocok banget buat ngelatih keputusan cepat pas waktu mepet.',
+  'Format soalnya bikin mikir terstruktur, enak buat ngebangun konsistensi tiap sesi.',
+  'Komposisi TWK-TIU-TKP di paket ini kerasa seimbang dan relevan buat simulasi real.',
+  'Pembahasannya bantu ngerti strategi jawab, bukan cuma hafal kunci jawaban.',
+  'Setelah kerjain TRYOUT 2, aku lebih kebayang pola soal yang sering muncul saat seleksi.',
+];
 
 const PACKAGE_RATING_PROFILES = [
   // Paket 1 -> 4.8
   [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 4],
   // Paket 2 -> 4.9
-  [5, 5, 5, 5, 5, 5, 5, 5, 5, 4],
+  [5, 5, 5, 5, 4],
   // Paket 3 -> 4.8
   [5, 5, 5, 5, 5, 4],
   // Paket 4 -> 4.7
@@ -221,7 +229,9 @@ async function main() {
         const sessionId = await getOrCreateCompletedSession(client, reviewer.userId, Number(pkg.id), reviewer.displayName, packageIndex * 20 + i);
 
         let comment = null;
-        if (reviewer.comment && (!reviewer.usedComment || packageIndex === 1)) {
+        if (packageIndex === 1) {
+          comment = TRYOUT_2_TESTIMONIALS[i] || null;
+        } else if (reviewer.comment && !reviewer.usedComment) {
           comment = reviewer.comment;
           reviewer.usedComment = true;
         }
