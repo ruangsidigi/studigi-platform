@@ -41,6 +41,12 @@ const isBundlePackage = (pkg: any) => {
   return packageType === 'bundling' || packageType === 'bundle' || (Array.isArray(pkg?.included_package_ids) && pkg.included_package_ids.length > 0);
 };
 
+const getPurchasePackageId = (purchase: any) => {
+  const rawId = purchase?.package_id ?? purchase?.package_ref_id ?? purchase?.packages?.id;
+  const id = Number(rawId);
+  return Number.isInteger(id) && id > 0 ? id : null;
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -83,8 +89,8 @@ export default function Home() {
           const paidPackageIds = new Set(
             allPurchases
               .filter((purchase) => paidStatuses.has(String(purchase?.payment_status || '').toLowerCase()))
-              .map((purchase) => Number(purchase?.package_id))
-              .filter((id) => Number.isInteger(id) && id > 0)
+              .map((purchase) => getPurchasePackageId(purchase))
+              .filter((id): id is number => id !== null)
           );
           setOwnedPackageIds(paidPackageIds);
           setError('');
@@ -157,6 +163,11 @@ export default function Home() {
     window.dispatchEvent(new CustomEvent('studigi:cart-updated', { detail: { count: cartItems.length } }));
   }, [cartItems]);
 
+  useEffect(() => {
+    if (!ownedPackageIds.size) return;
+    setCartItems((prev) => prev.filter((item) => !ownedPackageIds.has(Number(item.id))));
+  }, [ownedPackageIds]);
+
   const filteredPackages = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const searchTerm = String(params.get('q') || '').trim().toLowerCase();
@@ -187,6 +198,7 @@ export default function Home() {
   const singlePackages = useMemo(() => filteredPackages.filter((pkg) => !isBundlePackage(pkg)), [filteredPackages]);
 
   const handleAddToCart = (pkg: any) => {
+    if (ownedPackageIds.has(Number(pkg.id))) return;
     const mapped = normalizePackageToCartItem(pkg, categoryMap);
     setCartItems((prev) => {
       if (prev.some((item) => item.id === mapped.id)) return prev;
@@ -256,6 +268,7 @@ export default function Home() {
 
   const renderPackageCard = (pkg: any) => {
     const inCart = cartItems.some((item) => item.id === Number(pkg.id));
+    const isOwned = user && ownedPackageIds.has(Number(pkg.id));
     const categoryLabel = getCategoryName(pkg, categoryMap) || 'LAINNYA';
     const isEbook = isEbookPackage(pkg, categoryMap);
     const isBundle = isBundlePackage(pkg);
@@ -302,11 +315,11 @@ export default function Home() {
           <button
             type="button"
             onClick={() => handleAddToCart(pkg)}
-            disabled={inCart}
+            disabled={inCart || Boolean(isOwned)}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             <ShoppingCart size={15} />
-            {inCart ? 'Sudah di Cart' : 'Add to Cart'}
+            {isOwned ? 'Sudah Dibeli' : inCart ? 'Sudah di Cart' : 'Add to Cart'}
           </button>
 
           {isBundle && (
