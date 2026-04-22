@@ -24,11 +24,11 @@ const REVIEWERS = [
   { email: 'dummy.ranking8@studigi.id', displayName: 'Intan Lestari', comment: 'HOTS-nya challenging tapi masih masuk akal, worth tiap sesinya.' },
   { email: 'dummy.ranking9@studigi.id', displayName: 'Fikri Maulana', comment: 'Lumayan ngangkat speed ngerjain, cocok buat simulasi sebelum hari H.' },
   { email: 'dummy.ranking10@studigi.id', displayName: 'Nadia Putri', comment: 'Overall clean dan nyaman dipake di laptop maupun HP, no ribet.' },
-  { email: 'dummy.ranking11@studigi.id', displayName: 'Rizky Ananta', comment: null },
-  { email: 'dummy.ranking12@studigi.id', displayName: 'Maya Salsabila', comment: null },
-  { email: 'dummy.ranking13@studigi.id', displayName: 'Farhan Zidan', comment: null },
-  { email: 'dummy.ranking14@studigi.id', displayName: 'Tiara Nabila', comment: null },
-  { email: 'dummy.ranking15@studigi.id', displayName: 'Aditio Wibowo', comment: null },
+  { email: 'dummy.ranking11@studigi.id', displayName: 'Rizky Ananta', comment: 'Tryout 2 ini pas banget buat nguji fokus, ritmenya mirip kondisi tes asli.' },
+  { email: 'dummy.ranking12@studigi.id', displayName: 'Maya Salsabila', comment: 'Penjelasan jawabannya to the point, jadi cepet paham kenapa pilihan lain kurang tepat.' },
+  { email: 'dummy.ranking13@studigi.id', displayName: 'Farhan Zidan', comment: 'Soal HOTS-nya menantang tapi tetap fair, bikin latihan jadi berasa progres.' },
+  { email: 'dummy.ranking14@studigi.id', displayName: 'Tiara Nabila', comment: 'Suka banget sama pembagian level kesulitannya, ga bikin kaget di tengah sesi.' },
+  { email: 'dummy.ranking15@studigi.id', displayName: 'Aditio Wibowo', comment: 'Layout rapi dan responsif, enak dipakai maraton latihan tanpa gangguan.' },
 ];
 
 const MAX_PACKAGE_PER_REVIEWER = 3;
@@ -221,7 +221,7 @@ async function main() {
         const sessionId = await getOrCreateCompletedSession(client, reviewer.userId, Number(pkg.id), reviewer.displayName, packageIndex * 20 + i);
 
         let comment = null;
-        if (reviewer.comment && !reviewer.usedComment) {
+        if (reviewer.comment && (!reviewer.usedComment || packageIndex === 1)) {
           comment = reviewer.comment;
           reviewer.usedComment = true;
         }
