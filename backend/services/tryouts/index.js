@@ -34,6 +34,68 @@ const hasManualPointConfig = (row) => {
   return keys.some((key) => row?.[key] !== null && row?.[key] !== undefined && String(row?.[key]).trim() !== '');
 };
 
+const getAccessiblePackageIds = async (db, userId) => {
+  const accessible = new Set();
+
+  const purchaseResult = await db.query(
+    `SELECT package_id
+     FROM purchases
+     WHERE user_id = $1
+       AND package_id IS NOT NULL`,
+    [userId]
+  );
+
+  for (const row of purchaseResult.rows || []) {
+    const normalized = Number(row.package_id);
+    if (Number.isInteger(normalized) && normalized > 0) {
+      accessible.add(normalized);
+    }
+  }
+
+  if (!accessible.size) {
+    return accessible;
+  }
+
+  const ownedIds = [...accessible];
+
+  // Expand bundle ownership to its child packages.
+  try {
+    const bundleLinks = await db.query(
+      'SELECT package_id FROM bundle_packages WHERE bundle_id = ANY($1::int[])',
+      [ownedIds]
+    );
+    for (const row of bundleLinks.rows || []) {
+      const childId = Number(row.package_id);
+      if (Number.isInteger(childId) && childId > 0) {
+        accessible.add(childId);
+      }
+    }
+  } catch (_) {
+    // Ignore when bundle_packages table does not exist in older schema.
+  }
+
+  // Fallback for deployments that store bundle children on packages.included_package_ids.
+  try {
+    const packageRows = await db.query(
+      'SELECT id, included_package_ids FROM packages WHERE id = ANY($1::int[])',
+      [ownedIds]
+    );
+    for (const row of packageRows.rows || []) {
+      const includedIds = Array.isArray(row.included_package_ids) ? row.included_package_ids : [];
+      for (const includedId of includedIds) {
+        const childId = Number(includedId);
+        if (Number.isInteger(childId) && childId > 0) {
+          accessible.add(childId);
+        }
+      }
+    }
+  } catch (_) {
+    // Ignore legacy schema mismatches.
+  }
+
+  return accessible;
+};
+
 router.post('/tryouts/start', requireAuth, async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -59,16 +121,8 @@ router.post('/tryouts/start', requireAuth, async (req, res) => {
     }
 
     if (!isAdminUser(req.user)) {
-      const purchaseResult = await db.query(
-        `SELECT id
-         FROM purchases
-         WHERE user_id = $1 AND package_id = $2
-         ORDER BY id DESC
-         LIMIT 1`,
-        [userId, packageId]
-      );
-      const purchase = purchaseResult.rows[0];
-      if (!purchase) {
+      const accessiblePackageIds = await getAccessiblePackageIds(db, userId);
+      if (!accessiblePackageIds.has(packageId)) {
         return res.status(403).json({ error: 'User does not have access to this package' });
       }
     }
