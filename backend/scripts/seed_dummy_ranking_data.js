@@ -66,7 +66,7 @@ const firstNames = [
 ];
 
 const secondNames = [
-  'Aditya', 'Agustin', 'Aldebar', 'Alfian', 'Anjani', 'Ardana', 'Azzam', 'Baskara', 'Bella', 'Cakra',
+  'Agustin', 'Aldebar', 'Alfian', 'Anjani', 'Ardana', 'Azzam', 'Baskara', 'Bella', 'Cakra',
   'Danis', 'Dirgantara', 'Fadila', 'Faiz', 'Fikri', 'Firda', 'Gabriela', 'Hakim', 'Irawan', 'Jelita',
   'Kirana', 'Kusuma', 'Lazuardi', 'Mahendra', 'Maulani', 'Nirwana', 'Nur', 'Pangestu', 'Permata', 'Pradana',
   'Prakoso', 'Pratama', 'Putri', 'Ramadhan', 'Ranggana', 'Saputra', 'Sari', 'Setiawan', 'Syahputra', 'Wicaksono',
@@ -100,8 +100,9 @@ function buildDummyParticipants(count) {
 
   for (let i = 0; i < count; i += 1) {
     const first = firstNames[i % firstNames.length];
-    const second = secondNames[(i * 3 + 7) % secondNames.length];
-    const useSecondName = i >= firstNames.length || i % 3 !== 0;
+    // Use a coprime step to spread second names evenly and avoid visible repetition.
+    const second = secondNames[(i * 5 + 7) % secondNames.length];
+    const useSecondName = i >= firstNames.length || i % 4 !== 0;
     const name = useSecondName ? `${first} ${second}` : first;
 
     const scores = createScores(i);
