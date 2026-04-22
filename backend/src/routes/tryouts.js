@@ -43,6 +43,27 @@ const getAccessiblePackageIds = async (userId) => {
     }
   }
 
+  // Also include package ids from successful payment transaction metadata.
+  const paidStatuses = ['paid', 'completed', 'success', 'settlement'];
+  const { data: transactions, error: transactionsError } = await supabase
+    .from('payment_transactions')
+    .select('metadata, status')
+    .eq('user_id', userId)
+    .in('status', paidStatuses);
+
+  if (!transactionsError) {
+    for (const tx of transactions || []) {
+      const meta = tx?.metadata && typeof tx.metadata === 'object' ? tx.metadata : null;
+      const packageIds = Array.isArray(meta?.package_ids) ? meta.package_ids : [];
+      for (const id of packageIds) {
+        const normalized = Number(id);
+        if (Number.isInteger(normalized) && normalized > 0) {
+          accessible.add(normalized);
+        }
+      }
+    }
+  }
+
   if (!accessible.size) return accessible;
 
   const ownedPackageIds = [...accessible];

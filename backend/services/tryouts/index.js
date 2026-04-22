@@ -52,6 +52,31 @@ const getAccessiblePackageIds = async (db, userId) => {
     }
   }
 
+  // Also include package ids from successful payment transaction metadata.
+  try {
+    const paidStatuses = ['paid', 'completed', 'success', 'settlement'];
+    const txResult = await db.query(
+      `SELECT metadata
+       FROM payment_transactions
+       WHERE user_id = $1
+         AND LOWER(COALESCE(status, '')) = ANY($2::text[])`,
+      [userId, paidStatuses]
+    );
+
+    for (const row of txResult.rows || []) {
+      const meta = row?.metadata && typeof row.metadata === 'object' ? row.metadata : null;
+      const ids = Array.isArray(meta?.package_ids) ? meta.package_ids : [];
+      for (const id of ids) {
+        const normalized = Number(id);
+        if (Number.isInteger(normalized) && normalized > 0) {
+          accessible.add(normalized);
+        }
+      }
+    }
+  } catch (_) {
+    // Ignore when payment_transactions table is unavailable on older schema.
+  }
+
   if (!accessible.size) {
     return accessible;
   }
