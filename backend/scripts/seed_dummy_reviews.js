@@ -32,7 +32,7 @@ const REVIEWERS = [
 ];
 
 const MAX_PACKAGE_PER_REVIEWER = 4;
-const TARGET_REVIEW_COUNTS = [10, 8, 7, 7, 7, 6];
+const TARGET_REVIEW_COUNTS = [10, 10, 10, 10, 10, 10];
 
 const PACKAGE_TESTIMONIALS = [
   [
@@ -95,12 +95,18 @@ const PACKAGE_TESTIMONIALS = [
 ];
 
 const PACKAGE_RATING_PROFILES = [
+  // 4.8 average
   [5, 5, 5, 5, 5, 5, 5, 5, 4, 4],
-  [5, 5, 5, 5, 5, 4, 4, 4],
-  [5, 5, 5, 5, 4, 4, 4],
-  [5, 5, 5, 5, 4, 4, 4],
-  [5, 5, 5, 4, 4, 4, 4],
-  [5, 5, 5, 4, 4, 4],
+  // 4.9 average
+  [5, 5, 5, 5, 5, 5, 5, 5, 5, 4],
+  // 4.8 average
+  [5, 5, 5, 5, 5, 5, 5, 5, 4, 4],
+  // 4.8 average
+  [5, 5, 5, 5, 5, 5, 5, 5, 4, 4],
+  // 4.8 average
+  [5, 5, 5, 5, 5, 5, 5, 5, 4, 4],
+  // 4.9 average
+  [5, 5, 5, 5, 5, 5, 5, 5, 5, 4],
 ];
 
 async function ensureReviewSchema(client) {
