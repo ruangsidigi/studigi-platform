@@ -33,6 +33,7 @@ const ReviewPage = () => {
   const [gateSubmitting, setGateSubmitting] = useState(false);
   const [sessionRating, setSessionRating] = useState(0);
   const [sessionComment, setSessionComment] = useState('');
+  const [rewardVoucher, setRewardVoucher] = useState(null);
 
   // UI State
   const [showExplanation, setShowExplanation] = useState(true);
@@ -129,11 +130,16 @@ const ReviewPage = () => {
     try {
       setGateSubmitting(true);
       setError('');
-      await ratingService.submitSessionReview(attemptId, {
+      const response = await ratingService.submitSessionReview(attemptId, {
         rating: sessionRating,
         comment: sessionComment,
         skip: false,
       });
+      const reward = response?.data?.reward;
+      if (reward?.rewardGranted && reward?.voucher) {
+        setRewardVoucher(reward.voucher);
+        window.dispatchEvent(new CustomEvent('studigi:notifications-refresh'));
+      }
       setGateUnlocked(true);
     } catch (err) {
       setError(err?.response?.data?.error || 'Gagal menyimpan review.');
@@ -267,7 +273,7 @@ const ReviewPage = () => {
         <div style={{ maxWidth: 760, margin: '0 auto', width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8, color: '#0f172a' }}>Rate Tryout Anda</h1>
           <p style={{ color: '#475569', fontSize: 14, marginBottom: 16 }}>
-            Sebelum melihat hasil tes dan pembahasan, Anda bisa memberikan rating dan testimoni. Ini opsional dan bisa dilewati.
+            Sebelum melihat hasil tes dan pembahasan, Anda bisa memberikan rating dan testimoni. Ini opsional dan bisa dilewati. Jika Anda memberi bintang dan review/testimoni, Anda akan mendapatkan voucher diskon 10% dengan minimal pembelian Rp 15.000, dan kodenya langsung ditampilkan di sini.
           </p>
 
           <div style={{ marginBottom: 14 }}>
@@ -297,6 +303,9 @@ const ReviewPage = () => {
 
           <div style={{ marginBottom: 14 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Testimoni (opsional)</p>
+            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+              Isi bintang + testimoni untuk klaim voucher 10% (min. pembelian Rp 15.000).
+            </p>
             <textarea
               value={sessionComment}
               onChange={(event) => setSessionComment(event.target.value)}
@@ -382,6 +391,25 @@ const ReviewPage = () => {
 
   return (
     <div className="review-container">
+      {rewardVoucher && (
+        <div style={{ margin: '16px 24px 0', borderRadius: 16, border: '1px solid #bbf7d0', background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', padding: 18 }}>
+          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: '#166534', marginBottom: 6 }}>
+            Voucher Reward Berhasil Dibuat
+          </p>
+          <p style={{ fontSize: 20, fontWeight: 800, color: '#14532d', marginBottom: 8 }}>
+            {rewardVoucher.code}
+          </p>
+          <p style={{ fontSize: 14, color: '#166534', marginBottom: 6 }}>
+            {rewardVoucher.discountType === 'percentage'
+              ? `Diskon ${rewardVoucher.discountValue}%${rewardVoucher.maxDiscount ? ` hingga Rp ${Number(rewardVoucher.maxDiscount).toLocaleString('id-ID')}` : ''}`
+              : `Diskon Rp ${Number(rewardVoucher.discountValue).toLocaleString('id-ID')}`}
+          </p>
+          <p style={{ fontSize: 13, color: '#166534', marginBottom: 0 }}>
+            Berlaku sampai {rewardVoucher.validUntil ? new Date(rewardVoucher.validUntil).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-'}
+            {rewardVoucher.minPurchase ? `, minimal pembelian Rp ${Number(rewardVoucher.minPurchase).toLocaleString('id-ID')}` : ''}.
+          </p>
+        </div>
+      )}
       {/* Header */}
       <div className="review-header">
         <div className="review-header-left">

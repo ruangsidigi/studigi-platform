@@ -40,10 +40,19 @@ const ensureVoucherSchema = async (db) => {
       valid_from     TIMESTAMPTZ,
       valid_until    TIMESTAMPTZ,
       is_active      BOOLEAN NOT NULL DEFAULT true,
+      issued_to_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      reward_source   VARCHAR(50),
+      metadata        JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_by     BIGINT REFERENCES users(id) ON DELETE SET NULL,
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+  await db.query(`
+    ALTER TABLE vouchers
+      ADD COLUMN IF NOT EXISTS issued_to_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS reward_source VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb
   `);
   await db.query(`
     CREATE TABLE IF NOT EXISTS voucher_usages (
@@ -59,6 +68,80 @@ const ensureVoucherSchema = async (db) => {
   await db.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS voucher_usages_voucher_user_unique
     ON voucher_usages (voucher_id, user_id)
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_vouchers_issued_to_user_id
+    ON vouchers (issued_to_user_id)
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_vouchers_reward_source
+    ON vouchers (reward_source)
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS review_reward_configs (
+      id BIGSERIAL PRIMARY KEY,
+      title VARCHAR(120) NOT NULL DEFAULT 'Reward Review & Testimoni',
+      description TEXT,
+      discount_type VARCHAR(20) NOT NULL DEFAULT 'percentage'
+        CHECK (discount_type IN ('percentage', 'fixed')),
+      discount_value NUMERIC(12,2) NOT NULL CHECK (discount_value > 0),
+      min_purchase NUMERIC(12,2) NOT NULL DEFAULT 0,
+      max_discount NUMERIC(12,2),
+      expires_in_days INTEGER NOT NULL DEFAULT 7 CHECK (expires_in_days > 0),
+      is_active BOOLEAN NOT NULL DEFAULT FALSE,
+      created_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      updated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS review_reward_claims (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      session_id BIGINT NOT NULL REFERENCES tryout_sessions(id) ON DELETE CASCADE,
+      review_id BIGINT NOT NULL REFERENCES package_reviews(id) ON DELETE CASCADE,
+      package_id BIGINT NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
+      voucher_id BIGINT NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT review_reward_claims_session_user_unique UNIQUE (session_id, user_id),
+      CONSTRAINT review_reward_claims_review_unique UNIQUE (review_id),
+      CONSTRAINT review_reward_claims_voucher_unique UNIQUE (voucher_id)
+    )
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_review_reward_claims_user_id
+    ON review_reward_claims (user_id)
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_review_reward_claims_voucher_id
+    ON review_reward_claims (voucher_id)
+  `);
+  await db.query(`
+    INSERT INTO review_reward_configs
+      (title, description, discount_type, discount_value, min_purchase, max_discount, expires_in_days, is_active)
+    SELECT
+      'Reward Review & Testimoni',
+      'Voucher reward otomatis setelah peserta mengirim rating dan testimoni.',
+      'percentage',
+      10,
+      15000,
+      10000,
+      7,
+      TRUE
+    WHERE NOT EXISTS (SELECT 1 FROM review_reward_configs)
+  `);
+  await db.query(`
+    UPDATE review_reward_configs
+    SET min_purchase = 15000,
+        is_active = TRUE,
+        updated_at = NOW()
+    WHERE discount_type = 'percentage'
+      AND discount_value = 10
+      AND COALESCE(min_purchase, 0) = 0
+      AND COALESCE(max_discount, 0) = 10000
+      AND expires_in_days = 7
+      AND is_active = FALSE
   `);
   // Attempt to add voucher columns to payment_transactions (may already exist)
   try {
@@ -89,6 +172,10 @@ const validateVoucherCode = async (db, code, subtotal, userId = null) => {
   const v = result.rows[0];
 
   if (!v.is_active) return { valid: false, error: 'Kode voucher sudah tidak aktif' };
+
+  if (v.issued_to_user_id !== null && userId && Number(v.issued_to_user_id) !== Number(userId)) {
+    return { valid: false, error: 'Kode voucher ini hanya bisa dipakai oleh akun yang menerima voucher' };
+  }
 
   const now = new Date();
   if (v.valid_from && new Date(v.valid_from) > now) {
@@ -134,6 +221,17 @@ const validateVoucherCode = async (db, code, subtotal, userId = null) => {
   return { valid: true, voucher: v, discountAmount };
 };
 
+const getActiveReviewRewardConfig = async (db) => {
+  await ensureVoucherSchema(db);
+  const result = await db.query(
+    `SELECT *
+     FROM review_reward_configs
+     ORDER BY is_active DESC, updated_at DESC NULLS LAST, id DESC
+     LIMIT 1`
+  );
+  return result.rows[0] || null;
+};
+
 // ─────────────────────────────────────────────
 // Public endpoint: validate a voucher (returns discount preview)
 // POST /api/vouchers/validate
@@ -161,6 +259,116 @@ router.post('/vouchers/validate', requireAuth, async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Gagal memvalidasi voucher' });
+  }
+});
+
+router.get('/vouchers/my', requireAuth, async (req, res) => {
+  const db = req.app.locals.db;
+  try {
+    await ensureVoucherSchema(db);
+    const result = await db.query(
+      `SELECT
+         v.id,
+         v.code,
+         v.description,
+         v.discount_type,
+         v.discount_value,
+         v.min_purchase,
+         v.max_discount,
+         v.max_uses,
+         v.used_count,
+         v.valid_from,
+         v.valid_until,
+         v.is_active,
+         v.reward_source,
+         v.created_at,
+         rrc.session_id,
+         rrc.package_id,
+         p.name AS package_name
+       FROM vouchers v
+       LEFT JOIN review_reward_claims rrc ON rrc.voucher_id = v.id
+       LEFT JOIN packages p ON p.id = rrc.package_id
+       WHERE v.issued_to_user_id = $1
+       ORDER BY v.created_at DESC, v.id DESC`,
+      [req.user.id]
+    );
+    return res.json(result.rows || []);
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Gagal memuat voucher anda' });
+  }
+});
+
+router.get('/vouchers/review-reward-config', requireAdmin, async (req, res) => {
+  const db = req.app.locals.db;
+  try {
+    const config = await getActiveReviewRewardConfig(db);
+    return res.json(config || null);
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Gagal memuat konfigurasi reward review' });
+  }
+});
+
+router.put('/vouchers/review-reward-config', requireAdmin, async (req, res) => {
+  const db = req.app.locals.db;
+  try {
+    await ensureVoucherSchema(db);
+    const {
+      title = 'Reward Review & Testimoni',
+      description = '',
+      discount_type = 'percentage',
+      discount_value,
+      min_purchase = 0,
+      max_discount = null,
+      expires_in_days = 7,
+      is_active = false,
+    } = req.body || {};
+
+    if (!discount_value || Number(discount_value) <= 0) {
+      return res.status(400).json({ error: 'Nilai diskon reward harus lebih dari 0' });
+    }
+    if (!['percentage', 'fixed'].includes(discount_type)) {
+      return res.status(400).json({ error: 'Tipe diskon reward harus percentage atau fixed' });
+    }
+    if (discount_type === 'percentage' && Number(discount_value) > 100) {
+      return res.status(400).json({ error: 'Diskon persentase reward tidak boleh melebihi 100%' });
+    }
+    if (!Number.isInteger(Number(expires_in_days)) || Number(expires_in_days) <= 0) {
+      return res.status(400).json({ error: 'Masa berlaku reward harus minimal 1 hari' });
+    }
+
+    const current = await getActiveReviewRewardConfig(db);
+    const currentId = current?.id || 1;
+    const result = await db.query(
+      `UPDATE review_reward_configs
+       SET
+         title = $1,
+         description = $2,
+         discount_type = $3,
+         discount_value = $4,
+         min_purchase = $5,
+         max_discount = $6,
+         expires_in_days = $7,
+         is_active = $8,
+         updated_by = $9,
+         updated_at = NOW()
+       WHERE id = $10
+       RETURNING *`,
+      [
+        String(title || 'Reward Review & Testimoni').trim(),
+        String(description || '').trim() || null,
+        discount_type,
+        Number(discount_value),
+        Number(min_purchase || 0),
+        max_discount ? Number(max_discount) : null,
+        Number(expires_in_days),
+        Boolean(is_active),
+        req.user.id,
+        currentId,
+      ]
+    );
+    return res.json(result.rows[0] || null);
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Gagal menyimpan konfigurasi reward review' });
   }
 });
 
@@ -382,3 +590,4 @@ router.get('/vouchers/:id/usages', requireAdmin, async (req, res) => {
 module.exports = router;
 module.exports.validateVoucherCode = validateVoucherCode;
 module.exports.ensureVoucherSchema = ensureVoucherSchema;
+module.exports.getActiveReviewRewardConfig = getActiveReviewRewardConfig;

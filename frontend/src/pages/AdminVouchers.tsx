@@ -20,6 +20,18 @@ interface Voucher {
   created_at: string;
 }
 
+interface RewardConfig {
+  id: number;
+  title: string;
+  description: string | null;
+  discount_type: DiscountType;
+  discount_value: number;
+  min_purchase: number;
+  max_discount: number | null;
+  expires_in_days: number;
+  is_active: boolean;
+}
+
 const EMPTY_FORM = {
   code: '',
   description: '',
@@ -30,6 +42,17 @@ const EMPTY_FORM = {
   max_uses: '',
   valid_from: '',
   valid_until: '',
+  is_active: true,
+};
+
+const EMPTY_REWARD_FORM = {
+  title: 'Reward Review & Testimoni',
+  description: 'Voucher reward otomatis setelah peserta mengirim rating dan testimoni.',
+  discount_type: 'percentage' as DiscountType,
+  discount_value: '10',
+  min_purchase: '15000',
+  max_discount: '10000',
+  expires_in_days: '7',
   is_active: true,
 };
 
@@ -47,18 +70,38 @@ const formatDate = (raw: string | null) => {
 
 export default function AdminVouchers() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [rewardConfig, setRewardConfig] = useState<RewardConfig | null>(null);
+  const [rewardForm, setRewardForm] = useState({ ...EMPTY_REWARD_FORM });
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+  const [rewardSaving, setRewardSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await voucherService.getAll();
-      setVouchers(Array.isArray(res.data) ? res.data : []);
+      const [voucherRes, rewardRes] = await Promise.all([
+        voucherService.getAll(),
+        voucherService.getReviewRewardConfig().catch(() => ({ data: null })),
+      ]);
+      setVouchers(Array.isArray(voucherRes.data) ? voucherRes.data : []);
+      const nextReward = rewardRes?.data || null;
+      setRewardConfig(nextReward);
+      if (nextReward) {
+        setRewardForm({
+          title: nextReward.title || EMPTY_REWARD_FORM.title,
+          description: nextReward.description || '',
+          discount_type: nextReward.discount_type || 'percentage',
+          discount_value: String(nextReward.discount_value ?? EMPTY_REWARD_FORM.discount_value),
+          min_purchase: String(nextReward.min_purchase ?? 0),
+          max_discount: nextReward.max_discount != null ? String(nextReward.max_discount) : '',
+          expires_in_days: String(nextReward.expires_in_days ?? 7),
+          is_active: Boolean(nextReward.is_active),
+        });
+      }
     } catch (err: any) {
       setMessage(err?.response?.data?.error || 'Gagal memuat daftar voucher');
     } finally {
@@ -145,6 +188,42 @@ export default function AdminVouchers() {
     }
   };
 
+  const handleSaveRewardConfig = async () => {
+    if (!rewardForm.discount_value || Number(rewardForm.discount_value) <= 0) {
+      setMessage('Nilai diskon reward harus lebih dari 0.');
+      return;
+    }
+    if (rewardForm.discount_type === 'percentage' && Number(rewardForm.discount_value) > 100) {
+      setMessage('Diskon reward persentase tidak boleh melebihi 100.');
+      return;
+    }
+    if (!rewardForm.expires_in_days || Number(rewardForm.expires_in_days) <= 0) {
+      setMessage('Masa berlaku reward harus minimal 1 hari.');
+      return;
+    }
+
+    setRewardSaving(true);
+    setMessage('');
+    try {
+      await voucherService.updateReviewRewardConfig({
+        title: rewardForm.title.trim() || EMPTY_REWARD_FORM.title,
+        description: rewardForm.description.trim() || null,
+        discount_type: rewardForm.discount_type,
+        discount_value: Number(rewardForm.discount_value),
+        min_purchase: Number(rewardForm.min_purchase || 0),
+        max_discount: rewardForm.max_discount ? Number(rewardForm.max_discount) : null,
+        expires_in_days: Number(rewardForm.expires_in_days),
+        is_active: rewardForm.is_active,
+      });
+      setMessage('Konfigurasi reward review berhasil disimpan.');
+      await load();
+    } catch (err: any) {
+      setMessage(err?.response?.data?.error || 'Gagal menyimpan konfigurasi reward review.');
+    } finally {
+      setRewardSaving(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-20">
       <div className="flex items-center justify-between">
@@ -172,6 +251,119 @@ export default function AdminVouchers() {
           {message}
         </div>
       )}
+
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">Reward setelah Rate + Testimoni</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Atur diskon reward di sini. Saat aktif, peserta yang mengirim bintang dan testimoni akan menerima kode voucher unik dengan diskon 10% (min. pembelian Rp 15.000), hanya bisa dipakai oleh akun tersebut, dan otomatis punya masa berlaku.
+            </p>
+          </div>
+          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${rewardConfig?.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+            {rewardConfig?.is_active ? 'Reward aktif' : 'Reward nonaktif'}
+          </span>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium text-slate-600">Judul Reward</label>
+            <input
+              type="text"
+              value={rewardForm.title}
+              onChange={(e) => setRewardForm({ ...rewardForm, title: e.target.value })}
+              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:border-[var(--header-color,#103c21)]"
+            />
+          </div>
+          <div className="flex items-center gap-2 pt-5">
+            <input
+              type="checkbox"
+              id="reward_is_active"
+              checked={rewardForm.is_active}
+              onChange={(e) => setRewardForm({ ...rewardForm, is_active: e.target.checked })}
+              className="h-4 w-4"
+            />
+            <label htmlFor="reward_is_active" className="text-sm text-slate-700">Aktifkan reward review</label>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-slate-600">Deskripsi</label>
+            <textarea
+              value={rewardForm.description}
+              onChange={(e) => setRewardForm({ ...rewardForm, description: e.target.value })}
+              rows={2}
+              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:border-[var(--header-color,#103c21)]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600">Tipe Diskon</label>
+            <select
+              value={rewardForm.discount_type}
+              onChange={(e) => setRewardForm({ ...rewardForm, discount_type: e.target.value as DiscountType })}
+              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none"
+            >
+              <option value="percentage">Persentase (%)</option>
+              <option value="fixed">Nominal (Rp)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600">Nilai Diskon</label>
+            <input
+              type="number"
+              min="0"
+              max={rewardForm.discount_type === 'percentage' ? 100 : undefined}
+              value={rewardForm.discount_value}
+              onChange={(e) => setRewardForm({ ...rewardForm, discount_value: e.target.value })}
+              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600">Min. Pembelian (Rp)</label>
+            <input
+              type="number"
+              min="0"
+              value={rewardForm.min_purchase}
+              onChange={(e) => setRewardForm({ ...rewardForm, min_purchase: e.target.value })}
+              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600">Masa Berlaku (hari)</label>
+            <input
+              type="number"
+              min="1"
+              value={rewardForm.expires_in_days}
+              onChange={(e) => setRewardForm({ ...rewardForm, expires_in_days: e.target.value })}
+              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none"
+            />
+          </div>
+          {rewardForm.discount_type === 'percentage' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600">Maks. Diskon (Rp)</label>
+              <input
+                type="number"
+                min="0"
+                value={rewardForm.max_discount}
+                onChange={(e) => setRewardForm({ ...rewardForm, max_discount: e.target.value })}
+                className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSaveRewardConfig}
+            disabled={rewardSaving}
+            className="rounded-xl bg-[var(--header-color,#103c21)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {rewardSaving ? 'Menyimpan...' : 'Simpan Reward Review'}
+          </button>
+          <p className="text-xs text-slate-500">
+            Voucher reward selalu dibuat unik, kuota 1 kali, dan terkunci ke akun penerima.
+          </p>
+        </div>
+      </div>
 
       {/* Form Modal */}
       {showForm && (

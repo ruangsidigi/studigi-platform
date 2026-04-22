@@ -156,10 +156,13 @@ export const userService = {
 export const voucherService = {
   validate: (code, subtotal) => api.post('/vouchers/validate', { code, subtotal }),
   getAll: () => api.get('/vouchers'),
+  getMine: () => api.get('/vouchers/my'),
   create: (data) => api.post('/vouchers', data),
   update: (id, data) => api.put(`/vouchers/${id}`, data),
   remove: (id) => api.delete(`/vouchers/${id}`),
   getUsages: (id) => api.get(`/vouchers/${id}/usages`),
+  getReviewRewardConfig: () => api.get('/vouchers/review-reward-config'),
+  updateReviewRewardConfig: (data) => api.put('/vouchers/review-reward-config', data),
 };
 
 // Admin Service

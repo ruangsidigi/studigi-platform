@@ -2,7 +2,7 @@ import React, { useCallback, useContext, useEffect, useRef, useState } from 'rea
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Bell, ShoppingCart, Search, LogOut } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
-import { purchaseService, reportService } from '../services/api';
+import { purchaseService, reportService, voucherService } from '../services/api';
 
 interface NavbarProps {
   title: string;
@@ -11,12 +11,13 @@ interface NavbarProps {
 
 type NotificationItem = {
   id: string;
-  type: 'payment_success' | 'tryout_completed';
+  type: 'payment_success' | 'tryout_completed' | 'voucher_reward';
   title: string;
   message: string;
   createdAt: number;
   purchaseId?: number;
   attemptId?: number;
+  voucherCode?: string;
 };
 
 const COMPLETED_PAYMENT_STATUSES = ['paid', 'completed', 'success', 'settlement'];
@@ -72,13 +73,15 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
 
     try {
       setNotifLoading(true);
-      const [purchasesRes, historyRes] = await Promise.all([
+      const [purchasesRes, historyRes, vouchersRes] = await Promise.all([
         purchaseService.getAll().catch(() => ({ data: [] })),
         reportService.getHistory(1, 8).catch(() => ({ data: { items: [] } })),
+        voucherService.getMine().catch(() => ({ data: [] })),
       ]);
 
       const purchases = Array.isArray((purchasesRes as any)?.data) ? (purchasesRes as any).data : [];
       const historyItems = Array.isArray((historyRes as any)?.data?.items) ? (historyRes as any).data.items : [];
+      const myVouchers = Array.isArray((vouchersRes as any)?.data) ? (vouchersRes as any).data : [];
 
       const paymentNotifications: NotificationItem[] = purchases
         .filter((purchase: any) => {
@@ -112,7 +115,22 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
         };
       });
 
-      const merged = [...paymentNotifications, ...tryoutNotifications]
+      const voucherNotifications: NotificationItem[] = myVouchers
+        .filter((voucher: any) => String(voucher?.reward_source || '') === 'review_reward')
+        .map((voucher: any) => {
+          const createdAt = new Date(voucher?.created_at || Date.now()).getTime();
+          const packageName = voucher?.package_name || 'paket tryout';
+          return {
+            id: `voucher-${voucher.id}`,
+            type: 'voucher_reward',
+            title: 'Voucher Reward Review',
+            message: `Kode ${voucher.code} untuk ${packageName} sudah aktif dan hanya bisa dipakai akun Anda.`,
+            createdAt,
+            voucherCode: voucher.code,
+          };
+        });
+
+      const merged = [...paymentNotifications, ...tryoutNotifications, ...voucherNotifications]
         .filter((item) => Number.isFinite(item.createdAt))
         .sort((a, b) => b.createdAt - a.createdAt)
         .slice(0, 10);
@@ -179,6 +197,11 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
     setNotifOpen(false);
     if (item.type === 'payment_success') {
       navigate('/payouts');
+      return;
+    }
+
+    if (item.type === 'voucher_reward') {
+      navigate('/home');
       return;
     }
 
@@ -264,7 +287,7 @@ export default function Navbar({ title, onMenuClick }: NavbarProps) {
                       className="w-full border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50"
                     >
                       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--header-color,#103c21)]">
-                        {item.type === 'payment_success' ? 'Pembayaran' : 'Tryout'}
+                        {item.type === 'payment_success' ? 'Pembayaran' : item.type === 'voucher_reward' ? 'Voucher' : 'Tryout'}
                       </p>
                       <p className="mt-0.5 text-sm font-semibold text-slate-900">{item.title}</p>
                       <p className="mt-0.5 text-xs text-slate-600">{item.message}</p>

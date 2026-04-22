@@ -1,4 +1,5 @@
 const express = require('express');
+const voucherHelpers = require('../vouchers');
 
 const router = express.Router();
 
@@ -55,6 +56,138 @@ const getSessionForReview = async (db, sessionId, userId) => {
   );
 
   return result.rows[0] || null;
+};
+
+const buildRewardVoucherCode = (userId, sessionId) => {
+  const randomPart = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `RATE-${String(userId).padStart(2, '0')}${String(sessionId).padStart(3, '0')}-${randomPart}`;
+};
+
+const issueReviewRewardVoucher = async ({ db, user, session, reviewId, comment }) => {
+  const trimmedComment = String(comment || '').trim();
+  if (!trimmedComment) {
+    return { rewardGranted: false, reason: 'comment_required' };
+  }
+
+  await voucherHelpers.ensureVoucherSchema(db);
+  const rewardConfig = await voucherHelpers.getActiveReviewRewardConfig(db);
+  if (!rewardConfig || !rewardConfig.is_active) {
+    return { rewardGranted: false, reason: 'reward_inactive' };
+  }
+
+  const existingClaim = await db.query(
+    `SELECT
+       v.id,
+       v.code,
+       v.description,
+       v.discount_type,
+       v.discount_value,
+       v.min_purchase,
+       v.max_discount,
+       v.valid_until
+     FROM review_reward_claims rrc
+     JOIN vouchers v ON v.id = rrc.voucher_id
+     WHERE rrc.session_id = $1 AND rrc.user_id = $2
+     LIMIT 1`,
+    [session.id, user.id]
+  );
+
+  if (existingClaim.rows[0]) {
+    const voucher = existingClaim.rows[0];
+    return {
+      rewardGranted: true,
+      voucher: {
+        id: Number(voucher.id),
+        code: voucher.code,
+        description: voucher.description || '',
+        discountType: voucher.discount_type,
+        discountValue: Number(voucher.discount_value),
+        minPurchase: Number(voucher.min_purchase || 0),
+        maxDiscount: voucher.max_discount !== null ? Number(voucher.max_discount) : null,
+        validUntil: voucher.valid_until,
+      },
+    };
+  }
+
+  const validUntilResult = await db.query(
+    `SELECT NOW() + (($1 || ' days')::interval) AS valid_until`,
+    [Number(rewardConfig.expires_in_days || 7)]
+  );
+  const validUntil = validUntilResult.rows[0]?.valid_until || null;
+
+  let voucherRow = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const code = buildRewardVoucherCode(user.id, session.id);
+    try {
+      const insertVoucher = await db.query(
+        `INSERT INTO vouchers (
+           code,
+           description,
+           discount_type,
+           discount_value,
+           min_purchase,
+           max_discount,
+           max_uses,
+           used_count,
+           valid_from,
+           valid_until,
+           is_active,
+           issued_to_user_id,
+           reward_source,
+           metadata,
+           created_by,
+           created_at,
+           updated_at
+         ) VALUES (
+           $1,$2,$3,$4,$5,$6,1,0,NOW(),$7,TRUE,$8,'review_reward',$9::jsonb,$10,NOW(),NOW()
+         ) RETURNING *`,
+        [
+          code,
+          rewardConfig.description || `Voucher reward untuk ${session.package_id}`,
+          rewardConfig.discount_type,
+          Number(rewardConfig.discount_value),
+          Number(rewardConfig.min_purchase || 0),
+          rewardConfig.max_discount !== null ? Number(rewardConfig.max_discount) : null,
+          validUntil,
+          user.id,
+          JSON.stringify({
+            session_id: session.id,
+            package_id: session.package_id,
+            review_id: reviewId,
+          }),
+          rewardConfig.updated_by || rewardConfig.created_by || user.id,
+        ]
+      );
+      voucherRow = insertVoucher.rows[0];
+      break;
+    } catch (error) {
+      if (error.code !== '23505') throw error;
+    }
+  }
+
+  if (!voucherRow) {
+    throw new Error('Gagal membuat kode voucher reward unik');
+  }
+
+  await db.query(
+    `INSERT INTO review_reward_claims (user_id, session_id, review_id, package_id, voucher_id, created_at)
+     VALUES ($1, $2, $3, $4, $5, NOW())`,
+    [user.id, session.id, reviewId, session.package_id, voucherRow.id]
+  );
+
+  return {
+    rewardGranted: true,
+    voucher: {
+      id: Number(voucherRow.id),
+      code: voucherRow.code,
+      description: voucherRow.description || '',
+      discountType: voucherRow.discount_type,
+      discountValue: Number(voucherRow.discount_value),
+      minPurchase: Number(voucherRow.min_purchase || 0),
+      maxDiscount: voucherRow.max_discount !== null ? Number(voucherRow.max_discount) : null,
+      validUntil: voucherRow.valid_until,
+    },
+  };
 };
 
 router.get('/ratings/session/:sessionId/status', requireAuth, async (req, res) => {
@@ -139,6 +272,8 @@ router.post('/ratings/session/:sessionId/submit', requireAuth, async (req, res) 
       }
     }
 
+    await db.query('BEGIN');
+
     const upsertResult = await db.query(
       `INSERT INTO package_reviews (user_id, session_id, package_id, rating, comment, is_skipped, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
@@ -160,6 +295,19 @@ router.post('/ratings/session/:sessionId/submit', requireAuth, async (req, res) 
     );
 
     const row = upsertResult.rows[0];
+    let reward = { rewardGranted: false };
+
+    if (!skip) {
+      reward = await issueReviewRewardVoucher({
+        db,
+        user: req.user,
+        session,
+        reviewId: Number(row.id),
+        comment,
+      });
+    }
+
+    await db.query('COMMIT');
 
     return res.json({
       message: skip ? 'Review dilewati' : 'Review berhasil disimpan',
@@ -172,8 +320,12 @@ router.post('/ratings/session/:sessionId/submit', requireAuth, async (req, res) 
         sessionId: Number(row.session_id),
         updatedAt: row.updated_at,
       },
+      reward,
     });
   } catch (error) {
+    try {
+      await req.app.locals.db.query('ROLLBACK');
+    } catch (_) {}
     return res.status(500).json({ error: error.message || 'Gagal menyimpan review' });
   }
 });
