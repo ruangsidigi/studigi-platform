@@ -34,6 +34,38 @@ const hasManualPointConfig = (row) => {
   return keys.some((key) => row?.[key] !== null && row?.[key] !== undefined && String(row?.[key]).trim() !== '');
 };
 
+const parseJsonSafe = (value) => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return null;
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    return null;
+  }
+};
+
+const normalizeIdList = (raw) => {
+  if (Array.isArray(raw)) {
+    return raw.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  if (typeof raw === 'string') {
+    const parsed = parseJsonSafe(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+    }
+
+    // Fallback for comma-separated legacy values, e.g. "1,2,3".
+    return raw
+      .split(',')
+      .map((part) => Number(String(part).trim()))
+      .filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  return [];
+};
+
 const getAccessiblePackageIds = async (db, userId) => {
   const accessible = new Set();
 
@@ -64,8 +96,8 @@ const getAccessiblePackageIds = async (db, userId) => {
     );
 
     for (const row of txResult.rows || []) {
-      const meta = row?.metadata && typeof row.metadata === 'object' ? row.metadata : null;
-      const ids = Array.isArray(meta?.package_ids) ? meta.package_ids : [];
+      const meta = parseJsonSafe(row?.metadata);
+      const ids = normalizeIdList(meta?.package_ids);
       for (const id of ids) {
         const normalized = Number(id);
         if (Number.isInteger(normalized) && normalized > 0) {
@@ -106,7 +138,7 @@ const getAccessiblePackageIds = async (db, userId) => {
       [ownedIds]
     );
     for (const row of packageRows.rows || []) {
-      const includedIds = Array.isArray(row.included_package_ids) ? row.included_package_ids : [];
+      const includedIds = normalizeIdList(row.included_package_ids);
       for (const includedId of includedIds) {
         const childId = Number(includedId);
         if (Number.isInteger(childId) && childId > 0) {

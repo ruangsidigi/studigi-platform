@@ -17,6 +17,37 @@ const hasManualPointConfig = (question) => {
   return keys.some((key) => question?.[key] !== null && question?.[key] !== undefined && String(question?.[key]).trim() !== '');
 };
 
+const parseJsonSafe = (value) => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return null;
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    return null;
+  }
+};
+
+const normalizeIdList = (raw) => {
+  if (Array.isArray(raw)) {
+    return raw.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  if (typeof raw === 'string') {
+    const parsed = parseJsonSafe(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+    }
+
+    return raw
+      .split(',')
+      .map((part) => Number(String(part).trim()))
+      .filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  return [];
+};
+
 const isAdminUser = (user) => {
   const role = String(user?.role || '').toLowerCase();
   const email = String(user?.email || '').toLowerCase();
@@ -53,8 +84,8 @@ const getAccessiblePackageIds = async (userId) => {
 
   if (!transactionsError) {
     for (const tx of transactions || []) {
-      const meta = tx?.metadata && typeof tx.metadata === 'object' ? tx.metadata : null;
-      const packageIds = Array.isArray(meta?.package_ids) ? meta.package_ids : [];
+      const meta = parseJsonSafe(tx?.metadata);
+      const packageIds = normalizeIdList(meta?.package_ids);
       for (const id of packageIds) {
         const normalized = Number(id);
         if (Number.isInteger(normalized) && normalized > 0) {
@@ -91,7 +122,7 @@ const getAccessiblePackageIds = async (userId) => {
 
   if (!ownedPackagesError) {
     for (const pkg of ownedPackages || []) {
-      const included = Array.isArray(pkg?.included_package_ids) ? pkg.included_package_ids : [];
+      const included = normalizeIdList(pkg?.included_package_ids);
       for (const id of included) {
         const childId = Number(id);
         if (Number.isInteger(childId) && childId > 0) {
