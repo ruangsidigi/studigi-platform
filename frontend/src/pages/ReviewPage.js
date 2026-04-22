@@ -273,7 +273,7 @@ const ReviewPage = () => {
         <div style={{ maxWidth: 760, margin: '0 auto', width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8, color: '#0f172a' }}>Rate Tryout Anda</h1>
           <p style={{ color: '#475569', fontSize: 14, marginBottom: 16 }}>
-            Sebelum melihat hasil tes dan pembahasan, Anda bisa memberikan rating dan testimoni. Ini opsional dan bisa dilewati. Jika Anda memberi bintang dan review/testimoni, Anda akan mendapatkan voucher diskon 10% dengan minimal pembelian Rp 15.000, dan kodenya langsung ditampilkan di sini.
+            Sebelum melihat hasil tes dan pembahasan, Anda bisa memberikan rating dan testimoni. Ini opsional dan bisa dilewati.
           </p>
 
           <div style={{ marginBottom: 14 }}>
@@ -303,7 +303,7 @@ const ReviewPage = () => {
 
           <div style={{ marginBottom: 14 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Testimoni (opsional)</p>
-            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+            <p style={{ fontSize: 12, color: '#b91c1c', fontWeight: 700, marginBottom: 8 }}>
               Isi bintang + testimoni untuk klaim voucher 10% (min. pembelian Rp 15.000).
             </p>
             <textarea
