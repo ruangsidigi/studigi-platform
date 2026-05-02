@@ -6,6 +6,7 @@ const EVENTS = require('../architecture/core/events/eventTypes');
 const adaptiveService = require('../services/adaptiveService');
 
 const router = express.Router();
+const CORE_CATEGORIES = new Set(['TWK', 'TIU', 'TKP']);
 
 const getSelectedOptionPoint = (question, answer) => {
   const key = `point_${String(answer || '').toLowerCase()}`;
@@ -483,6 +484,7 @@ router.get('/:sessionId/results', authenticateToken, async (req, res) => {
       explanation: answer.questions.explanation,
       imageUrl: answer.questions.image_url,
     }));
+    const showSectionScores = results.some((item) => CORE_CATEGORIES.has(String(item.category || '').toUpperCase()));
 
     res.json({
       sessionData: {
@@ -493,6 +495,7 @@ router.get('/:sessionId/results', authenticateToken, async (req, res) => {
         totalScore: Math.round(session.total_score),
         isPassed: session.is_passed,
         status: session.is_passed ? 'LULUS' : 'TIDAK LULUS',
+        showSectionScores,
         startedAt: session.started_at,
         finishedAt: session.finished_at,
       },

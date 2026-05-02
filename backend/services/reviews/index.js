@@ -8,6 +8,7 @@ const requireAuth = (req, res, next) => {
 };
 
 const asNumber = (value) => Number(value || 0);
+const CORE_CATEGORIES = new Set(['TWK', 'TIU', 'TKP']);
 
 const latestAnswerMapByQuestionId = (answers) => {
   const map = new Map();
@@ -110,6 +111,7 @@ router.get('/reviews/attempt/:attemptId', requireAuth, async (req, res) => {
       unanswered: review.filter((row) => row.status === 'unanswered').length,
       bookmarked: review.filter((row) => row.isBookmarked).length,
     };
+    const showSectionScores = review.some((row) => CORE_CATEGORIES.has(String(row.category || '').toUpperCase()));
 
     return res.json({
       attempt: {
@@ -120,6 +122,7 @@ router.get('/reviews/attempt/:attemptId', requireAuth, async (req, res) => {
         totalScore: asNumber(attempt.total_score),
         isPassed: !!attempt.is_passed,
         status: attempt.is_passed ? 'LULUS' : 'TIDAK LULUS',
+        showSectionScores,
       },
       review,
       stats,

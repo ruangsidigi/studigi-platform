@@ -388,6 +388,7 @@ const ReviewPage = () => {
   }
 
   const filteredQuestions = getFilteredQuestions();
+  const showSectionScores = reviewData?.attempt?.showSectionScores !== false;
 
   return (
     <div className="review-container">
@@ -428,18 +429,22 @@ const ReviewPage = () => {
           </div>
         </div>
         <div className="review-header-stats">
-          <div className="score-chip">
-            <span className="score-chip-label">TWK</span>
-            <span className="score-chip-value">{reviewData?.attempt?.twkScore ?? 0}</span>
-          </div>
-          <div className="score-chip">
-            <span className="score-chip-label">TIU</span>
-            <span className="score-chip-value">{reviewData?.attempt?.tiuScore ?? 0}</span>
-          </div>
-          <div className="score-chip">
-            <span className="score-chip-label">TKP</span>
-            <span className="score-chip-value">{reviewData?.attempt?.tkpScore ?? 0}</span>
-          </div>
+          {showSectionScores && (
+            <>
+              <div className="score-chip">
+                <span className="score-chip-label">TWK</span>
+                <span className="score-chip-value">{reviewData?.attempt?.twkScore ?? 0}</span>
+              </div>
+              <div className="score-chip">
+                <span className="score-chip-label">TIU</span>
+                <span className="score-chip-value">{reviewData?.attempt?.tiuScore ?? 0}</span>
+              </div>
+              <div className="score-chip">
+                <span className="score-chip-label">TKP</span>
+                <span className="score-chip-value">{reviewData?.attempt?.tkpScore ?? 0}</span>
+              </div>
+            </>
+          )}
           <div className="score-chip total">
             <span className="score-chip-label">Total</span>
             <span className="score-chip-value">{reviewData?.attempt?.totalScore ?? 0}</span>

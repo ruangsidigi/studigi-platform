@@ -32,6 +32,7 @@ const Results = () => {
   if (!results) return <div className="container">No results found</div>;
 
   const { sessionData, results: questionResults } = results;
+  const showSectionScores = sessionData?.showSectionScores !== false;
 
   return (
     <div className="container results-page">
@@ -51,21 +52,25 @@ const Results = () => {
         </div>
 
         <div className="scores-grid">
-          <div className="score-card">
-            <div className="score-value">{sessionData.twkScore}</div>
-            <div className="score-label">TWK</div>
-            <div className="score-requirement">(Target: > 65)</div>
-          </div>
-          <div className="score-card">
-            <div className="score-value">{sessionData.tiuScore}</div>
-            <div className="score-label">TIU</div>
-            <div className="score-requirement">(Target: > 85)</div>
-          </div>
-          <div className="score-card">
-            <div className="score-value">{sessionData.tkpScore}</div>
-            <div className="score-label">TKP</div>
-            <div className="score-requirement">(Target: > 166)</div>
-          </div>
+          {showSectionScores && (
+            <>
+              <div className="score-card">
+                <div className="score-value">{sessionData.twkScore}</div>
+                <div className="score-label">TWK</div>
+                <div className="score-requirement">(Target: &gt; 65)</div>
+              </div>
+              <div className="score-card">
+                <div className="score-value">{sessionData.tiuScore}</div>
+                <div className="score-label">TIU</div>
+                <div className="score-requirement">(Target: &gt; 85)</div>
+              </div>
+              <div className="score-card">
+                <div className="score-value">{sessionData.tkpScore}</div>
+                <div className="score-label">TKP</div>
+                <div className="score-requirement">(Target: &gt; 166)</div>
+              </div>
+            </>
+          )}
           <div className="score-card total">
             <div className="score-value">{sessionData.totalScore}</div>
             <div className="score-label">Total Score</div>
