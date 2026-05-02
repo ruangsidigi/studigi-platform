@@ -41,9 +41,6 @@ const normalizePlainTextSegment = (rawText) => {
   // Common exponent notation in plain text, e.g. 'x^2'.
   text = text.replace(/\b([a-zA-Z0-9]+)\^(\d+)\b/g, (match, base, power) => `$${base}^{${power}}$`);
 
-  // Common fraction notation for numeric values, e.g. '3/4'.
-  text = text.replace(/\b(\d+)\s*\/\s*(\d+)\b/g, (match, num, den) => `$\\frac{${num}}{${den}}$`);
-
   // Auto-wrap plain lines containing LaTeX commands (e.g. \times, \implies)
   // when the line is not already wrapped in math delimiters.
   text = text
