@@ -1622,6 +1622,7 @@ const EditQuestionsTab = () => {
                   <option value="TWK">TWK</option>
                   <option value="TIU">TIU</option>
                   <option value="TKP">TKP</option>
+                  <option value="LAINNYA">Lainnya</option>
                 </select>
               </div>
 

@@ -104,6 +104,13 @@ const defaultColumnIndexMap = {
   image_url: 16,
 };
 
+const VALID_CATEGORIES = ['TWK', 'TIU', 'TKP'];
+const normalizeCategory = (value) => {
+  if (!value) return 'LAINNYA';
+  const upper = String(value).trim().toUpperCase();
+  return VALID_CATEGORIES.includes(upper) ? upper : 'LAINNYA';
+};
+
 // For TWK/TIU: if poin_benar is set, auto-fill point columns
 // (correct option = poin_benar, wrong options = 0), unless already explicitly set
 const applyPoinBenar = (points, poinBenar, correctAnswer) => {
@@ -327,7 +334,7 @@ router.post('/questions/upload', requireAdmin, upload.single('file'), async (req
           optionE ? String(optionE) : null,
           caStr,
           explanation ? String(explanation) : null,
-          category ? String(category).trim().toUpperCase() : null,
+          normalizeCategory(category),
           points.point_a,
           points.point_b,
           points.point_c,
@@ -401,7 +408,7 @@ router.post('/questions/upload', requireAdmin, upload.single('file'), async (req
             optionE ? String(optionE) : null,
             caStr,
             explanation ? String(explanation) : null,
-            category ? String(category).trim().toUpperCase() : null,
+            normalizeCategory(category),
             points.point_a,
             points.point_b,
             points.point_c,
