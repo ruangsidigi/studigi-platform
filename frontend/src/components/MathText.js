@@ -6,6 +6,25 @@ const BLOCK_MATH_RE = /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\])/g;
 const INLINE_MATH_RE = /(\$[^$\n]+\$|\\\([^\n]+?\\\))/g;
 const ALL_MATH_RE = /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\$[^$\n]+\$|\\\([^\n]+?\\\))/g;
 const LATEX_CMD_RE = /\\(times|implies|cdot|div|leq|geq|le|ge|in|notin|sqrt|frac|sum|int|log|sin|cos|tan|exp|partial|Delta|alpha|beta|gamma|lambda|mu|pi|sigma|theta|omega|Sigma|Pi|Omega|infty|approx|equiv|neq|pm)\b/;
+const ALLOWED_FORMATTING_TAG_RE = /&lt;(\/?(?:strong|b|em|i|u|br))\s*\/??&gt;/gi;
+
+const escapeHtml = (value) => String(value || '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const normalizeFormattingMarkup = (value) => String(value || '')
+  .replace(/\*\*([^*\n][\s\S]*?)\*\*/g, '<strong>$1</strong>')
+  .replace(/__([^_\n][\s\S]*?)__/g, '<strong>$1</strong>')
+  .replace(/(^|[^*])\*([^*\n][\s\S]*?)\*(?!\*)/g, '$1<em>$2</em>')
+  .replace(/(^|[^_])_([^_\n][\s\S]*?)_(?!_)/g, '$1<em>$2</em>');
+
+const formatPlainTextHtml = (rawText) => {
+  const escaped = escapeHtml(normalizeFormattingMarkup(rawText));
+  return escaped.replace(ALLOWED_FORMATTING_TAG_RE, '<$1>');
+};
 
 const normalizePlainTextSegment = (rawText) => {
   let text = String(rawText || '');
@@ -91,7 +110,13 @@ const renderInlineParts = (textPart, keyPrefix) => {
   return tokens.map((token, index) => {
     const parsed = parseMathToken(token);
     if (!parsed) {
-      return <React.Fragment key={`${keyPrefix}-plain-${index}`}>{token}</React.Fragment>;
+      const html = formatPlainTextHtml(token);
+      return (
+        <span
+          key={`${keyPrefix}-plain-${index}`}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      );
     }
 
     const html = renderMath(parsed.expr, false);
