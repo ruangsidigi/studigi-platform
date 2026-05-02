@@ -1,5 +1,5 @@
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { adminService, packageService, questionService, materialService, brandingService, purchaseService } from '../services/api';
 import MathText from '../components/MathText';
 import {
@@ -87,6 +87,12 @@ const extractErrorMessage = (error, fallback = 'Terjadi kesalahan') => {
   }
 
   return fallback;
+};
+
+const TEXT_FORMAT_MARKERS = {
+  bold: '**',
+  italic: '*',
+  underline: '<u>',
 };
 
 const AdminDashboard = () => {
@@ -1416,6 +1422,8 @@ const EditQuestionsTab = () => {
   const [selectedImagePreview, setSelectedImagePreview] = useState('');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const questionTextRef = useRef(null);
+  const explanationRef = useRef(null);
 
   useEffect(() => {
     loadPackages();
@@ -1462,6 +1470,52 @@ const EditQuestionsTab = () => {
   const handleFormChange = (field, value) => {
     setEditFormData({ ...editFormData, [field]: value });
   };
+
+  const applyTextFormat = (field, formatType) => {
+    const targetRef = field === 'question_text' ? questionTextRef : explanationRef;
+    const target = targetRef.current;
+    if (!target) return;
+
+    const value = String(editFormData[field] || '');
+    const start = target.selectionStart ?? value.length;
+    const end = target.selectionEnd ?? value.length;
+    const selectedText = value.slice(start, end) || 'teks';
+
+    let prefix = TEXT_FORMAT_MARKERS[formatType] || '';
+    let suffix = prefix;
+    if (formatType === 'underline') {
+      prefix = '<u>';
+      suffix = '</u>';
+    }
+
+    const nextValue = `${value.slice(0, start)}${prefix}${selectedText}${suffix}${value.slice(end)}`;
+    const selectionStart = start + prefix.length;
+    const selectionEnd = selectionStart + selectedText.length;
+
+    setEditFormData((current) => ({ ...current, [field]: nextValue }));
+
+    window.requestAnimationFrame(() => {
+      target.focus();
+      target.setSelectionRange(selectionStart, selectionEnd);
+    });
+  };
+
+  const renderFormattingToolbar = (field) => (
+    <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+      <button type="button" className="btn btn-sm" onClick={() => applyTextFormat(field, 'bold')}>
+        <strong>B</strong>
+      </button>
+      <button type="button" className="btn btn-sm" onClick={() => applyTextFormat(field, 'italic')}>
+        <em>I</em>
+      </button>
+      <button type="button" className="btn btn-sm" onClick={() => applyTextFormat(field, 'underline')}>
+        <span style={{ textDecoration: 'underline' }}>U</span>
+      </button>
+      <span style={{ fontSize: 12, color: '#64748b', alignSelf: 'center' }}>
+        Pilih teks lalu klik tombol format.
+      </span>
+    </div>
+  );
 
   const toNullableNumber = (value) => {
     if (value === undefined || value === null || String(value).trim() === '') return null;
@@ -1600,7 +1654,9 @@ const EditQuestionsTab = () => {
 
               <div className="form-group">
                 <label>Teks Soal</label>
+                {renderFormattingToolbar('question_text')}
                 <textarea
+                  ref={questionTextRef}
                   value={editFormData.question_text || ''}
                   onChange={(e) => handleFormChange('question_text', e.target.value)}
                   rows="3"
@@ -1663,7 +1719,9 @@ const EditQuestionsTab = () => {
 
               <div className="form-group">
                 <label>Penjelasan</label>
+                {renderFormattingToolbar('explanation')}
                 <textarea
+                  ref={explanationRef}
                   value={editFormData.explanation || ''}
                   onChange={(e) => handleFormChange('explanation', e.target.value)}
                   rows="2"
