@@ -26,6 +26,38 @@ const requireAdmin = (req, res, next) => {
 };
 
 const normalizeStatus = (status) => String(status || '').toLowerCase();
+const roundMoney = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+
+const parseJsonSafe = (value) => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return null;
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    return null;
+  }
+};
+
+const normalizeIdList = (raw) => {
+  if (Array.isArray(raw)) {
+    return raw.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  if (typeof raw === 'string') {
+    const parsed = parseJsonSafe(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+    }
+
+    return raw
+      .split(',')
+      .map((part) => Number(String(part).trim()))
+      .filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  return [];
+};
 
 const mapMidtransStatusToPaymentStatus = (transactionStatus, fraudStatus) => {
   const normalizedTransactionStatus = normalizeStatus(transactionStatus);
@@ -46,9 +78,57 @@ const mapMidtransStatusToPaymentStatus = (transactionStatus, fraudStatus) => {
 };
 
 const mapPaymentStatusToPurchaseStatus = (status) => {
-  if (['paid', 'success', 'completed'].includes(status)) return 'completed';
+  if (['paid', 'success', 'completed', 'settlement'].includes(status)) return 'completed';
   if (['failed', 'expired', 'cancelled', 'canceled'].includes(status)) return 'failed';
   return 'pending';
+};
+
+const ensureMissingPurchasesFromTransaction = async (db, tx, paymentStatusOverride) => {
+  const txId = Number(tx?.id);
+  const userId = Number(tx?.user_id);
+  if (!Number.isInteger(txId) || txId <= 0 || !Number.isInteger(userId) || userId <= 0) return 0;
+
+  const meta = parseJsonSafe(tx?.metadata) || {};
+  const packageIds = normalizeIdList(meta.package_ids);
+  if (!packageIds.length) return 0;
+
+  const existingResult = await db.query(
+    `SELECT package_id
+     FROM purchases
+     WHERE payment_transaction_id = $1`,
+    [txId]
+  );
+
+  const existingPackageIds = new Set(
+    (existingResult.rows || [])
+      .map((row) => Number(row.package_id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  );
+
+  const missingPackageIds = packageIds.filter((id) => !existingPackageIds.has(id));
+  if (!missingPackageIds.length) return 0;
+
+  const paymentStatus = normalizeStatus(paymentStatusOverride || tx?.status || 'pending');
+  const purchaseStatus = mapPaymentStatusToPurchaseStatus(paymentStatus);
+  const totalAmount = Number(tx?.total_amount || 0);
+  const perPackageAmount = packageIds.length > 0 ? roundMoney(totalAmount / packageIds.length) : 0;
+  const paymentMethod = tx?.payment_method || 'midtrans';
+  const paymentReference = tx?.provider_reference || null;
+
+  let inserted = 0;
+  for (const packageId of missingPackageIds) {
+    const insertResult = await db.query(
+      `INSERT INTO purchases
+        (user_id, package_id, payment_method, payment_status, total_price, payment_transaction_id, payment_reference, created_at)
+       VALUES
+        ($1, $2, $3, $4, $5, $6, $7, NOW())
+       RETURNING id`,
+      [userId, packageId, paymentMethod, purchaseStatus, perPackageAmount, txId, paymentReference]
+    );
+    inserted += insertResult.rowCount || 0;
+  }
+
+  return inserted;
 };
 
 const getMidtransStatusEndpoint = (reference) => {
@@ -65,7 +145,7 @@ const reconcilePendingMidtransPayments = async (db, userId) => {
   if (!config.midtransServerKey) return;
 
   const pendingTxResult = await db.query(
-    `SELECT id, provider_reference, status
+    `SELECT id, user_id, payment_method, provider_reference, status, total_amount, metadata
      FROM payment_transactions
      WHERE user_id = $1
        AND LOWER(COALESCE(provider, '')) = 'midtrans'
@@ -98,21 +178,58 @@ const reconcilePendingMidtransPayments = async (db, userId) => {
       const normalizedCurrent = normalizeStatus(tx.status);
       const normalizedNext = normalizeStatus(paymentStatus);
 
-      if (normalizedCurrent === normalizedNext) continue;
-
       await db.query('BEGIN');
-      await db.query(
-        `UPDATE payment_transactions
-         SET status = $1::varchar,
-             paid_at = CASE WHEN $1::text IN ('paid', 'success', 'completed') THEN NOW() ELSE paid_at END,
-             updated_at = NOW()
-         WHERE id = $2`,
-        [paymentStatus, tx.id]
-      );
+
+      if (normalizedCurrent !== normalizedNext) {
+        await db.query(
+          `UPDATE payment_transactions
+           SET status = $1::varchar,
+               paid_at = CASE WHEN $1::text IN ('paid', 'success', 'completed') THEN NOW() ELSE paid_at END,
+               updated_at = NOW()
+           WHERE id = $2`,
+          [paymentStatus, tx.id]
+        );
+      }
+
+      await ensureMissingPurchasesFromTransaction(db, tx, paymentStatus);
+
       await db.query(
         `UPDATE purchases
          SET payment_status = $1::varchar,
              paid_at = CASE WHEN $1::text = 'completed' THEN NOW() ELSE paid_at END
+         WHERE payment_transaction_id = $2`,
+        [purchaseStatus, tx.id]
+      );
+      await db.query('COMMIT');
+    } catch (_) {
+      try {
+        await db.query('ROLLBACK');
+      } catch (rollbackError) {
+        // ignore rollback errors
+      }
+    }
+  }
+
+  const completedTxResult = await db.query(
+    `SELECT id, user_id, payment_method, provider_reference, status, total_amount, metadata
+     FROM payment_transactions
+     WHERE user_id = $1
+       AND LOWER(COALESCE(status, '')) = ANY($2::text[])
+     ORDER BY created_at DESC NULLS LAST, id DESC
+     LIMIT 10`,
+    [userId, ['paid', 'completed', 'success', 'settlement']]
+  );
+
+  for (const tx of completedTxResult.rows || []) {
+    const paymentStatus = normalizeStatus(tx.status || 'paid');
+    const purchaseStatus = mapPaymentStatusToPurchaseStatus(paymentStatus);
+    try {
+      await db.query('BEGIN');
+      await ensureMissingPurchasesFromTransaction(db, tx, paymentStatus);
+      await db.query(
+        `UPDATE purchases
+         SET payment_status = $1::varchar,
+             paid_at = CASE WHEN $1::text = 'completed' THEN COALESCE(paid_at, NOW()) ELSE paid_at END
          WHERE payment_transaction_id = $2`,
         [purchaseStatus, tx.id]
       );
