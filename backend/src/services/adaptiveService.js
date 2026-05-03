@@ -1,10 +1,23 @@
 const supabase = require('../config/supabase');
 const CORE_TOPICS = new Set(['TWK', 'TIU', 'TKP']);
 
+const buildPackageNameMap = async (packageIds = []) => {
+  const normalizedIds = [...new Set((packageIds || []).map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!normalizedIds.length) return new Map();
+
+  const { data, error } = await supabase
+    .from('packages')
+    .select('id, name')
+    .in('id', normalizedIds);
+
+  if (error) return new Map();
+  return new Map((data || []).map((row) => [Number(row.id), String(row.name || '').trim()]));
+};
+
 const getLatestNonCorePackageName = async (userId) => {
   const { data: sessions, error } = await supabase
     .from('tryout_sessions')
-    .select('package_id, finished_at, packages(name)')
+    .select('package_id, finished_at')
     .eq('user_id', userId)
     .eq('status', 'completed')
     .order('finished_at', { ascending: false })
@@ -12,10 +25,12 @@ const getLatestNonCorePackageName = async (userId) => {
 
   if (error) return '';
 
+  const packageNameMap = await buildPackageNameMap((sessions || []).map((row) => row.package_id));
+
   const packageCandidates = (sessions || [])
     .map((row) => ({
       packageId: Number(row.package_id),
-      packageName: String(row?.packages?.name || '').trim(),
+      packageName: String(packageNameMap.get(Number(row.package_id)) || '').trim(),
     }))
     .filter((row) => Number.isInteger(row.packageId) && row.packageId > 0 && row.packageName);
 
@@ -36,17 +51,19 @@ const getLatestNonCorePackageName = async (userId) => {
 };
 
 const getLatestCompletedPackageName = async (userId) => {
-  const { data, error } = await supabase
+  const { data: sessions, error } = await supabase
     .from('tryout_sessions')
-    .select('packages(name)')
+    .select('package_id, finished_at')
     .eq('user_id', userId)
     .eq('status', 'completed')
     .order('finished_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
 
   if (error) return '';
-  return String(data?.packages?.name || '').trim();
+  const topSession = (sessions || [])[0];
+  if (!topSession?.package_id) return '';
+  const packageNameMap = await buildPackageNameMap([topSession.package_id]);
+  return String(packageNameMap.get(Number(topSession.package_id)) || '').trim();
 };
 
 const toDisplayTopic = (topic, fallbackPackageName = '') => {

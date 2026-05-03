@@ -14,6 +14,19 @@ const normalizeReportTopic = (category, packageName) => {
   return safePackageName || 'LAINNYA';
 };
 
+const buildPackageNameMap = async (packageIds = []) => {
+  const normalizedIds = [...new Set((packageIds || []).map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!normalizedIds.length) return new Map();
+
+  const { data, error } = await supabase
+    .from('packages')
+    .select('id, name')
+    .in('id', normalizedIds);
+
+  if (error) return new Map();
+  return new Map((data || []).map((row) => [Number(row.id), String(row.name || '').trim()]));
+};
+
 const toMinutes = (startedAt, finishedAt) => {
   if (!startedAt || !finishedAt) return null;
   return Math.max(0, Math.round((new Date(finishedAt).getTime() - new Date(startedAt).getTime()) / 60000));
@@ -203,7 +216,7 @@ router.get('/analytics', authenticateToken, async (req, res) => {
 
     const { data: sessions, error: sessionsError } = await supabase
       .from('tryout_sessions')
-      .select('id, package_id, total_score, status, packages(name)')
+      .select('id, package_id, total_score, status')
       .eq('user_id', userId)
       .eq('status', 'completed');
 
@@ -230,7 +243,8 @@ router.get('/analytics', authenticateToken, async (req, res) => {
 
     const statsByTopic = new Map();
 
-    const sessionPackageNameMap = new Map((sessions || []).map((session) => [Number(session.id), String(session?.packages?.name || '').trim()]));
+    const packageNameMap = await buildPackageNameMap((sessions || []).map((session) => session.package_id));
+    const sessionPackageNameMap = new Map((sessions || []).map((session) => [Number(session.id), String(packageNameMap.get(Number(session.package_id)) || '').trim()]));
 
     latestAnswers.forEach((answer) => {
       const topic = normalizeReportTopic(answer.questions?.category, sessionPackageNameMap.get(Number(answer.session_id)));
