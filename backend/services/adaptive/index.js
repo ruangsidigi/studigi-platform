@@ -7,6 +7,15 @@ const requireAuth = (req, res, next) => {
   return next();
 };
 
+const CORE_TOPICS = new Set(['TWK', 'TIU', 'TKP']);
+
+const normalizePackageTopic = (category, packageName) => {
+  const normalizedCategory = String(category || '').trim().toUpperCase();
+  if (CORE_TOPICS.has(normalizedCategory)) return normalizedCategory;
+  const safePackageName = String(packageName || '').trim();
+  return safePackageName || 'LAINNYA';
+};
+
 const safeQuery = async (db, queryText, params = []) => {
   try {
     const result = await db.query(queryText, params);
@@ -50,19 +59,25 @@ const computeAdaptiveFromSessions = async (db, userId) => {
     const sessionIds = sessionRows.map((s) => Number(s.id));
     const catAgg = await safeQuery(
       db,
-      `SELECT q.category,
+      `SELECT CASE
+                WHEN UPPER(COALESCE(q.category, '')) IN ('TWK', 'TIU', 'TKP')
+                  THEN UPPER(COALESCE(q.category, ''))
+                ELSE COALESCE(NULLIF(TRIM(p.name), ''), 'LAINNYA')
+              END AS topic,
               COUNT(*)::int AS total_answered,
               SUM(CASE WHEN a.is_correct = true THEN 1 ELSE 0 END)::int AS correct_count
        FROM tryout_answers a
+       JOIN tryout_sessions ts ON ts.id = a.session_id
        JOIN questions q ON q.id = a.question_id
+       LEFT JOIN packages p ON p.id = ts.package_id
        WHERE a.session_id = ANY($1::int[])
-       GROUP BY q.category`,
+       GROUP BY 1`,
       [sessionIds]
     );
     categoryData = catAgg
       .filter((row) => Number(row.total_answered || 0) > 0)
       .map((row) => ({
-        topic: String(row.category || '').toUpperCase(),
+        topic: String(row.topic || 'LAINNYA').trim(),
         skillScore: Math.round((Number(row.correct_count || 0) / Number(row.total_answered)) * 100),
       }));
   }
@@ -142,7 +157,7 @@ router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
     }
 
     const progressChart = sourceRows.map((row) => ({
-      topic: row.topic,
+      topic: normalizePackageTopic(row.topic, row.package_name),
       skillScore: Number(row.skill_score || 0),
     }));
 
@@ -153,7 +168,7 @@ router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
         return Number(row.skill_score || 0) < 70;
       })
       .map((row) => ({
-        topic: row.topic,
+        topic: normalizePackageTopic(row.topic, row.package_name),
         skill_score: Number(row.skill_score || 0),
         weakness_level: row.weakness_level || (Number(row.skill_score || 0) < 55 ? 'high' : 'medium'),
       }));
@@ -171,7 +186,7 @@ router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
 
     const recommendedNextAction = recommendationRows.map((row) => ({
       id: row.id,
-      topic: row.topic,
+      topic: normalizePackageTopic(row.topic, row.package_name),
       recommendation_type: row.recommendation_type || 'review',
       reason: row.reason || 'Lanjutkan latihan bertahap pada topik ini.',
       priority: row.priority || 1,
@@ -187,7 +202,7 @@ router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
 
       return {
         priority: index + 1,
-        topic: row.topic,
+        topic: normalizePackageTopic(row.topic, row.package_name),
         action,
         targetAccuracy: Math.min(95, Math.max(70, Math.round(Number(row.accuracy || 0) * 100) + 10)),
       };

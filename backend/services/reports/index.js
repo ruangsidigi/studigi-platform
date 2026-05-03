@@ -8,6 +8,14 @@ const requireAuth = (req, res, next) => {
 };
 
 const asNumber = (value) => Number(value || 0);
+const CORE_TOPICS = new Set(['TWK', 'TIU', 'TKP']);
+
+const normalizeReportTopic = (category, packageName) => {
+  const normalizedCategory = String(category || '').trim().toUpperCase();
+  if (CORE_TOPICS.has(normalizedCategory)) return normalizedCategory;
+  const safePackageName = String(packageName || '').trim();
+  return safePackageName || 'LAINNYA';
+};
 
 const mapLatestAnswers = (rows) => {
   const latestByQuestion = new Map();
@@ -186,9 +194,12 @@ router.get('/reports/analytics', requireAuth, async (req, res) => {
     try {
       const answersResult = await db.query(
         `SELECT a.session_id, a.question_id, a.user_answer, a.is_correct, a.submitted_at,
-                q.category, q.correct_answer, q.point_a, q.point_b, q.point_c, q.point_d, q.point_e
+                q.category, q.correct_answer, q.point_a, q.point_b, q.point_c, q.point_d, q.point_e,
+                p.name AS package_name
          FROM tryout_answers a
          LEFT JOIN questions q ON q.id = a.question_id
+         LEFT JOIN tryout_sessions ts ON ts.id = a.session_id
+         LEFT JOIN packages p ON p.id = ts.package_id
          WHERE a.session_id = ANY($1::int[])`,
         [sessionIds]
       );
@@ -207,9 +218,11 @@ router.get('/reports/analytics', requireAuth, async (req, res) => {
       hasTkpPointColumns = false;
       const fallbackAnswers = await db.query(
         `SELECT a.session_id, a.question_id, a.user_answer, a.is_correct, a.submitted_at,
-                q.category, q.correct_answer
+                q.category, q.correct_answer, p.name AS package_name
          FROM tryout_answers a
          LEFT JOIN questions q ON q.id = a.question_id
+         LEFT JOIN tryout_sessions ts ON ts.id = a.session_id
+         LEFT JOIN packages p ON p.id = ts.package_id
          WHERE a.session_id = ANY($1::int[])`,
         [sessionIds]
       );
@@ -219,7 +232,7 @@ router.get('/reports/analytics', requireAuth, async (req, res) => {
     const latestAnswers = mapLatestAnswers(answersRows);
     const topicMap = new Map();
     for (const item of latestAnswers) {
-      const topic = String(item.category || 'LAINNYA').toUpperCase();
+      const topic = normalizeReportTopic(item.category, item.package_name);
       const current = topicMap.get(topic) || { topic, total: 0, correct: 0, wrong: 0, tkpPoints: 0, tkpMax: 0 };
       current.total += 1;
 
@@ -346,7 +359,7 @@ router.get('/reports/:attemptId(\\d+)', requireAuth, async (req, res) => {
     const review = answers.map((item) => ({
       questionId: item.question_id,
       questionNumber: item.number,
-      category: String(item.category || 'LAINNYA').toUpperCase(),
+      category: normalizeReportTopic(item.category, attempt.package_name),
       userAnswer: item.user_answer,
       correctAnswer: item.correct_answer,
       isCorrect: item.is_correct,
@@ -398,8 +411,10 @@ router.get('/reports/attempt/:attemptId/question/:questionNumber', requireAuth, 
       `SELECT a.user_answer, a.is_correct,
               q.number AS question_number, q.category, q.question_text, q.image_url,
               q.option_a, q.option_b, q.option_c, q.option_d, q.option_e,
-              q.correct_answer, q.explanation
+          q.correct_answer, q.explanation,
+          p.name AS package_name
        FROM tryout_sessions ts
+        LEFT JOIN packages p ON p.id = ts.package_id
        JOIN questions q ON q.package_id = ts.package_id
        LEFT JOIN tryout_answers a ON a.session_id = ts.id AND a.question_id = q.id
        WHERE ts.id = $1 AND ts.user_id = $2 AND q.number = $3
@@ -413,7 +428,7 @@ router.get('/reports/attempt/:attemptId/question/:questionNumber', requireAuth, 
 
     return res.json({
       question_number: row.question_number,
-      category: String(row.category || 'LAINNYA').toUpperCase(),
+      category: normalizeReportTopic(row.category, row.package_name),
       question_text: row.question_text,
       image_url: row.image_url || null,
       options: [
