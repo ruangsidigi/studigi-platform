@@ -9,6 +9,7 @@ const requireAuth = (req, res, next) => {
 
 const asNumber = (value) => Number(value || 0);
 const CORE_CATEGORIES = new Set(['TWK', 'TIU', 'TKP']);
+const isTkpCategory = (category) => String(category || '').toUpperCase() === 'TKP';
 
 const latestAnswerMapByQuestionId = (answers) => {
   const map = new Map();
@@ -85,10 +86,10 @@ router.get('/reviews/attempt/:attemptId', requireAuth, async (req, res) => {
 
       let status = 'unanswered';
       if (userAnswer) {
-        if (category === 'TWK' || category === 'TIU') {
-          status = String(userAnswer).toUpperCase() === String(correctAnswer || '').toUpperCase() ? 'correct' : 'incorrect';
-        } else if (category === 'TKP') {
+        if (isTkpCategory(category)) {
           status = 'partial';
+        } else {
+          status = String(userAnswer).toUpperCase() === String(correctAnswer || '').toUpperCase() ? 'correct' : 'incorrect';
         }
       }
 
@@ -171,7 +172,7 @@ router.get('/reviews/attempt/:attemptId/question/:questionNumber', requireAuth, 
     const category = String(question.category || '').toUpperCase();
 
     let isCorrect = null;
-    if (category === 'TWK' || category === 'TIU') {
+    if (!isTkpCategory(category)) {
       isCorrect = userAnswer ? String(userAnswer).toUpperCase() === String(question.correct_answer || '').toUpperCase() : false;
     }
 

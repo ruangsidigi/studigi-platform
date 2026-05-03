@@ -29,6 +29,10 @@ const getSelectedOptionPoint = (row, answer) => {
   return Number(row?.[key] ?? 0) || 0;
 };
 
+const isTkpCategory = (category) => String(category || '').toUpperCase() === 'TKP';
+
+const isObjectiveCategory = (category) => !isTkpCategory(category);
+
 const hasManualPointConfig = (row) => {
   const keys = ['point_a', 'point_b', 'point_c', 'point_d', 'point_e'];
   return keys.some((key) => row?.[key] !== null && row?.[key] !== undefined && String(row?.[key]).trim() !== '');
@@ -244,16 +248,19 @@ router.post('/tryouts/submit-answer', requireAuth, async (req, res) => {
 
     const category = String(question.category || '').toUpperCase();
     let isCorrect = null;
-    if (category === 'TWK' || category === 'TIU') {
+    if (isObjectiveCategory(category)) {
       isCorrect = selectedAnswer === String(question.correct_answer || '').toUpperCase();
     }
 
+    await db.query('BEGIN');
+    await db.query('DELETE FROM tryout_answers WHERE session_id = $1 AND question_id = $2', [sessionId, questionId]);
     const answerResult = await db.query(
       `INSERT INTO tryout_answers (session_id, question_id, user_answer, is_correct, submitted_at)
        VALUES ($1, $2, $3, $4, NOW())
        RETURNING *`,
       [sessionId, questionId, selectedAnswer, isCorrect]
     );
+    await db.query('COMMIT');
 
     return res.json({
       message: 'Answer submitted',
@@ -261,6 +268,11 @@ router.post('/tryouts/submit-answer', requireAuth, async (req, res) => {
       isCorrect,
     });
   } catch (error) {
+    try {
+      await req.app.locals.db.query('ROLLBACK');
+    } catch (_) {
+      // ignore rollback errors
+    }
     return res.status(500).json({ error: error.message });
   }
 });
@@ -280,16 +292,24 @@ router.post('/tryouts/finish', requireAuth, async (req, res) => {
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
     const answersResult = await db.query(
-      `SELECT a.user_answer, q.category, q.correct_answer, q.point_a, q.point_b, q.point_c, q.point_d, q.point_e
-       FROM tryout_answers a
-       JOIN questions q ON q.id = a.question_id
-       WHERE a.session_id = $1`,
+      `WITH latest_answers AS (
+         SELECT DISTINCT ON (a.question_id)
+           a.question_id,
+           a.user_answer
+         FROM tryout_answers a
+         WHERE a.session_id = $1
+         ORDER BY a.question_id, a.submitted_at DESC NULLS LAST, a.id DESC
+       )
+       SELECT la.user_answer, q.category, q.correct_answer, q.point_a, q.point_b, q.point_c, q.point_d, q.point_e
+       FROM latest_answers la
+       JOIN questions q ON q.id = la.question_id`,
       [sessionId]
     );
 
     let twkPoints = 0;
     let tiuPoints = 0;
     let tkpPoints = 0;
+    let otherPoints = 0;
 
     for (const row of answersResult.rows || []) {
       const category = String(row.category || '').toUpperCase();
@@ -313,10 +333,17 @@ router.post('/tryouts/finish', requireAuth, async (req, res) => {
       } else if (category === 'TKP') {
         const key = `point_${answer.toLowerCase()}`;
         tkpPoints += Number(row[key] || 0);
+      } else {
+        // Categories outside TWK/TIU/TKP are scored like objective questions.
+        if (hasManualPointConfig(row)) {
+          otherPoints += getSelectedOptionPoint(row, answer);
+        } else if (answer && answer === correctAnswer) {
+          otherPoints += 5;
+        }
       }
     }
 
-  const totalScore = Math.round(twkPoints + tiuPoints + tkpPoints);
+  const totalScore = Math.round(twkPoints + tiuPoints + tkpPoints + otherPoints);
 
     // Use package-level pass_score if configured, else standard SKD thresholds
     let isPass;

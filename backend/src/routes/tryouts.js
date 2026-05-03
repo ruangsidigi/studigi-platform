@@ -8,6 +8,10 @@ const adaptiveService = require('../services/adaptiveService');
 const router = express.Router();
 const CORE_CATEGORIES = new Set(['TWK', 'TIU', 'TKP']);
 
+const isTkpCategory = (category) => String(category || '').toUpperCase() === 'TKP';
+
+const isObjectiveCategory = (category) => !isTkpCategory(category);
+
 const getSelectedOptionPoint = (question, answer) => {
   const key = `point_${String(answer || '').toLowerCase()}`;
   return Number(question?.[key] ?? 0) || 0;
@@ -202,14 +206,11 @@ router.post('/submit-answer', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    // Determine correctness: for TWK/TIU use true/false, for TKP leave as null
+    // Determine correctness: non-TKP categories use true/false, TKP leaves null.
     const category = (question.category || '').toUpperCase();
     let isCorrect = null;
-    if (category === 'TWK' || category === 'TIU') {
+    if (isObjectiveCategory(category)) {
       isCorrect = selectedAnswer === question.correct_answer;
-    } else if (category === 'TKP') {
-      // For TKP we intentionally leave is_correct null (no true/false)
-      isCorrect = null;
     }
 
     // Save answer
@@ -345,7 +346,8 @@ router.post('/finish', authenticateToken, async (req, res) => {
     // TKP: each selected option yields its configured point (point_a..point_e)
     let twkPoints = 0,
       tiuPoints = 0,
-      tkpPoints = 0;
+      tkpPoints = 0,
+      otherPoints = 0;
 
     answers.forEach((answer) => {
       const question = answer.questions;
@@ -369,11 +371,18 @@ router.post('/finish', authenticateToken, async (req, res) => {
           const pts = parseFloat(question[key]) || 0;
           tkpPoints += pts;
         }
+      } else {
+        // Categories outside TWK/TIU/TKP are scored like objective questions.
+        if (hasManualPointConfig(question)) {
+          otherPoints += getSelectedOptionPoint(question, answer.user_answer);
+        } else if (answer.user_answer && answer.user_answer === question.correct_answer) {
+          otherPoints += 5;
+        }
       }
     });
 
     // Determine pass/fail using absolute point thresholds
-    const totalScore = Math.round(twkPoints + tiuPoints + tkpPoints);
+    const totalScore = Math.round(twkPoints + tiuPoints + tkpPoints + otherPoints);
 
     // Use package-level pass_score if configured, else standard SKD thresholds
     let isPass;

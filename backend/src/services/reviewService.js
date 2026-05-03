@@ -4,6 +4,7 @@
  */
 
 const supabase = require('../config/supabase');
+const isTkpCategory = (category) => String(category || '').toUpperCase() === 'TKP';
 
 const reviewService = {
   /**
@@ -81,10 +82,10 @@ const reviewService = {
           let status = 'unanswered'; // unanswered, correct, incorrect, partial
           if (!userAnswer) {
             status = 'unanswered';
-          } else if (category === 'TWK' || category === 'TIU') {
-            status = userAnswer === correctAnswer ? 'correct' : 'incorrect';
-          } else if (category === 'TKP') {
+          } else if (isTkpCategory(category)) {
             status = 'partial'; // TKP doesn't have definitive answers
+          } else {
+            status = userAnswer === correctAnswer ? 'correct' : 'incorrect';
           }
 
           return {
@@ -185,7 +186,7 @@ const reviewService = {
         const category = (question.category || '').toUpperCase();
 
         let isCorrect = null;
-        if (category === 'TWK' || category === 'TIU') {
+        if (!isTkpCategory(category)) {
           isCorrect = userAnswer && correctAnswer ? userAnswer === correctAnswer : false;
         }
 
@@ -245,7 +246,7 @@ const reviewService = {
       const category = (q.category || '').toUpperCase();
 
       let isCorrect = null;
-      if (category === 'TWK' || category === 'TIU') {
+      if (!isTkpCategory(category)) {
         isCorrect = userAnswer && correctAnswer ? userAnswer === correctAnswer : false;
       }
 
