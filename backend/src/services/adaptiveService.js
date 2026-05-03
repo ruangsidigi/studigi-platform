@@ -35,6 +35,20 @@ const getLatestNonCorePackageName = async (userId) => {
   return '';
 };
 
+const getLatestCompletedPackageName = async (userId) => {
+  const { data, error } = await supabase
+    .from('tryout_sessions')
+    .select('packages(name)')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .order('finished_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return '';
+  return String(data?.packages?.name || '').trim();
+};
+
 const toDisplayTopic = (topic, fallbackPackageName = '') => {
   const normalizedTopic = String(topic || '').trim();
   if (!normalizedTopic) return fallbackPackageName || 'LAINNYA';
@@ -291,7 +305,7 @@ const getRecommendations = async (userId, limit = 5) => {
     .limit(limit);
 
   if (error) throw new Error(error.message);
-  const fallbackPackageName = await getLatestNonCorePackageName(userId);
+  const fallbackPackageName = (await getLatestNonCorePackageName(userId)) || (await getLatestCompletedPackageName(userId));
   return (data || []).map((item) => {
     const displayTopic = toDisplayTopic(item.topic, fallbackPackageName);
     return {
@@ -334,7 +348,7 @@ const getStudyPlan = async (userId) => {
 };
 
 const getAdaptiveDashboard = async (userId) => {
-  const fallbackPackageName = await getLatestNonCorePackageName(userId);
+  const fallbackPackageName = (await getLatestNonCorePackageName(userId)) || (await getLatestCompletedPackageName(userId));
   const { data: skills, error: skillError } = await supabase
     .from('user_skills')
     .select('topic, skill_score, accuracy, avg_time_ms, total_answered, updated_at')

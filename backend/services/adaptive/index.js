@@ -46,6 +46,21 @@ const getLatestNonCorePackageName = async (db, userId) => {
   return String(rows[0]?.package_name || '').trim();
 };
 
+const getLatestCompletedPackageName = async (db, userId) => {
+  const rows = await safeQuery(
+    db,
+    `SELECT p.name AS package_name
+     FROM tryout_sessions ts
+     JOIN packages p ON p.id = ts.package_id
+     WHERE ts.user_id = $1
+       AND ts.status = 'completed'
+     ORDER BY ts.finished_at DESC NULLS LAST, ts.id DESC
+     LIMIT 1`,
+    [userId]
+  );
+  return String(rows[0]?.package_name || '').trim();
+};
+
 const safeQuery = async (db, queryText, params = []) => {
   try {
     const result = await db.query(queryText, params);
@@ -179,7 +194,9 @@ router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
 
     const sourceRows = performanceRows.length ? performanceRows : fallbackSkillRows;
     const latestNonCorePackageName = await getLatestNonCorePackageName(db, userId);
-    const toDisplayTopic = (topic, packageName) => normalizePackageTopic(topic, packageName || latestNonCorePackageName);
+    const latestAnyPackageName = await getLatestCompletedPackageName(db, userId);
+    const fallbackPackageName = latestNonCorePackageName || latestAnyPackageName;
+    const toDisplayTopic = (topic, packageName) => normalizePackageTopic(topic, packageName || fallbackPackageName);
 
     // No pre-computed data: compute from actual tryout sessions
     if (!sourceRows.length) {
