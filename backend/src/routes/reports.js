@@ -5,6 +5,14 @@ const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 
 const asNumber = (value) => Number(value || 0);
+const CORE_TOPICS = new Set(['TWK', 'TIU', 'TKP']);
+
+const normalizeReportTopic = (category, packageName) => {
+  const normalizedCategory = String(category || '').trim().toUpperCase();
+  if (CORE_TOPICS.has(normalizedCategory)) return normalizedCategory;
+  const safePackageName = String(packageName || '').trim();
+  return safePackageName || 'LAINNYA';
+};
 
 const toMinutes = (startedAt, finishedAt) => {
   if (!startedAt || !finishedAt) return null;
@@ -195,7 +203,7 @@ router.get('/analytics', authenticateToken, async (req, res) => {
 
     const { data: sessions, error: sessionsError } = await supabase
       .from('tryout_sessions')
-      .select('id, package_id, total_score, status')
+      .select('id, package_id, total_score, status, packages(name)')
       .eq('user_id', userId)
       .eq('status', 'completed');
 
@@ -222,8 +230,10 @@ router.get('/analytics', authenticateToken, async (req, res) => {
 
     const statsByTopic = new Map();
 
+    const sessionPackageNameMap = new Map((sessions || []).map((session) => [Number(session.id), String(session?.packages?.name || '').trim()]));
+
     latestAnswers.forEach((answer) => {
-      const topic = (answer.questions?.category || 'LAINNYA').toUpperCase();
+      const topic = normalizeReportTopic(answer.questions?.category, sessionPackageNameMap.get(Number(answer.session_id)));
       const current = statsByTopic.get(topic) || {
         topic,
         total: 0,
@@ -387,7 +397,7 @@ router.get('/:attemptId', authenticateToken, async (req, res) => {
         return {
           questionId: answer.question_id,
           questionNumber: answer.questions?.number,
-          category,
+          category: normalizeReportTopic(category, attempt.packages?.name),
           questionText: answer.questions?.question_text,
           options: {
             A: answer.questions?.option_a,
@@ -498,7 +508,7 @@ router.get('/attempt/:attemptId/question/:questionNumber', authenticateToken, as
 
     res.json({
       question_number: q.number,
-      category,
+      category: normalizeReportTopic(category, attempt.packages?.name),
       question_text: q.question_text,
       image_url: q.image_url || null,
       options: [

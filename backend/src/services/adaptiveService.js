@@ -1,6 +1,56 @@
 const supabase = require('../config/supabase');
 const CORE_TOPICS = new Set(['TWK', 'TIU', 'TKP']);
 
+const getLatestNonCorePackageName = async (userId) => {
+  const { data: sessions, error } = await supabase
+    .from('tryout_sessions')
+    .select('package_id, finished_at, packages(name)')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .order('finished_at', { ascending: false })
+    .limit(20);
+
+  if (error) return '';
+
+  const packageCandidates = (sessions || [])
+    .map((row) => ({
+      packageId: Number(row.package_id),
+      packageName: String(row?.packages?.name || '').trim(),
+    }))
+    .filter((row) => Number.isInteger(row.packageId) && row.packageId > 0 && row.packageName);
+
+  for (const item of packageCandidates) {
+    const { data: questionRows, error: questionError } = await supabase
+      .from('questions')
+      .select('id, category')
+      .eq('package_id', item.packageId)
+      .limit(20);
+
+    const hasNonCoreQuestion = !questionError && (questionRows || []).some((row) => !CORE_TOPICS.has(String(row.category || '').toUpperCase()));
+    if (hasNonCoreQuestion) {
+      return item.packageName;
+    }
+  }
+
+  return '';
+};
+
+const toDisplayTopic = (topic, fallbackPackageName = '') => {
+  const normalizedTopic = String(topic || '').trim();
+  if (!normalizedTopic) return fallbackPackageName || 'LAINNYA';
+  if (CORE_TOPICS.has(normalizedTopic.toUpperCase())) return normalizedTopic.toUpperCase();
+  if (normalizedTopic.toUpperCase() === 'LAINNYA' && fallbackPackageName) return fallbackPackageName;
+  return normalizedTopic;
+};
+
+const replaceTopicInText = (text, originalTopic, displayTopic) => {
+  const rawText = String(text || '');
+  const source = String(originalTopic || '').trim();
+  const target = String(displayTopic || '').trim();
+  if (!rawText || !source || !target || source === target) return rawText;
+  return rawText.split(source).join(target);
+};
+
 const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
 const getTargetTimeByDifficulty = (difficulty) => {
@@ -241,7 +291,15 @@ const getRecommendations = async (userId, limit = 5) => {
     .limit(limit);
 
   if (error) throw new Error(error.message);
-  return data || [];
+  const fallbackPackageName = await getLatestNonCorePackageName(userId);
+  return (data || []).map((item) => {
+    const displayTopic = toDisplayTopic(item.topic, fallbackPackageName);
+    return {
+      ...item,
+      topic: displayTopic,
+      reason: replaceTopicInText(item.reason, item.topic, displayTopic),
+    };
+  });
 };
 
 const getStudyPlan = async (userId) => {
@@ -254,6 +312,7 @@ const getStudyPlan = async (userId) => {
   if (error) throw new Error(error.message);
 
   const plan = (topics || []).map((topic, index) => {
+    const displayTopic = toDisplayTopic(topic.topic, '');
     const action = topic.weakness_level === 'high'
       ? 'Kerjakan 15 soal latihan dasar + review konsep inti'
       : topic.weakness_level === 'medium'
@@ -262,7 +321,7 @@ const getStudyPlan = async (userId) => {
 
     return {
       priority: index + 1,
-      topic: topic.topic,
+      topic: displayTopic,
       skillScore: Number(topic.skill_score || 0),
       weaknessLevel: topic.weakness_level,
       recommendedDifficulty: topic.recommended_difficulty,
@@ -275,6 +334,7 @@ const getStudyPlan = async (userId) => {
 };
 
 const getAdaptiveDashboard = async (userId) => {
+  const fallbackPackageName = await getLatestNonCorePackageName(userId);
   const { data: skills, error: skillError } = await supabase
     .from('user_skills')
     .select('topic, skill_score, accuracy, avg_time_ms, total_answered, updated_at')
@@ -297,14 +357,25 @@ const getAdaptiveDashboard = async (userId) => {
 
   return {
     progressChart: (skills || []).map((item) => ({
-      topic: item.topic,
+      topic: toDisplayTopic(item.topic, fallbackPackageName),
       skillScore: Number(item.skill_score || 0),
       accuracy: Number((Number(item.accuracy || 0) * 100).toFixed(2)),
       avgTimeMs: Number(item.avg_time_ms || 0),
     })),
-    weaknessInsights: weaknesses || [],
-    recommendedNextAction: recommendations,
-    studyPlan,
+    weaknessInsights: (weaknesses || []).map((item) => ({
+      ...item,
+      topic: toDisplayTopic(item.topic, fallbackPackageName),
+    })),
+    recommendedNextAction: (recommendations || []).map((item) => ({
+      ...item,
+      topic: toDisplayTopic(item.topic, fallbackPackageName),
+      reason: replaceTopicInText(item.reason, item.topic, toDisplayTopic(item.topic, fallbackPackageName)),
+    })),
+    studyPlan: (studyPlan || []).map((item) => ({
+      ...item,
+      topic: toDisplayTopic(item.topic, fallbackPackageName),
+      action: replaceTopicInText(item.action, item.topic, toDisplayTopic(item.topic, fallbackPackageName)),
+    })),
   };
 };
 
