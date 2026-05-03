@@ -16,6 +16,36 @@ const normalizePackageTopic = (category, packageName) => {
   return safePackageName || 'LAINNYA';
 };
 
+const rewriteReasonTopic = (reason, originalTopic, displayTopic) => {
+  const text = String(reason || '');
+  if (!text) return text;
+  const source = String(originalTopic || '').trim();
+  const target = String(displayTopic || '').trim();
+  if (!source || !target || source === target) return text;
+  return text.split(source).join(target);
+};
+
+const getLatestNonCorePackageName = async (db, userId) => {
+  const rows = await safeQuery(
+    db,
+    `SELECT p.name AS package_name
+     FROM tryout_sessions ts
+     JOIN packages p ON p.id = ts.package_id
+     WHERE ts.user_id = $1
+       AND ts.status = 'completed'
+       AND EXISTS (
+         SELECT 1
+         FROM questions q
+         WHERE q.package_id = ts.package_id
+           AND UPPER(COALESCE(q.category, '')) NOT IN ('TWK', 'TIU', 'TKP')
+       )
+     ORDER BY ts.finished_at DESC NULLS LAST, ts.id DESC
+     LIMIT 1`,
+    [userId]
+  );
+  return String(rows[0]?.package_name || '').trim();
+};
+
 const safeQuery = async (db, queryText, params = []) => {
   try {
     const result = await db.query(queryText, params);
@@ -148,6 +178,8 @@ router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
         );
 
     const sourceRows = performanceRows.length ? performanceRows : fallbackSkillRows;
+    const latestNonCorePackageName = await getLatestNonCorePackageName(db, userId);
+    const toDisplayTopic = (topic, packageName) => normalizePackageTopic(topic, packageName || latestNonCorePackageName);
 
     // No pre-computed data: compute from actual tryout sessions
     if (!sourceRows.length) {
@@ -157,7 +189,7 @@ router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
     }
 
     const progressChart = sourceRows.map((row) => ({
-      topic: normalizePackageTopic(row.topic, row.package_name),
+      topic: toDisplayTopic(row.topic, row.package_name),
       skillScore: Number(row.skill_score || 0),
     }));
 
@@ -168,7 +200,7 @@ router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
         return Number(row.skill_score || 0) < 70;
       })
       .map((row) => ({
-        topic: normalizePackageTopic(row.topic, row.package_name),
+        topic: toDisplayTopic(row.topic, row.package_name),
         skill_score: Number(row.skill_score || 0),
         weakness_level: row.weakness_level || (Number(row.skill_score || 0) < 55 ? 'high' : 'medium'),
       }));
@@ -184,13 +216,16 @@ router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
       [userId]
     );
 
-    const recommendedNextAction = recommendationRows.map((row) => ({
-      id: row.id,
-      topic: normalizePackageTopic(row.topic, row.package_name),
-      recommendation_type: row.recommendation_type || 'review',
-      reason: row.reason || 'Lanjutkan latihan bertahap pada topik ini.',
-      priority: row.priority || 1,
-    }));
+    const recommendedNextAction = recommendationRows.map((row) => {
+      const topic = toDisplayTopic(row.topic, row.package_name);
+      return {
+        id: row.id,
+        topic,
+        recommendation_type: row.recommendation_type || 'review',
+        reason: rewriteReasonTopic(row.reason || 'Lanjutkan latihan bertahap pada topik ini.', row.topic, topic),
+        priority: row.priority || 1,
+      };
+    });
 
     const studyPlan = sourceRows.slice(0, 5).map((row, index) => {
       const weakness = String(row.weakness_level || '').toLowerCase();
@@ -202,7 +237,7 @@ router.get('/adaptive/dashboard', requireAuth, async (req, res) => {
 
       return {
         priority: index + 1,
-        topic: normalizePackageTopic(row.topic, row.package_name),
+        topic: toDisplayTopic(row.topic, row.package_name),
         action,
         targetAccuracy: Math.min(95, Math.max(70, Math.round(Number(row.accuracy || 0) * 100) + 10)),
       };

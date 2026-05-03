@@ -275,10 +275,28 @@ router.post('/submit-answer', authenticateToken, async (req, res) => {
 
     // Adaptive learning update (best effort, does not block tryout flow)
     try {
-      const topic = (question.category || 'General').toUpperCase();
+      const rawTopic = String(question.category || 'General').toUpperCase();
+      let topic = rawTopic;
+      if (!CORE_CATEGORIES.has(rawTopic)) {
+        const { data: sessionPackage } = await supabase
+          .from('tryout_sessions')
+          .select('package_id')
+          .eq('id', sessionId)
+          .single();
+
+        if (sessionPackage?.package_id) {
+          const { data: pkg } = await supabase
+            .from('packages')
+            .select('name')
+            .eq('id', sessionPackage.package_id)
+            .single();
+          topic = String(pkg?.name || '').trim() || rawTopic;
+        }
+      }
+
       let adaptiveIsCorrect = Boolean(isCorrect);
 
-      if (topic === 'TKP') {
+      if (rawTopic === 'TKP') {
         const optionScores = ['a', 'b', 'c', 'd', 'e'].map((key) => Number(question[`point_${key}`] || 0));
         const maxScore = Math.max(...optionScores);
         const selectedPoint = Number(question[`point_${String(selectedAnswer || '').toLowerCase()}`] || 0);

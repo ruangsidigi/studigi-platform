@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const CORE_TOPICS = new Set(['TWK', 'TIU', 'TKP']);
 
 const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
@@ -321,7 +322,7 @@ const backfillAdaptiveFromCompletedTryouts = async (userId) => {
 
   const { data: sessions, error: sessionsError } = await supabase
     .from('tryout_sessions')
-    .select('id')
+    .select('id, package_id, packages(name)')
     .eq('user_id', userId)
     .eq('status', 'completed')
     .order('finished_at', { ascending: true });
@@ -339,10 +340,12 @@ const backfillAdaptiveFromCompletedTryouts = async (userId) => {
     if (answersError) throw new Error(answersError.message);
 
     for (const answer of answers || []) {
-      const topic = String(answer?.questions?.category || 'General').toUpperCase();
+      const rawCategory = String(answer?.questions?.category || 'General').toUpperCase();
+      const packageName = String(session?.packages?.name || '').trim();
+      const topic = CORE_TOPICS.has(rawCategory) ? rawCategory : (packageName || rawCategory);
       let adaptiveIsCorrect = Boolean(answer.is_correct);
 
-      if (topic === 'TKP') {
+      if (rawCategory === 'TKP') {
         const pointMap = {
           a: Number(answer?.questions?.point_a || 0),
           b: Number(answer?.questions?.point_b || 0),
