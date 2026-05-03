@@ -1,4 +1,6 @@
 const express = require('express');
+const axios = require('axios');
+const config = require('../../shared/config');
 
 const router = express.Router();
 
@@ -23,9 +25,119 @@ const requireAdmin = (req, res, next) => {
   return next();
 };
 
+const normalizeStatus = (status) => String(status || '').toLowerCase();
+
+const mapMidtransStatusToPaymentStatus = (transactionStatus, fraudStatus) => {
+  const normalizedTransactionStatus = normalizeStatus(transactionStatus);
+  const normalizedFraudStatus = normalizeStatus(fraudStatus);
+
+  if (normalizedTransactionStatus === 'capture') {
+    if (normalizedFraudStatus === 'challenge') return 'pending';
+    return 'paid';
+  }
+
+  if (normalizedTransactionStatus === 'settlement') return 'paid';
+  if (normalizedTransactionStatus === 'pending') return 'pending';
+  if (normalizedTransactionStatus === 'expire') return 'expired';
+  if (normalizedTransactionStatus === 'cancel') return 'cancelled';
+  if (['deny', 'failure'].includes(normalizedTransactionStatus)) return 'failed';
+
+  return 'pending';
+};
+
+const mapPaymentStatusToPurchaseStatus = (status) => {
+  if (['paid', 'success', 'completed'].includes(status)) return 'completed';
+  if (['failed', 'expired', 'cancelled', 'canceled'].includes(status)) return 'failed';
+  return 'pending';
+};
+
+const getMidtransStatusEndpoint = (reference) => {
+  const base = config.midtransIsProduction
+    ? 'https://api.midtrans.com/v2'
+    : 'https://api.sandbox.midtrans.com/v2';
+  return `${base}/${encodeURIComponent(reference)}/status`;
+};
+
+const getMidtransAuthHeader = () =>
+  `Basic ${Buffer.from(`${config.midtransServerKey}:`).toString('base64')}`;
+
+const reconcilePendingMidtransPayments = async (db, userId) => {
+  if (!config.midtransServerKey) return;
+
+  const pendingTxResult = await db.query(
+    `SELECT id, provider_reference, status
+     FROM payment_transactions
+     WHERE user_id = $1
+       AND LOWER(COALESCE(provider, '')) = 'midtrans'
+       AND LOWER(COALESCE(status, 'pending')) = 'pending'
+       AND provider_reference IS NOT NULL
+     ORDER BY created_at DESC NULLS LAST, id DESC
+     LIMIT 5`,
+    [userId]
+  );
+
+  const pendingTxRows = pendingTxResult.rows || [];
+  if (!pendingTxRows.length) return;
+
+  for (const tx of pendingTxRows) {
+    const reference = String(tx.provider_reference || '').trim();
+    if (!reference) continue;
+
+    try {
+      const response = await axios.get(getMidtransStatusEndpoint(reference), {
+        headers: {
+          Accept: 'application/json',
+          Authorization: getMidtransAuthHeader(),
+        },
+        timeout: 10000,
+      });
+
+      const body = response?.data || {};
+      const paymentStatus = mapMidtransStatusToPaymentStatus(body.transaction_status, body.fraud_status);
+      const purchaseStatus = mapPaymentStatusToPurchaseStatus(paymentStatus);
+      const normalizedCurrent = normalizeStatus(tx.status);
+      const normalizedNext = normalizeStatus(paymentStatus);
+
+      if (normalizedCurrent === normalizedNext) continue;
+
+      await db.query('BEGIN');
+      await db.query(
+        `UPDATE payment_transactions
+         SET status = $1::varchar,
+             paid_at = CASE WHEN $1::text IN ('paid', 'success', 'completed') THEN NOW() ELSE paid_at END,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [paymentStatus, tx.id]
+      );
+      await db.query(
+        `UPDATE purchases
+         SET payment_status = $1::varchar,
+             paid_at = CASE WHEN $1::text = 'completed' THEN NOW() ELSE paid_at END
+         WHERE payment_transaction_id = $2`,
+        [purchaseStatus, tx.id]
+      );
+      await db.query('COMMIT');
+    } catch (_) {
+      try {
+        await db.query('ROLLBACK');
+      } catch (rollbackError) {
+        // ignore rollback errors
+      }
+    }
+  }
+};
+
 router.get('/purchases', requireAuth, async (req, res) => {
   try {
     const db = req.app.locals.db;
+
+    // Self-heal missed webhook cases: reconcile a few recent pending Midtrans payments.
+    try {
+      await reconcilePendingMidtransPayments(db, req.user.id);
+    } catch (_) {
+      // Keep purchases endpoint resilient even if reconciliation fails.
+    }
+
     const result = await db.query(
       `SELECT p.*, pkg.id AS package_ref_id, pkg.name AS package_name, pkg.type AS package_type
        FROM purchases p

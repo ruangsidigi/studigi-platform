@@ -35,6 +35,37 @@ const normalizePackageIds = (packageIds) => {
 
 const normalizeStatus = (status) => String(status || '').toLowerCase();
 
+const parseJsonSafe = (value) => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return null;
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    return null;
+  }
+};
+
+const normalizeIdList = (raw) => {
+  if (Array.isArray(raw)) {
+    return raw.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  if (typeof raw === 'string') {
+    const parsed = parseJsonSafe(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+    }
+
+    return raw
+      .split(',')
+      .map((part) => Number(String(part).trim()))
+      .filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  return [];
+};
+
 const mapPaymentStatusToPurchaseStatus = (status) => {
   if (['paid', 'success', 'completed'].includes(status)) return 'completed';
   if (['failed', 'expired', 'cancelled', 'canceled'].includes(status)) return 'failed';
@@ -122,6 +153,58 @@ const getPaymentCallbackUrls = () => {
     error: `${frontendBaseUrl}/dashboard?payment=failed`,
     pending: `${frontendBaseUrl}/dashboard?payment=pending`,
   };
+};
+
+const ensurePurchasesForPaymentTransaction = async (db, paymentTransaction) => {
+  const tx = paymentTransaction || {};
+  const txId = Number(tx.id);
+  const userId = Number(tx.user_id);
+  if (!Number.isInteger(txId) || txId <= 0 || !Number.isInteger(userId) || userId <= 0) {
+    return { inserted: 0 };
+  }
+
+  const metadata = parseJsonSafe(tx.metadata) || {};
+  const packageIds = normalizeIdList(metadata.package_ids);
+  if (!packageIds.length) return { inserted: 0 };
+
+  const existingResult = await db.query(
+    `SELECT package_id
+     FROM purchases
+     WHERE payment_transaction_id = $1`,
+    [txId]
+  );
+
+  const existingPackageIds = new Set(
+    (existingResult.rows || [])
+      .map((row) => Number(row.package_id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  );
+
+  const missingPackageIds = packageIds.filter((id) => !existingPackageIds.has(id));
+  if (!missingPackageIds.length) return { inserted: 0 };
+
+  const purchaseStatus = mapPaymentStatusToPurchaseStatus(normalizeStatus(tx.status || 'pending'));
+  const totalAmount = Number(tx.total_amount || 0);
+  const perPackageAmount = missingPackageIds.length
+    ? roundMoney(totalAmount / packageIds.length)
+    : 0;
+  const paymentMethod = tx.payment_method || 'midtrans';
+  const paymentReference = tx.provider_reference || null;
+
+  let inserted = 0;
+  for (const packageId of missingPackageIds) {
+    const insertResult = await db.query(
+      `INSERT INTO purchases
+        (user_id, package_id, payment_method, payment_status, total_price, payment_transaction_id, payment_reference, created_at)
+       VALUES
+        ($1, $2, $3, $4, $5, $6, $7, NOW())
+       RETURNING id`,
+      [userId, packageId, paymentMethod, purchaseStatus, perPackageAmount, txId, paymentReference]
+    );
+    inserted += insertResult.rowCount || 0;
+  }
+
+  return { inserted };
 };
 
 let paymentSchemaReady = false;
@@ -598,13 +681,15 @@ router.post('/payments/webhook', async (req, res) => {
     }
 
     const rawStatus = mapMidtransStatusToPaymentStatus(transactionStatus, fraudStatus);
-    const purchaseStatus = mapPaymentStatusToPurchaseStatus(rawStatus);
 
     await db.query('BEGIN');
 
     // Check if payment already processed (idempotency check)
     const existingPaymentResult = await db.query(
-      `SELECT id, status FROM payment_transactions WHERE provider_reference = $1 FOR UPDATE`,
+      `SELECT id, user_id, payment_method, status, total_amount, provider_reference, metadata
+       FROM payment_transactions
+       WHERE provider_reference = $1
+       FOR UPDATE`,
       [reference]
     );
 
@@ -616,14 +701,30 @@ router.post('/payments/webhook', async (req, res) => {
 
     const currentStatus = normalizeStatus(existingPayment.status);
     const newStatus = normalizeStatus(rawStatus);
+    const finalStatuses = ['paid', 'success', 'completed', 'failed', 'expired', 'cancelled'];
 
-    // Idempotency: if already in final state (paid/failed/expired), return success without re-updating
-    if (['paid', 'success', 'completed', 'failed', 'expired', 'cancelled'].includes(currentStatus)) {
-      if (currentStatus === newStatus) {
-        await db.query('ROLLBACK');
-        return res.status(200).json({ message: 'Webhook already processed (idempotent)', payment_id: existingPayment.id });
-      }
+    // Self-heal: re-create missing purchase rows from tx metadata if needed.
+    await ensurePurchasesForPaymentTransaction(db, existingPayment);
+
+    // Idempotency: if transaction already reached final state, do not downgrade.
+    if (finalStatuses.includes(currentStatus)) {
+      const purchaseStatus = mapPaymentStatusToPurchaseStatus(currentStatus);
+      await db.query(
+        `UPDATE purchases
+         SET payment_status = $1::varchar,
+             paid_at = CASE WHEN $1::text = 'completed' THEN COALESCE(paid_at, NOW()) ELSE paid_at END
+         WHERE payment_transaction_id = $2`,
+        [purchaseStatus, existingPayment.id]
+      );
+
+      await db.query('COMMIT');
+      return res.status(200).json({
+        message: currentStatus === newStatus ? 'Webhook already processed (idempotent)' : 'Webhook ignored (final state preserved)',
+        payment_id: existingPayment.id,
+      });
     }
+
+    const purchaseStatus = mapPaymentStatusToPurchaseStatus(rawStatus);
 
     const paymentResult = await db.query(
       `UPDATE payment_transactions
