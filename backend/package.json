@@ -9,6 +9,7 @@
     "migrate": "node scripts/run_migrations_local.js",
     "seed:admin": "node scripts/seed_admin.js",
     "fix:library:access": "node scripts/fix_user_library_access.js",
+    "reconcile:library": "node scripts/reconcile_library_access.js",
     "seed:reviews": "node scripts/seed_dummy_reviews.js",
     "seed:ranking:tryout6": "node scripts/seed_dummy_ranking_tryout6.js",
     "sync:ranking:provinces": "node scripts/sync_dummy_ranking_provinces.js",
