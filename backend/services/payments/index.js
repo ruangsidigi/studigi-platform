@@ -652,13 +652,19 @@ router.post('/payments/:id/confirm', requireAuth, async (req, res) => {
 
 router.post('/payments/webhook', async (req, res) => {
   const db = req.app.locals.db;
+  const ack = (message, extra = {}) =>
+    res.status(200).json({
+      message,
+      received: true,
+      ...extra,
+    });
 
   try {
     if (!config.midtransServerKey) {
-      return res.status(500).json({ error: 'Midtrans is not configured' });
+      // Always ack to prevent provider retries/noise when backend env is temporarily incomplete.
+      return ack('Webhook ignored: Midtrans not configured');
     }
 
-    await ensurePaymentSchema(db);
     const reference = String(req.body?.order_id || '').trim();
     const transactionStatus = String(req.body?.transaction_status || '').trim();
     const fraudStatus = String(req.body?.fraud_status || '').trim();
@@ -667,7 +673,7 @@ router.post('/payments/webhook', async (req, res) => {
     const signatureKey = String(req.body?.signature_key || '').trim().toLowerCase();
 
     if (!reference || !transactionStatus || !statusCode || !grossAmount || !signatureKey) {
-      return res.status(400).json({ error: 'Invalid Midtrans notification payload' });
+      return ack('Webhook ignored: invalid payload');
     }
 
     const expectedSignature = getMidtransSignature({
@@ -677,8 +683,10 @@ router.post('/payments/webhook', async (req, res) => {
     });
 
     if (signatureKey !== expectedSignature) {
-      return res.status(401).json({ error: 'Invalid Midtrans signature' });
+      return ack('Webhook ignored: invalid signature', { order_id: reference });
     }
+
+    await ensurePaymentSchema(db);
 
     const rawStatus = mapMidtransStatusToPaymentStatus(transactionStatus, fraudStatus);
 
@@ -696,7 +704,7 @@ router.post('/payments/webhook', async (req, res) => {
     const existingPayment = existingPaymentResult.rows[0];
     if (!existingPayment) {
       await db.query('ROLLBACK');
-      return res.status(404).json({ error: 'Payment not found' });
+      return ack('Webhook ignored: payment not found', { order_id: reference });
     }
 
     const currentStatus = normalizeStatus(existingPayment.status);
@@ -718,10 +726,10 @@ router.post('/payments/webhook', async (req, res) => {
       );
 
       await db.query('COMMIT');
-      return res.status(200).json({
-        message: currentStatus === newStatus ? 'Webhook already processed (idempotent)' : 'Webhook ignored (final state preserved)',
-        payment_id: existingPayment.id,
-      });
+      return ack(
+        currentStatus === newStatus ? 'Webhook already processed (idempotent)' : 'Webhook ignored (final state preserved)',
+        { payment_id: existingPayment.id }
+      );
     }
 
     const purchaseStatus = mapPaymentStatusToPurchaseStatus(rawStatus);
@@ -748,12 +756,14 @@ router.post('/payments/webhook', async (req, res) => {
 
     await db.query('COMMIT');
 
-    return res.status(200).json({ message: 'Webhook processed', payment_id: payment.id });
+    return ack('Webhook processed', { payment_id: payment.id });
   } catch (error) {
     try {
       await db.query('ROLLBACK');
     } catch (_) {}
-    return res.status(500).json({ error: error.message });
+    console.error('payments webhook error:', error && error.message ? error.message : error);
+    // Prevent Midtrans from repeatedly retrying and spamming error emails.
+    return ack('Webhook accepted for deferred reconciliation');
   }
 });
 
