@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/ops/reconcile-library?limit=500",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 2 * * *"
     }
   ],
   "functions": {
