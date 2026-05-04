@@ -380,6 +380,7 @@ const ratingsRoutes = require('../services/ratings');
 const categoriesRoutes = require('../services/categories');
 const usersRoutes = require('../services/users');
 const vouchersRoutes = require('../services/vouchers');
+const opsRoutes = require('../services/ops');
 const bundlesLegacyRoutes = require('./routes/bundles');
 
 // Mount all service routers under the common `/api` prefix. Service routers
@@ -403,6 +404,7 @@ app.use('/api', ratingsRoutes);
 app.use('/api', categoriesRoutes);
 app.use('/api', usersRoutes);
 app.use('/api', vouchersRoutes);
+app.use('/api', opsRoutes);
 // Keep bundles route mounted statically so it is always included in Vercel bundle.
 app.use('/api/bundles', bundlesLegacyRoutes);
 

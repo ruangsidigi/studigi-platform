@@ -1,5 +1,11 @@
 {
   "version": 2,
+  "crons": [
+    {
+      "path": "/api/ops/reconcile-library?limit=500",
+      "schedule": "*/15 * * * *"
+    }
+  ],
   "functions": {
     "api/index.js": {
       "maxDuration": 60
