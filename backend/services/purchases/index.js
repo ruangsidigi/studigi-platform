@@ -275,7 +275,77 @@ router.get('/purchases', requireAuth, async (req, res) => {
         : null,
     }));
 
-    return res.json(rows);
+    // Fail-safe: if a successful payment transaction exists but purchases rows are missing,
+    // synthesize entries from payment metadata so library still shows owned packages.
+    const existingPackageIds = new Set(
+      rows
+        .map((row) => Number(row.package_id || row.package_ref_id || row.packages?.id))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    );
+
+    const paidStatuses = ['paid', 'completed', 'success', 'settlement'];
+    const txResult = await db.query(
+      `SELECT id, payment_method, status, provider_reference, metadata, created_at
+       FROM payment_transactions
+       WHERE user_id = $1
+         AND LOWER(COALESCE(status, '')) = ANY($2::text[])
+       ORDER BY created_at DESC NULLS LAST, id DESC
+       LIMIT 50`,
+      [req.user.id, paidStatuses]
+    );
+
+    const fallbackFromTransactions = [];
+    const pendingPackageIds = new Set();
+    const txByPackageId = new Map();
+
+    for (const tx of txResult.rows || []) {
+      const txMeta = parseJsonSafe(tx.metadata) || {};
+      const packageIds = normalizeIdList(txMeta.package_ids);
+      for (const packageId of packageIds) {
+        if (existingPackageIds.has(packageId)) continue;
+        if (!txByPackageId.has(packageId)) {
+          txByPackageId.set(packageId, tx);
+          pendingPackageIds.add(packageId);
+        }
+      }
+    }
+
+    if (pendingPackageIds.size > 0) {
+      const packageResult = await db.query(
+        `SELECT id, name, type
+         FROM packages
+         WHERE id = ANY($1::bigint[])`,
+        [[...pendingPackageIds]]
+      );
+      const packageMap = new Map((packageResult.rows || []).map((pkg) => [Number(pkg.id), pkg]));
+
+      for (const packageId of pendingPackageIds) {
+        const tx = txByPackageId.get(packageId);
+        const pkg = packageMap.get(Number(packageId));
+        fallbackFromTransactions.push({
+          id: null,
+          user_id: req.user.id,
+          package_id: Number(packageId),
+          payment_method: tx?.payment_method || 'midtrans',
+          payment_status: mapPaymentStatusToPurchaseStatus(normalizeStatus(tx?.status || 'paid')),
+          total_price: null,
+          payment_transaction_id: tx?.id || null,
+          payment_reference: tx?.provider_reference || null,
+          created_at: tx?.created_at || null,
+          package_ref_id: pkg?.id || Number(packageId),
+          package_name: pkg?.name || `Paket #${packageId}`,
+          package_type: pkg?.type || null,
+          packages: {
+            id: pkg?.id || Number(packageId),
+            name: pkg?.name || `Paket #${packageId}`,
+            type: pkg?.type || null,
+          },
+          source: 'payment_transaction_fallback',
+        });
+      }
+    }
+
+    return res.json([...rows, ...fallbackFromTransactions]);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
