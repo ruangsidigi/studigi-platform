@@ -196,8 +196,14 @@ const ensurePurchasesForPaymentTransaction = async (db, paymentTransaction) => {
     const insertResult = await db.query(
       `INSERT INTO purchases
         (user_id, package_id, payment_method, payment_status, total_price, payment_transaction_id, payment_reference, created_at)
-       VALUES
-        ($1, $2, $3, $4, $5, $6, $7, NOW())
+       SELECT
+        $1, $2, $3, $4, $5, $6, $7, NOW()
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM purchases
+         WHERE payment_transaction_id = $6
+           AND package_id = $2
+       )
        RETURNING id`,
       [userId, packageId, paymentMethod, purchaseStatus, perPackageAmount, txId, paymentReference]
     );

@@ -120,8 +120,14 @@ const ensureMissingPurchasesFromTransaction = async (db, tx, paymentStatusOverri
     const insertResult = await db.query(
       `INSERT INTO purchases
         (user_id, package_id, payment_method, payment_status, total_price, payment_transaction_id, payment_reference, created_at)
-       VALUES
-        ($1, $2, $3, $4, $5, $6, $7, NOW())
+       SELECT
+        $1, $2, $3, $4, $5, $6, $7, NOW()
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM purchases
+         WHERE payment_transaction_id = $6
+           AND package_id = $2
+       )
        RETURNING id`,
       [userId, packageId, paymentMethod, purchaseStatus, perPackageAmount, txId, paymentReference]
     );
@@ -409,7 +415,77 @@ router.get('/purchases/admin/all', requireAdmin, async (req, res) => {
       };
     });
 
-    return res.json(rows);
+    const existingTxIds = new Set(
+      rows
+        .map((row) => Number(row.payment_transaction?.id || row.payment_transaction_id || row.payment_tx_id))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    );
+
+    const txOnlyResult = await db.query(
+      `SELECT
+         pt.id AS payment_tx_id,
+         pt.user_id AS user_ref_id,
+         COALESCE(u.display_name, u.name, u.email) AS user_name,
+         u.email AS user_email,
+         pt.provider_reference AS payment_tx_reference,
+         pt.status AS payment_tx_status,
+         pt.metadata AS payment_tx_metadata,
+         pt.created_at AS payment_tx_created_at
+       FROM payment_transactions pt
+       LEFT JOIN users u ON u.id = pt.user_id
+       WHERE pt.metadata IS NOT NULL
+       ORDER BY pt.created_at DESC NULLS LAST, pt.id DESC`
+    );
+
+    const txOnlyRows = (txOnlyResult.rows || [])
+      .filter((row) => {
+        const txId = Number(row.payment_tx_id);
+        if (!Number.isInteger(txId) || txId <= 0) return false;
+        if (existingTxIds.has(txId)) return false;
+        const metadata = parseJsonSafe(row.payment_tx_metadata) || {};
+        return Boolean(metadata.terms_acceptance);
+      })
+      .map((row) => {
+        const metadata = parseJsonSafe(row.payment_tx_metadata) || {};
+        const termsAcceptance = metadata.terms_acceptance || null;
+        return {
+          id: null,
+          user_id: row.user_ref_id || null,
+          package_id: null,
+          payment_method: row.payment_tx_status || null,
+          payment_status: mapPaymentStatusToPurchaseStatus(normalizeStatus(row.payment_tx_status || 'pending')),
+          total_price: null,
+          payment_transaction_id: row.payment_tx_id,
+          payment_reference: row.payment_tx_reference || null,
+          created_at: row.payment_tx_created_at || null,
+          users: row.user_ref_id
+            ? { id: row.user_ref_id, name: row.user_name, email: row.user_email }
+            : null,
+          packages: null,
+          payment_transaction: {
+            id: row.payment_tx_id,
+            reference: row.payment_tx_reference,
+            status: row.payment_tx_status,
+            terms_acceptance: termsAcceptance
+              ? {
+                  accepted: termsAcceptance.accepted === true,
+                  accepted_at: termsAcceptance.accepted_at || null,
+                  terms_version: termsAcceptance.terms_version || null,
+                  terms_file: termsAcceptance.terms_file || null,
+                }
+              : null,
+          },
+          source: 'payment_transaction_only',
+        };
+      });
+
+    const mergedRows = [...rows, ...txOnlyRows].sort((a, b) => {
+      const aTime = new Date(a?.created_at || 0).getTime() || 0;
+      const bTime = new Date(b?.created_at || 0).getTime() || 0;
+      return bTime - aTime;
+    });
+
+    return res.json(mergedRows);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

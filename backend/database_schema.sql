@@ -110,6 +110,7 @@ CREATE INDEX IF NOT EXISTS idx_questions_package ON questions(package_id);
 CREATE INDEX IF NOT EXISTS idx_purchases_user ON purchases(user_id);
 CREATE INDEX IF NOT EXISTS idx_purchases_package ON purchases(package_id);
 CREATE INDEX IF NOT EXISTS idx_purchases_payment_transaction_id ON purchases(payment_transaction_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_purchases_unique_tx_package ON purchases(payment_transaction_id, package_id) WHERE payment_transaction_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_user_id ON payment_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_status ON payment_transactions(status);
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_reference ON payment_transactions(provider_reference);
