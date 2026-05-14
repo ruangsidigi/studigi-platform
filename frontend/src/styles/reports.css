@@ -7,9 +7,13 @@
 
 .report-page .report-grid-two {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 20px;
+}
+
+.report-page .report-grid-two > .card {
+  min-width: 0;
 }
 
 .report-page .mini-chart {
@@ -21,6 +25,23 @@
   border-radius: 8px;
   padding: 12px;
   overflow-x: auto;
+}
+
+.report-page .report-category-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.report-page .report-category-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.report-page .report-category-table th,
+.report-page .report-category-table td {
+  white-space: normal;
+  word-break: break-word;
 }
 
 .report-page .mini-chart-item {
@@ -101,6 +122,12 @@
 }
 
 @media (max-width: 768px) {
+  .report-page .report-grid-two {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1200px) {
   .report-page .report-grid-two {
     grid-template-columns: 1fr;
   }

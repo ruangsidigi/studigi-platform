@@ -223,7 +223,7 @@ const Reports = () => {
           </div>
 
           <div className="report-grid-two">
-            <div className="card">
+            <div className="card report-progress-card">
               <div className="card-title">Grafik Progres Skor</div>
               <div className="mini-chart">
                 {progressPoints.length === 0 ? (
@@ -241,23 +241,25 @@ const Reports = () => {
               </div>
             </div>
 
-            <div className="card">
+            <div className="card report-category-card">
               <div className="card-title">Statistik per Kategori Tes</div>
-              <table className="admin-table">
-                <thead>
-                  <tr><th>Kategori</th><th>Attempt</th><th>Rata-rata</th><th>Pass Rate</th></tr>
-                </thead>
-                <tbody>
-                  {(overview.categoryStats || []).map((row) => (
-                    <tr key={`cat-${row.categoryId || row.categoryName}`}>
-                      <td>{row.categoryName}</td>
-                      <td>{row.attempts}</td>
-                      <td>{row.averageScore}</td>
-                      <td>{row.passRate}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="report-category-table-wrap">
+                <table className="admin-table report-category-table">
+                  <thead>
+                    <tr><th>Kategori</th><th>Attempt</th><th>Rata-rata</th><th>Pass Rate</th></tr>
+                  </thead>
+                  <tbody>
+                    {(overview.categoryStats || []).map((row) => (
+                      <tr key={`cat-${row.categoryId || row.categoryName}`}>
+                        <td>{row.categoryName}</td>
+                        <td>{row.attempts}</td>
+                        <td>{row.averageScore}</td>
+                        <td>{row.passRate}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
