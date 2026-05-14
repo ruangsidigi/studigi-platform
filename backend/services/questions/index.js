@@ -542,4 +542,23 @@ router.put('/questions/:id', requireAdmin, async (req, res) => {
   }
 });
 
+router.delete('/questions/:id', requireAdmin, async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const questionId = Number(req.params.id);
+    if (!Number.isInteger(questionId)) return res.status(400).json({ error: 'Invalid question id' });
+
+    const result = await db.query(
+      'DELETE FROM questions WHERE id = $1 RETURNING id',
+      [questionId]
+    );
+
+    if (!result.rows[0]) return res.status(404).json({ error: 'Question not found' });
+
+    return res.json({ message: 'Question deleted successfully' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
