@@ -548,12 +548,14 @@ router.delete('/questions/:id', requireAdmin, async (req, res) => {
     const questionId = Number(req.params.id);
     if (!Number.isInteger(questionId)) return res.status(400).json({ error: 'Invalid question id' });
 
-    const result = await db.query(
-      'DELETE FROM questions WHERE id = $1 RETURNING id',
-      [questionId]
-    );
+    // Check question exists first
+    const check = await db.query('SELECT id FROM questions WHERE id = $1', [questionId]);
+    if (!check.rows[0]) return res.status(404).json({ error: 'Question not found' });
 
-    if (!result.rows[0]) return res.status(404).json({ error: 'Question not found' });
+    // Remove related tryout_answers (no CASCADE on this FK)
+    await db.query('DELETE FROM tryout_answers WHERE question_id = $1', [questionId]);
+
+    await db.query('DELETE FROM questions WHERE id = $1', [questionId]);
 
     return res.json({ message: 'Question deleted successfully' });
   } catch (error) {
